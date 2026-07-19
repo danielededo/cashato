@@ -1,0 +1,26 @@
+# Child Application: the data layer (CNPG Cluster + Alembic migration Job).
+# sync-wave 0 — the first component the root app-of-apps rolls out, so the schema
+# exists before services (later waves) start.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Gitea bridge now; switch to public GitHub later (repoURL only).
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/data/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cashato-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

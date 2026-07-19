@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cashato-data
+  annotations:
+    # Created before the namespaced resources below.
+    argocd.argoproj.io/sync-wave: "-1"

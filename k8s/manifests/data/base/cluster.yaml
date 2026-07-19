@@ -1,0 +1,24 @@
+# CloudNativePG Postgres cluster for cashato. Single instance (personal scale,
+# local kind). wal_level=logical is set now so phase D (Debezium/CDC) needs no
+# cluster recreation. The DB `cashato` is owned by cashato_migrator, which the
+# Alembic migration Job connects as to run all DDL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cashato-db
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  instances: 1
+
+  storage:
+    size: 1Gi
+
+  postgresql:
+    parameters:
+      wal_level: logical
+
+  bootstrap:
+    initdb:
+      database: cashato
+      owner: cashato_migrator
