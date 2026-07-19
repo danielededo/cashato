@@ -1,0 +1,97 @@
+# Centralized, multilingual categorization.
+#
+# i18n model:
+# - `category` in the DB is always a stable, language-neutral CODE (e.g.
+#   `dining`), NEVER localized text;
+# - per-language labels all live here, under `categories`: adding a language =
+#   adding a key (e.g. `es:`), no code change;
+# - `rules` are BILINGUAL on input (patterns with IT and EN words), applied to
+#   the normalized description (lowercase, no accents, no punctuation);
+# - `seeds` map each source's NATIVE category to the canonical code (optional
+#   bootstrap only; NOT a runtime resolver -- see categorize.py).
+#
+# Label languages currently supported: it, en.
+
+default: other
+
+# Canonical code -> localized labels (extensible with new languages)
+categories:
+  groceries:     {it: "Spesa",          en: "Groceries"}
+  dining:        {it: "Ristorazione",   en: "Dining"}
+  transport:     {it: "Trasporti",      en: "Transport"}
+  bills:         {it: "Bollette",       en: "Bills & utilities"}
+  subscriptions: {it: "Abbonamenti",    en: "Subscriptions"}
+  salary:        {it: "Stipendio",      en: "Salary"}
+  rent:          {it: "Affitti",        en: "Rent"}
+  health:        {it: "Salute",         en: "Health"}
+  shopping:      {it: "Acquisti",       en: "Shopping"}
+  transfers:     {it: "Trasferimenti",  en: "Transfers"}
+  investments:   {it: "Investimenti",   en: "Investments"}
+  crypto:        {it: "Crypto",         en: "Crypto"}
+  cash:          {it: "Contanti",       en: "Cash"}
+  fees:          {it: "Commissioni",    en: "Fees"}
+  other:         {it: "Altro",          en: "Other"}
+
+# [OPTIONAL / BOOTSTRAP] Map each source's native category -> code.
+# NOT a runtime resolver (open-source choice: don't depend on provider
+# taxonomies, which differ/are inconsistent/often absent). Used only, if
+# explicitly enabled (--use-native-seeds), as a weak signal to bootstrap the
+# training set or for cross-check during evaluation.
+seeds:
+  revolut:
+    "Top up": transfers
+    "Transfers": transfers
+    "Transfer": transfers
+    "Exchange": transfers
+    "Fees": fees
+    "Cashback": other
+    "Groceries": groceries
+    "Restaurants": dining
+    "Transport": transport
+    "Utilities": bills
+    "Investments": investments
+    "General": other
+    "Shopping": shopping
+    "Health": health
+  intesa:
+    "Ristoranti e bar": dining
+    "Generi alimentari e supermercati": groceries
+    "Stipendi e pensioni": salary
+    "Affitti incassati": rent
+    "Pagamento affitti": rent
+    "Bonifici in uscita": transfers
+    "Bonifici in entrata": transfers
+    "Cura della persona": health
+    "Prodotti vista e udito": health
+    "Trasporti e viaggi": transport
+    "Utenze e bollette": bills
+    "Addebiti vari": other
+    "Altre uscite": other
+    "Altre entrate": other
+  trade_republic:
+    # dal campo `category`/`type` del CSV export
+    "TRADING": investments
+    "INTEREST_PAYMENT": investments
+    "CASH": null   # generico: lascia decidere alle regole
+
+# Bilingual rules (IT + EN), evaluated top-down: first match wins.
+# Pattern = regex (IGNORECASE) over the normalized description (lowercase, no
+# accents/punctuation). Convention: STEMS have only the LEADING word-boundary
+# (\b) so they match inflected forms (e.g. \baffitt -> "affitti", "affitto");
+# short/risky words have both boundaries (\bbar\b).
+rules:
+  - {pattern: "\\b(?:dividend|cedol|coupon|etf|ishares|vanguard|msci|savings plan|piano di accumulo|buy trade|sell trade|tax optimisation|investiment)", category: investments}
+  - {pattern: "\\b(?:crypto|bitcoin|ethereum|coinbase|binance)|\\b(?:btc|eth)\\b", category: crypto}
+  - {pattern: "\\b(?:interess|interest)", category: investments}
+  - {pattern: "\\b(?:stipend|salary|payroll|emolument|pension)", category: salary}
+  - {pattern: "\\b(?:affitt|locazion)|\\brent\\b", category: rent}
+  - {pattern: "\\b(?:enel|hera|acea|iren|plenitude|luce|acqua|tari|vodafone|windtre|fastweb|iliad|utilit|bollett)|\\b(?:eni|a2a|gas|tim)\\b", category: bills}
+  - {pattern: "\\b(?:netflix|spotify|disney|youtube|icloud|google one|dropbox|adobe|abbonament|subscription)|\\bprime\\b", category: subscriptions}
+  - {pattern: "\\b(?:trenitalia|italo|atac|uber|freenow|benzin|carburant|ryanair|easyjet|terravision|autostrad|telepass|parcheggi|taxi|transport|trasport)", category: transport}
+  - {pattern: "\\b(?:ristorant|pizzeri|pizza|osteria|trattoria|caffe|mcdonald|burger|kebab|sushi|glovo|deliveroo|just ?eat|restaurant|dining)|\\bbar\\b", category: dining}
+  - {pattern: "\\b(?:esselunga|coop|conad|carrefour|lidl|eurospin|penny|supermercat|grocer|market|aliment)|\\bpam\\b", category: groceries}
+  - {pattern: "\\b(?:farmac|pharmac|dottor|medic|ottic|health|salute|cura della persona)", category: health}
+  - {pattern: "\\b(?:ikea|decathlon|zara|amazon|feltrinelli|salmoiraghi|shopping|acquist)", category: shopping}
+  - {pattern: "\\b(?:preliev|withdrawal|contant)|\\b(?:atm|cash)\\b", category: cash}
+  - {pattern: "\\b(?:commission)|\\b(?:fee|fees)\\b", category: fees}
+  - {pattern: "\\b(?:bonific|transfer|giroconto|topup|top up|ricarica|sepa|incoming|outgoing)", category: transfers}

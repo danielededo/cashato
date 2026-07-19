@@ -1,0 +1,39 @@
+# Single source of truth for the supported sources (banks/brokers).
+# Everything else derives from here: the set of valid sources, content-based
+# detection, per-source defaults. Adding a source = add an entry here + a
+# `libs/parsers/<name>.py` adapter exposing `parse(path)`.
+#
+# In phase C this file becomes a Kubernetes ConfigMap mounted read-only, so a
+# new source/marker can be added without rebuilding the images.
+#
+# `detection`: list of marker groups matched against the file's lowercased head
+# text. A source matches if, for ANY group, ALL its markers are present. The
+# Italian markers match the real (Italian) document text -> keep them in Italian.
+# Order matters (most specific first).
+
+sources:
+  trade_republic:
+    display: "Trade Republic"
+    currency: EUR
+    detection:
+      - ["asset_class", "transaction_id"]
+      - ["trade republic"]
+
+  revolut:
+    display: "Revolut"
+    currency: EUR
+    detection:
+      - ["current accounts summaries"]
+      - ["revolut"]
+      - ["money in/out", "balance"]
+
+  intesa:
+    display: "Intesa Sanpaolo"
+    currency: EUR
+    detection:
+      - ["intesa sanpaolo"]
+      - ["estratto conto"]
+      - ["dettaglio movimenti"]
+      - ["lista movimenti"]
+      - ["data contabile"]
+      - ["operazione", "importo"] # Intesa 13-month XLSX header

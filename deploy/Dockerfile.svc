@@ -1,0 +1,21 @@
+# Immagine condivisa dei servizi (ingest-api, etl-worker, query-api).
+# Il comando specifico e' impostato da docker-compose / k8s.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Dipendenze di sistema minime per pdfplumber
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libjpeg62-turbo libopenjp2-7 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-svc.txt .
+RUN pip install --no-cache-dir -r requirements-svc.txt
+
+COPY libs ./libs
+COPY db ./db
+COPY config ./config
+COPY services ./services
+COPY load.py export.py ./
+
+ENV PYTHONUNBUFFERED=1

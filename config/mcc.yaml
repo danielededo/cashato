@@ -1,0 +1,67 @@
+# Merchant Category Code (ISO 18245) -> codice categoria canonico.
+# Standard e language-agnostic. Presente nel CSV Trade Republic (campo mcc_code);
+# le altre fonti spesso non lo hanno. Resolver deterministico ad alta precisione.
+# Chiave = MCC a 4 cifre (stringa).
+
+# --- alimentari / spesa ---
+"5411": groceries   # supermercati
+"5422": groceries   # macellerie
+"5441": groceries   # dolciumi
+"5451": groceries   # latticini
+"5462": groceries   # panetterie
+"5499": groceries   # alimentari vari
+
+# --- ristorazione ---
+"5811": dining      # catering
+"5812": dining      # ristoranti
+"5813": dining      # bar/locali
+"5814": dining      # fast food
+
+# --- trasporti ---
+"4111": transport   # trasporto locale/pendolari
+"4112": transport   # treni
+"4121": transport   # taxi
+"4131": transport   # autobus
+"4304": transport
+"4411": transport
+"4511": transport   # compagnie aeree
+"4722": transport   # agenzie viaggi
+"4784": transport   # pedaggi
+"5541": transport   # distributori carburante
+"5542": transport   # carburante self-service
+"7512": transport   # noleggio auto
+"7523": transport   # parcheggi
+
+# --- salute ---
+"5912": health      # farmacie
+"8011": health      # medici
+"8021": health      # dentisti
+"8042": health      # ottici
+"8062": health      # ospedali
+
+# --- bollette / utenze / telecom ---
+"4814": bills       # telecom
+"4899": bills       # tv via cavo/streaming
+"4900": bills       # utenze (acqua/gas/luce)
+
+# --- abbonamenti / digitale ---
+"5815": subscriptions  # media digitali
+"5816": subscriptions  # giochi digitali
+"5817": subscriptions  # app software
+"5818": subscriptions
+
+# --- shopping / retail ---
+"5311": shopping    # grandi magazzini
+"5399": shopping
+"5651": shopping    # abbigliamento
+"5691": shopping
+"5732": shopping    # elettronica
+"5734": shopping    # software
+"5735": shopping
+"5999": shopping    # retail vario
+"7995": other       # scommesse
+
+# --- contanti / trasferimenti ---
+"6011": cash        # prelievo ATM
+"6012": transfers   # istituti finanziari
+"4829": transfers   # money transfer

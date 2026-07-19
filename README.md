@@ -1,0 +1,160 @@
+# cashato — bank transaction data platform
+
+Normalizes transactions from multiple banks (Revolut, Trade Republic, Intesa
+Sanpaolo), in heterogeneous formats (CSV/PDF/XLSX), into **one common schema**,
+**deduplicates** them across formats/sources, detects **internal transfers**
+between your own accounts, and **categorizes** them in a provider-agnostic,
+multilingual (IT/EN) way. All processing is **local** — no bank data leaves the
+machine.
+
+## Prerequisites
+
+| Tool | Use | Required |
+|------|-----|:--------:|
+| **Docker + Docker Compose** | local Postgres, NATS | yes |
+| **Python 3.12** | parsers, loader, services, ML | yes |
+| **Ollama** | offline LLM labeling (ML phase) | ML only |
+
+## Quick start
+
+```bash
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt          # or requirements-dev.txt
+docker compose -f deploy/docker-compose.yml up -d postgres
+./.venv/bin/alembic upgrade head                     # schemas bronze/silver/gold
+```
+
+The DB URL is configurable via `DATABASE_URL` (default
+`postgresql+psycopg://cashato:cashato@localhost:5432/cashato`).
+
+## Data ingestion
+
+Put files under `data/<source>/` (`data/` is git-ignored for privacy). Each
+source accepts **multiple formats**; the source is detected by **content**
+(configurable in `config/sources.yaml`), no filename guessing.
+
+| Source | Supported formats |
+|--------|-------------------|
+| Revolut | consolidated CSV · PDF statement |
+| Trade Republic | PDF statement · CSV transaction export |
+| Intesa Sanpaolo | 21 quarterly PDF statements · 13-month PDF/XLSX export |
+
+```bash
+./.venv/bin/python load.py --source revolut        "data/Revolut/consolidated-....csv"
+./.venv/bin/python load.py --source trade_republic "data/trade_republic/Transaction export.csv"
+./.venv/bin/python load.py --source intesa         "data/intesa/....pdf"
+```
+
+The loader is **idempotent**: the same file (or overlapping exports, or different
+formats of the same source) does not create duplicates. The canonical dedup key
+is `hash(account, value_date, amount, occurrence_index)` — format-independent
+(the description, which varies across formats, is not part of the key).
+
+## Categorization (provider-agnostic, multilingual)
+
+The stored category is always a language-neutral **code** (e.g. `dining`);
+per-language labels live in `config/categorie.yaml` (add a language = add a key,
+no code change). Resolver chain (order = priority):
+
+1. **MCC** (`config/mcc.yaml`, ISO 18245) — when the source exposes the code;
+2. **ML model** (embedding kNN, if trained) above a confidence threshold;
+3. **Rules** (bilingual regex, `config/categorie.yaml`) — thin safety net;
+4. `other` fallback.
+
+> Open-source choice: we do **not** depend on providers' native categories
+> (taxonomies differ/are inconsistent/often absent). Canonical labels are ours
+> (rules + local-LLM labeling + user corrections).
+
+## Internal transfers
+
+Money moved between your own accounts creates two legs (−X on account A, +X on
+account B) that are **not spending**. `link_transfers.py` detects the pairs
+(equal opposite amount, different account, close dates, with a same-day/hint
+guard) and tags both legs with a shared `transfer_group`; the GOLD spend views
+exclude them.
+
+```bash
+./.venv/bin/python link_transfers.py        # run after loading
+```
+
+## Unified export
+
+```bash
+./.venv/bin/python export.py --lang it   # -> output/transazioni.csv
+./.venv/bin/python export.py --lang en --out output/transactions_en.csv
+```
+
+## Services (local, docker-compose)
+
+`ingest-api` (upload → NATS) → `etl-worker` (detect → parse → persist) →
+`query-api` (spend aggregates). OpenAPI at `/docs` · `/redoc` · `/openapi.json`;
+probes at `/healthz` · `/readyz`; business API under `/api/v1`.
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d          # full stack
+curl -F "file=@data/.../file.csv" localhost:8000/api/v1/uploads
+curl "localhost:8001/api/v1/summary?lang=en"
+```
+
+## ML pipeline (advanced categorization)
+
+Rules cover part of the transactions; the **long tail** (unseen merchants, e.g.
+"Metro de Madrid") needs world knowledge. A local **LLM** generates canonical
+labels; a lightweight **embedding kNN** classifier (multilingual
+sentence-transformers) is trained on them (fast, no LLM at inference).
+
+### ⚠️ External / manual steps (tracked for reproducibility)
+
+**1. Install Ollama** (local LLM):
+
+```bash
+# (a) official installer (needs sudo)
+curl -fsSL https://ollama.com/install.sh | sh
+# (b) userspace (no sudo): GitHub release tarball (zstd)
+curl -fSL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst \
+  -o ~/.local/ollama.tar.zst
+tar --zstd -xf ~/.local/ollama.tar.zst -C ~/.local   # or decompress via `python -m zstandard`
+export PATH="$HOME/.local/bin:$PATH" && ollama serve &
+```
+
+**2. Pull the model**: `ollama pull qwen2.5:3b` — **3. Verify**: `curl http://localhost:11434/api/tags`.
+
+> Ollama runs **locally**; no data leaves the machine.
+
+### Run the ML pipeline
+
+```bash
+./.venv/bin/python ml/label_llm.py --model qwen2.5:3b --limit 1000   # M1: label the long tail
+./.venv/bin/python ml/train.py --include-rules --stamp "$(date +%Y%m%d-%H%M)"  # M2: train embedding kNN
+./.venv/bin/python ml/recategorize.py                                # M3: apply + measure `other` drop
+```
+
+Metrics are tracked with **MLflow** if installed, otherwise the step is skipped.
+
+## Development
+
+```bash
+make install-dev        # runtime + ruff/mypy/pytest/pre-commit
+make lint && make test  # ruff + unit tests (no DB/data needed)
+```
+
+Verification scripts reconcile each adapter against the statement's declared
+totals: `tests/verify_{revolut,trade_republic,intesa}.py`.
+
+## Repository layout
+
+```
+libs/           config.py (settings/sources loader) · messaging.py (NATS) · transfers.py
+libs/parsers/   base.py (Transaction, Decimal, dedup) · registry.py (auto-wired adapters)
+                revolut.py · trade_republic.py · intesa.py · detect.py · categorize.py
+ml/             label_llm.py (M1) · train.py (M2) · model.py (EmbeddingKNN) · recategorize.py (M3)
+config/         sources.yaml · settings.yaml · categorie.yaml · mcc.yaml   (ConfigMaps in phase C)
+services/       ingest-api · etl-worker · query-api        db/  Alembic migrations + engine
+load.py  export.py  link_transfers.py                      tests/  unit + verification
+deploy/         docker-compose.yml · Dockerfile.svc · k8s/ (phase C, IaC)
+data/  output/  models/   (git-ignored)
+```
+
+## License
+
+MIT — see `LICENSE`. Contributions welcome, see `CONTRIBUTING.md`.

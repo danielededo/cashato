@@ -1,0 +1,21 @@
+# Tunable settings (data, not logic). In phase C this becomes a ConfigMap.
+# Infra endpoints (DATABASE_URL, NATS_URL) stay as env vars / Secrets.
+
+categorization:
+  # minimum model confidence to accept an ML prediction (else rules/default)
+  model_threshold: 0.55
+  # embedding model used by the classifier (sentence-transformers)
+  embed_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  knn_k: 5
+
+transfers:
+  # date window (days) to match an internal transfer between own accounts
+  window_days: 4
+
+uploads:
+  # per-file size cap (bytes); enforced server-side by ingest-api (413 if over)
+  max_file_bytes: 10485760 # 10 MB
+  # max files a client should send in one batch (enforced by the frontend)
+  max_files_per_batch: 50
+  # accepted file extensions (bank statements are PDF / CSV / XLSX)
+  allowed_extensions: [".pdf", ".csv", ".xlsx", ".xls"]

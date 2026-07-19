@@ -1,0 +1,32 @@
+# Minimal single-pod Gitea for the LOCAL GitOps bridge.
+# No HA subcharts: sqlite DB, in-memory session/cache, on-disk level queue.
+# This is a throwaway git remote for Argo CD until the repo goes public on
+# GitHub — at which point only the Argo Application repoURL changes.
+replicaCount: 1
+
+# Disable every bundled HA dependency (all default to enabled in this chart).
+postgresql-ha:
+  enabled: false
+postgresql:
+  enabled: false
+valkey-cluster:
+  enabled: false
+valkey:
+  enabled: false
+
+persistence:
+  enabled: true
+
+gitea:
+  config:
+    database:
+      DB_TYPE: sqlite3
+    session:
+      PROVIDER: memory
+    cache:
+      ADAPTER: memory
+    queue:
+      TYPE: level
+    service:
+      # Single-user bridge: no open sign-ups.
+      DISABLE_REGISTRATION: true

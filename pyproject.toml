@@ -1,0 +1,46 @@
+[project]
+name = "cashato"
+version = "0.1.0"
+description = "Bank transaction data platform: multi-source/format normalization, cross-format dedup, and provider-agnostic multilingual ML categorization."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Daniele De Dominicis" }]
+keywords = ["finance", "bank-statements", "etl", "categorization", "pdf-parsing"]
+
+# Le dipendenze runtime sono elencate in requirements.txt (pin espliciti).
+# Qui teniamo solo metadati e configurazione strumenti.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "data", "output", "models", "mlruns"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]  # lunghezza riga gestita dal formatter
+
+[tool.ruff.lint.isort]
+known-first-party = ["libs", "db", "ml"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI idiom: dependency-injection markers used as argument defaults.
+extend-immutable-calls = [
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Depends",
+    "fastapi.Form",
+    "fastapi.Header",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# gli script di verifica end-to-end richiedono dati/DB reali: esclusi dai test unitari
+addopts = "-q --ignore=tests/verify_revolut.py --ignore=tests/verify_trade_republic.py --ignore=tests/verify_intesa.py"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = "(^data/|^output/|^models/|^\\.venv/)"

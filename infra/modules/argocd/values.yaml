@@ -1,0 +1,12 @@
+# Minimal Argo CD for local kind. Drop components we don't need locally:
+# Dex (no external SSO — use the built-in admin user) and notifications.
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+configs:
+  params:
+    # Serve UI/API over plain HTTP; TLS is terminated upstream (port-forward now,
+    # Envoy Gateway later). Avoids the self-signed-cert friction on kind.
+    server.insecure: true

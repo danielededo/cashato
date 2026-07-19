@@ -1,0 +1,32 @@
+# Dati bancari reali: mai versionati (privacy, vincolo CLAUDE.md)
+/data/
+!/data/.gitkeep
+
+# Output generati
+/output/
+!/output/.gitkeep
+
+# Artefatti modello ML (versionati altrove: MLflow/registry)
+/models/
+/mlruns/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Ambiente
+.env
+*.local
+
+# IaC / stato
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# kubeconfig generato dal provider kind (contiene certificati/chiavi del cluster)
+/infra/cashato-config
+/infra/*-config

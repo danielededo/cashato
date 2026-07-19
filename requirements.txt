@@ -1,0 +1,36 @@
+# Core parsing / ETL
+pdfplumber==0.11.4
+pandas==2.2.3
+pyyaml==6.0.2
+python-dateutil==2.9.0.post0
+
+# DB / persistenza
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3
+alembic==1.14.0
+
+# Test
+pytest==8.3.4
+openpyxl==3.1.5
+
+# ML (Fase ML)
+scikit-learn==1.6.0
+joblib==1.4.2
+mlflow==2.19.0
+# Classificatore a embedding (locale, multilingua). Per contenere il peso ed
+# evitare contesa VRAM con Ollama, installare torch CPU-only PRIMA:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers==3.3.1
+# Usato una tantum per estrarre il tarball di Ollama (.tar.zst) senza il binario zstd
+zstandard==0.23.0
+
+# Servizi (Fase B)
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+nats-py==2.9.0
+httpx==0.28.1
+
+# Observability
+prometheus-client==0.21.1
+prometheus-fastapi-instrumentator==7.0.0
