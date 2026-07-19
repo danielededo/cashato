@@ -6,5 +6,5 @@ resources:
 
 # Central place to swap the image (kind-loaded now; Harbor tag in C7).
 images:
-  - name: cashato/svc
+  - name: cashato/migrate
     newTag: dev

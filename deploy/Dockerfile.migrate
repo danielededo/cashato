@@ -1,0 +1,17 @@
+# Lightweight image for running Alembic migrations as a one-shot Job.
+# Kept separate from Dockerfile.svc so the service images stay free of alembic.
+# Migrations need only alembic + SQLAlchemy + psycopg and the db/ package
+# (env.py uses target_metadata=None, so no models/config are imported).
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    alembic==1.14.0 \
+    SQLAlchemy==2.0.36 \
+    "psycopg[binary]==3.2.3"
+
+COPY db ./db
+COPY alembic.ini ./
+
+ENV PYTHONUNBUFFERED=1

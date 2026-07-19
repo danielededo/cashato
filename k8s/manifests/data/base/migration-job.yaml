@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       initContainers:
         - name: wait-db
-          image: cashato/svc:dev
+          image: cashato/migrate:dev
           imagePullPolicy: IfNotPresent
           command:
             - python
@@ -45,7 +45,7 @@ spec:
                 secretKeyRef: { name: cashato-db-app, key: password }
       containers:
         - name: alembic
-          image: cashato/svc:dev
+          image: cashato/migrate:dev
           imagePullPolicy: IfNotPresent
           workingDir: /app
           command: ["alembic", "upgrade", "head"]
