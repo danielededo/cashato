@@ -5,5 +5,8 @@ module "gitea" {
   source        = "./modules/gitea"
   chart_version = local.chart_versions.gitea
 
+  admin_username = var.git_bridge_username
+  admin_password = var.git_bridge_password
+
   depends_on = [module.cilium]
 }

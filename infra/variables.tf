@@ -11,3 +11,25 @@ variable "node_image" {
   type        = string
   default     = "kindest/node:v1.32.0"
 }
+
+# --- Local GitOps bridge (Gitea) credentials ---
+# Shared by the Gitea admin account and the Argo CD repository Secret so both
+# sides of the bridge use the same login. Local-only, temporary until GitHub.
+variable "git_bridge_username" {
+  description = "Username for the Gitea admin / Argo CD repo credential."
+  type        = string
+  default     = "cashato"
+}
+
+variable "git_bridge_password" {
+  description = "Password for the Gitea admin / Argo CD repo credential (local bridge)."
+  type        = string
+  default     = "cashato-admin-pw"
+  sensitive   = true
+}
+
+variable "git_bridge_repo" {
+  description = "Repository name pushed to Gitea for GitOps."
+  type        = string
+  default     = "cashato"
+}
