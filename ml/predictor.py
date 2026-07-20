@@ -41,6 +41,10 @@ class CategorizerModel(kserve.Model):
         self._model = load_champion()
         if self._model is None:
             raise RuntimeError("no @champion model in the MLflow registry")
+        # Warm up: force the (lazy) embedding model to load now, at startup, so the
+        # readiness probe only passes once the pod can serve fast — no 20s cold
+        # start on the first real request.
+        self._model.predict_batch(["warmup"])
         self.ready = True
 
     def predict(self, payload: dict, headers: dict | None = None) -> dict:
