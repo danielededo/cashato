@@ -1,10 +1,14 @@
 # Pool of IPs Cilium LB IPAM hands out to type=LoadBalancer services (the Envoy
-# Gateway proxy). A small block at the TOP of the kind docker network
+# Gateway proxy). A small range at the TOP of the kind docker network
 # (172.19.0.0/16) — docker allocates node IPs from the bottom, so this stays free.
+# start/stop (not a /28 CIDR) so we skip the network (.0) and broadcast (.15)
+# addresses: traffic to a .0 network address is dropped by the stack even though
+# Cilium ARP-announces it, which silently breaks reachability.
 apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
 metadata:
   name: cashato-lb-pool
 spec:
   blocks:
-    - cidr: "172.19.255.0/28"
+    - start: "172.19.255.1"
+      stop: "172.19.255.14"
