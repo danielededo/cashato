@@ -1,0 +1,63 @@
+# Per-schema GRANTs for the least-privilege app roles (C5). CNPG creates the
+# roles + passwords (spec.managed.roles); it does NOT manage table/schema grants,
+# so this Job applies them. Runs as the schema OWNER (cashato_migrator, from the
+# CNPG-generated cashato-db-app secret) since only the owner can GRANT on its
+# objects. Idempotent (GRANT / ALTER DEFAULT PRIVILEGES re-run safely) and retried
+# (backoffLimit) so it survives racing the CNPG role reconciliation.
+# sync-wave 2 = after the migration (wave 1), so the tables already exist.
+# NOTE (future): a declarative alternative is Crossplane provider-sql (grants as
+# reconciled CRDs) — noted as a later learning milestone.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-grants
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-grants
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: grants
+          image: cashato/migrate:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -c
+            - |
+              import psycopg
+              SQL = """
+              -- etl_writer: read/write bronze + silver, insert feedback into gold
+              GRANT USAGE ON SCHEMA bronze, silver TO etl_writer;
+              GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA bronze, silver TO etl_writer;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA bronze, silver
+                  GRANT SELECT, INSERT, UPDATE ON TABLES TO etl_writer;
+              GRANT USAGE ON SCHEMA gold TO etl_writer;
+              GRANT SELECT, INSERT ON gold.category_feedback TO etl_writer;
+
+              -- query_reader: read-only gold (views + tables)
+              GRANT USAGE ON SCHEMA gold TO query_reader;
+              GRANT SELECT ON ALL TABLES IN SCHEMA gold TO query_reader;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA gold
+                  GRANT SELECT ON TABLES TO query_reader;
+              """
+              with psycopg.connect() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute(SQL)
+                  conn.commit()
+              print("grants applied")
+          env:
+            - { name: PGHOST, value: cashato-db-rw.cashato-data.svc }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGDATABASE, value: cashato }
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: { name: cashato-db-app, key: username }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: cashato-db-app, key: password }

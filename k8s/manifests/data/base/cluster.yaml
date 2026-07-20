@@ -22,3 +22,21 @@ spec:
     initdb:
       database: cashato
       owner: cashato_migrator
+
+  # Least-privilege app roles (C5). CNPG creates/reconciles the LOGIN roles and
+  # sets their password from the referenced Secret (decrypted by Sealed Secrets).
+  # Schema GRANTs are applied separately by the db-grants Job (CNPG manages the
+  # role object + password, not per-schema privileges). Services connect as these
+  # roles, never as the owner cashato_migrator.
+  managed:
+    roles:
+      - name: etl_writer # ingest-api + etl-worker: RW bronze/silver (+ feedback)
+        ensure: present
+        login: true
+        passwordSecret:
+          name: etl-writer-db
+      - name: query_reader # query-api: read-only gold
+        ensure: present
+        login: true
+        passwordSecret:
+          name: query-reader-db

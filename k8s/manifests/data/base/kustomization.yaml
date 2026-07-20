@@ -6,5 +6,8 @@ namespace: cashato-data
 
 resources:
   - namespace.yaml
+  - sealedsecret-etl-writer.yaml
+  - sealedsecret-query-reader.yaml
   - cluster.yaml
   - migration-job.yaml
+  - grant-job.yaml
