@@ -1,0 +1,27 @@
+# Child Application: MLflow tracking + model registry (C6).
+# sync-wave 2 — after the data layer (DB + mlflow database, wave 0/1) and MinIO
+# (wave 1) it depends on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/mlflow/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

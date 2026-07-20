@@ -23,7 +23,8 @@ MINIO="$ROOT/infra/secrets/minio-creds.env"
 DATA="$ROOT/k8s/manifests/data/base"
 SERVICES="$ROOT/k8s/manifests/services/base"
 MINIO_DIR="$ROOT/k8s/manifests/minio/base"
-mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR"
+MLFLOW_DIR="$ROOT/k8s/manifests/mlflow/base"
+mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR" "$MLFLOW_DIR"
 
 [[ -f "$CERT" ]]  || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$PW" ]]    || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
@@ -57,5 +58,11 @@ seal query-reader-db cashato query_reader "$query_reader" "$SERVICES/sealedsecre
 # MINIO_ACCESS_KEY/SECRET_KEY in the deployments).
 seal minio-creds minio   "$minio_user" "$minio_password" "$MINIO_DIR/sealedsecret-minio.yaml"
 seal minio-creds cashato "$minio_user" "$minio_password" "$SERVICES/sealedsecret-minio.yaml"
+
+# MLflow DB role (mlflow): sealed for CNPG (ns cashato-data, managed.roles password)
+# and for the MLflow server (ns mlflow). Also give MLflow the MinIO creds (artifacts).
+seal mlflow-db cashato-data mlflow "$mlflow" "$DATA/sealedsecret-mlflow-db.yaml"
+seal mlflow-db mlflow       mlflow "$mlflow" "$MLFLOW_DIR/sealedsecret-mlflow-db.yaml"
+seal minio-creds mlflow "$minio_user" "$minio_password" "$MLFLOW_DIR/sealedsecret-minio.yaml"
 
 echo "done. review + commit the regenerated SealedSecrets."

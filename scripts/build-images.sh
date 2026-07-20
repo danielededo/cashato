@@ -27,6 +27,7 @@ build_load() { # <image:tag> <dockerfile-name>
 
 build_load cashato/svc:dev     Dockerfile.svc
 build_load cashato/migrate:dev Dockerfile.migrate
+build_load cashato/mlflow:dev  Dockerfile.mlflow
 
 echo "done. kind reloaded the :dev tags — restart pods to use them, e.g.:"
 echo "  kubectl -n cashato rollout restart deploy"

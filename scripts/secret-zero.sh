@@ -36,6 +36,7 @@ else
   {
     echo "etl_writer=$(openssl rand -hex 24)"
     echo "query_reader=$(openssl rand -hex 24)"
+    echo "mlflow=$(openssl rand -hex 24)"
   } > "$PW"
   chmod 600 "$PW"
 fi

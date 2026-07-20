@@ -1,0 +1,70 @@
+# MLflow tracking server + model registry (C6). Backend store = the mlflow DB on
+# CNPG; artifact store = the mlflow bucket on MinIO, proxied by MLflow itself
+# (--serve-artifacts), so clients (train.py, the predictor) need only the tracking
+# URL, not S3 creds. An initContainer creates the bucket idempotently with mc.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlflow
+    spec:
+      initContainers:
+        - name: create-bucket
+          image: minio/mc
+          command:
+            - sh
+            - -c
+            - >
+              mc alias set m http://minio.minio.svc:9000 "$MINIO_USER" "$MINIO_PASSWORD" &&
+              mc mb --ignore-existing m/mlflow
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+      containers:
+        - name: mlflow
+          image: cashato/mlflow:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - >
+              mlflow server --host 0.0.0.0 --port 5000
+              --backend-store-uri "postgresql://mlflow:${PGPASSWORD}@cashato-db-rw.cashato-data.svc:5432/mlflow"
+              --serve-artifacts --artifacts-destination s3://mlflow
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: mlflow-db, key: password }
+            - { name: MLFLOW_S3_ENDPOINT_URL, value: http://minio.minio.svc:9000 }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+          ports:
+            - { name: http, containerPort: 5000 }
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
