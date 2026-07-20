@@ -1,8 +1,9 @@
 """ingest-api — receives a statement upload and enqueues an ingestion job.
 
-Flow: POST /api/v1/uploads -> save the file on a shared volume -> publish a job
-on NATS JetStream (subject ``ingest.jobs``) -> the etl-worker consumes it.
-The service stays **lightweight**: it parses nothing and loads no models.
+Flow: POST /api/v1/uploads -> store the file in object storage (MinIO) -> publish
+a job on NATS JetStream (subject ``ingest.jobs``) carrying the object key -> the
+etl-worker consumes it. The service stays **lightweight** and **stateless**: it
+parses nothing, loads no models, and keeps no local files.
 
 Path conventions: probes at root (``/healthz``, ``/readyz``); business API under
 ``/api/v1``; ``ROOT_PATH`` (env) for the gateway prefix. OpenAPI at
@@ -14,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -28,12 +30,12 @@ from pydantic import BaseModel, Field  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from db.db import get_engine  # noqa: E402
+from libs import objstore  # noqa: E402
 from libs.config import SOURCE_NAMES, setting  # noqa: E402
 from libs.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream  # noqa: E402
 from libs.obs import setup_logging  # noqa: E402
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
-UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "data/uploads"))
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("ingest-api")
 # Valid category codes (for feedback validation); labels/model not needed here.
@@ -52,7 +54,7 @@ _TAGS = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    objstore.ensure_bucket()
     app.state.nc, app.state.js = await connect_jetstream()
     yield
     await app.state.nc.drain()
@@ -149,23 +151,28 @@ async def create_upload(
             status_code=415,
             detail=f"unsupported file type {suffix!r}. Allowed: {sorted(_ALLOWED_EXT)}",
         )
-    dest = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    # Stream to a local temp file (enforcing the size cap), then hand it off to
+    # object storage and drop the temp. The job carries only the object KEY.
+    key = f"{uuid.uuid4().hex[:8]}_{file.filename}"
     size = 0
-    with open(dest, "wb") as out:
-        while chunk := await file.read(_CHUNK):
-            size += len(chunk)
-            if size > _MAX_FILE_BYTES:
-                out.close()
-                dest.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"file too large (> {_MAX_FILE_BYTES} bytes)",
-                )
-            out.write(chunk)
-    job = {"path": str(dest), "filename": file.filename, "source": source}
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        try:
+            while chunk := await file.read(_CHUNK):
+                size += len(chunk)
+                if size > _MAX_FILE_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"file too large (> {_MAX_FILE_BYTES} bytes)",
+                    )
+                tmp.write(chunk)
+            tmp.flush()
+            objstore.fput(key, tmp.name)
+        finally:
+            os.unlink(tmp.name)
+    job = {"key": key, "filename": file.filename, "source": source}
     await app.state.js.publish(SUBJECT_INGEST, json.dumps(job).encode())
     return UploadAccepted(
-        status="queued", filename=file.filename, stored_as=dest.name, source=source
+        status="queued", filename=file.filename, stored_as=key, source=source
     )
 
 

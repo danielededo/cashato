@@ -3,7 +3,7 @@
 Day-0 provisioning of the local **kind** cluster and every platform
 operator/Helm chart. This layer is **state-backed** and applied with a
 `tofu apply` (push). Application manifests are **not** here — they live in
-`deploy/k8s/` (Kustomize) and are delivered by **Argo CD** in GitOps pull.
+`k8s/` (Kustomize) and are delivered by **Argo CD** in GitOps pull.
 That boundary is deliberate: OpenTofu owns the platform, Argo CD owns the apps.
 
 ## Layout

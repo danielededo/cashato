@@ -167,8 +167,9 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   infra endpoints/secrets stay env/Secret.
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
-  pytest, MIT license. Dev via `deploy/docker-compose.yml` (postgres + nats +
-  services). Everything in English (Italian only in string literals that must
+  pytest, MIT license. Dev: a local Postgres for the data core; the full platform
+  runs on kind (`infra/` OpenTofu + `k8s/` GitOps via Argo CD). Bootstrap images
+  in `build/`. Everything in English (Italian only in string literals that must
   match real document text).
 
 ## Key decisions

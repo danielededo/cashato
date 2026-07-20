@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -24,6 +26,7 @@ from sqlalchemy import text  # noqa: E402
 
 import load  # noqa: E402  (reusable loader: parse -> bronze/silver + fast-path)
 from db.db import get_engine  # noqa: E402
+from libs import objstore  # noqa: E402
 from libs.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream  # noqa: E402
 from libs.obs import setup_logging, start_metrics_server  # noqa: E402
 from libs.parsers.detect import detect_source  # noqa: E402
@@ -36,17 +39,27 @@ PROC = Histogram("cashato_etl_process_seconds", "Job processing time (s)")
 FEEDBACK = Counter("cashato_etl_feedback_total", "Category corrections applied", ["status"])
 
 
-def _process(path: str, source_override: str | None) -> None:
-    source = source_override if source_override in load.ADAPTERS else detect_source(path)
-    if not source:
-        JOBS.labels(status="skipped").inc()
-        log.warning("unrecognized source", extra={"fields": {"path": path}})
-        return
-    with PROC.time():
-        inserted = load.load(Path(path), source)
-    ROWS.inc(inserted)
-    JOBS.labels(status="ok").inc()
-    log.info("ingested", extra={"fields": {"path": path, "source": source, "inserted": inserted}})
+def _process(key: str, filename: str | None, source_override: str | None) -> None:
+    # Fetch the object from storage to a temp file (services are stateless — no
+    # shared volume); parse it, then drop the temp. Keep the original extension so
+    # content/format detection behaves as with a real upload.
+    suffix = Path(filename or key).suffix
+    fd, dest = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
+    try:
+        objstore.fget(key, dest)
+        source = source_override if source_override in load.ADAPTERS else detect_source(dest)
+        if not source:
+            JOBS.labels(status="skipped").inc()
+            log.warning("unrecognized source", extra={"fields": {"key": key}})
+            return
+        with PROC.time():
+            inserted = load.load(Path(dest), source)
+        ROWS.inc(inserted)
+        JOBS.labels(status="ok").inc()
+        log.info("ingested", extra={"fields": {"key": key, "source": source, "inserted": inserted}})
+    finally:
+        os.unlink(dest)
 
 
 def _apply_feedback(natural_key: str, category: str, corrected_by: str | None) -> int:
@@ -90,10 +103,12 @@ async def _consume(sub, handler) -> None:
 
 async def _handle_ingest(data: dict) -> None:
     try:
-        await asyncio.to_thread(_process, data.get("path"), data.get("source"))
+        await asyncio.to_thread(
+            _process, data.get("key"), data.get("filename"), data.get("source")
+        )
     except Exception as exc:  # noqa: BLE001
         JOBS.labels(status="error").inc()
-        log.error("ingest failed", extra={"fields": {"path": data.get("path"), "error": str(exc)}})
+        log.error("ingest failed", extra={"fields": {"key": data.get("key"), "error": str(exc)}})
 
 
 async def _handle_feedback(data: dict) -> None:

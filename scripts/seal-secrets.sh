@@ -20,6 +20,8 @@ ROOT="$(git rev-parse --show-toplevel)"
 CERT="$ROOT/infra/secrets/sealed-secrets.crt"
 PW="$ROOT/infra/secrets/role-passwords.env"
 DATA="$ROOT/k8s/manifests/data/base"
+SERVICES="$ROOT/k8s/manifests/services/base"
+mkdir -p "$DATA" "$SERVICES"
 
 [[ -f "$CERT" ]] || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$PW" ]]   || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
@@ -39,5 +41,10 @@ seal() { # <secret-name> <namespace> <username> <password> <out-file>
 seal etl-writer-db   cashato-data etl_writer   "$etl_writer"   "$DATA/sealedsecret-etl-writer.yaml"
 seal query-reader-db cashato-data query_reader "$query_reader" "$DATA/sealedsecret-query-reader.yaml"
 
-# (C5c will add the cashato-namespace copies for the services here.)
+# Same role creds, copied into the services namespace (cashato) — sealed-secrets
+# strict scope is name+namespace-bound, so each namespace needs its own sealing.
+# ingest-api + etl-worker connect as etl_writer; query-api as query_reader.
+seal etl-writer-db   cashato etl_writer   "$etl_writer"   "$SERVICES/sealedsecret-etl-writer.yaml"
+seal query-reader-db cashato query_reader "$query_reader" "$SERVICES/sealedsecret-query-reader.yaml"
+
 echo "done. review + commit the regenerated SealedSecrets."

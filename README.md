@@ -20,7 +20,9 @@ machine.
 ```bash
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt          # or requirements-dev.txt
-docker compose -f deploy/docker-compose.yml up -d postgres
+docker run -d --name cashato-pg -p 5432:5432 \
+  -e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato \
+  postgres:17-alpine                                 # local Postgres for the data core
 ./.venv/bin/alembic upgrade head                     # schemas bronze/silver/gold
 ```
 
@@ -90,10 +92,13 @@ exclude them.
 `query-api` (spend aggregates). OpenAPI at `/docs` · `/redoc` · `/openapi.json`;
 probes at `/healthz` · `/readyz`; business API under `/api/v1`.
 
+The full stack runs on the local **kind** cluster (phase C, IaC) — see `infra/`
+(OpenTofu) and `k8s/` (GitOps via Argo CD). Once deployed, the services are
+reached through the Envoy Gateway:
+
 ```bash
-docker compose -f deploy/docker-compose.yml up -d          # full stack
-curl -F "file=@data/.../file.csv" localhost:8000/api/v1/uploads
-curl "localhost:8001/api/v1/summary?lang=en"
+curl -F "file=@data/.../file.csv" http://<gateway-ip>/api/v1/uploads
+curl "http://<gateway-ip>/api/v1/summary?lang=en"
 ```
 
 ## ML pipeline (advanced categorization)
@@ -151,7 +156,9 @@ ml/             label_llm.py (M1) · train.py (M2) · model.py (EmbeddingKNN) ·
 config/         sources.yaml · settings.yaml · categorie.yaml · mcc.yaml   (ConfigMaps in phase C)
 services/       ingest-api · etl-worker · query-api        db/  Alembic migrations + engine
 load.py  export.py  link_transfers.py                      tests/  unit + verification
-deploy/         docker-compose.yml · Dockerfile.svc · k8s/ (phase C, IaC)
+build/          Dockerfile.svc · Dockerfile.migrate        (bootstrap images; Harbor in C7)
+infra/          OpenTofu (kind + operators)   k8s/         GitOps manifests (Argo CD)
+scripts/        secret-zero.sh · seal-secrets.sh · build-images.sh
 data/  output/  models/   (git-ignored)
 ```
 
