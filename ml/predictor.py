@@ -17,10 +17,22 @@ Response (V1):  {"predictions": [{"category": "<code>", "confidence": <float>}, 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 import kserve
+
+# Pin torch/OpenMP threads to the pod's CPU allotment. Without this torch spawns
+# ~half the HOST cores (it can't see the cgroup limit) and thrashes against the
+# container CPU cap — making encoding pathologically slow. Match OMP_NUM_THREADS.
+_THREADS = int(os.environ.get("OMP_NUM_THREADS", "4"))
+try:
+    import torch
+
+    torch.set_num_threads(_THREADS)
+except Exception:  # noqa: BLE001
+    pass
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
