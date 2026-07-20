@@ -11,3 +11,4 @@ resources:
   - ingest-api.yaml
   - etl-worker.yaml
   - query-api.yaml
+  - httproutes.yaml

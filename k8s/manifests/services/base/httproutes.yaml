@@ -1,0 +1,41 @@
+# North-south routing: attach to the shared Gateway `cashato` (ns cashato-gateway)
+# from this namespace (allowedRoutes.from: All permits it). Both APIs live under
+# /api/v1 with DISJOINT sub-paths, so a path-prefix split needs no URL rewrite.
+# Backends are in this same namespace (cashato) → no ReferenceGrant required.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ingest-api
+  namespace: cashato
+spec:
+  parentRefs:
+    - name: cashato
+      namespace: cashato-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/v1/uploads }
+        - path: { type: PathPrefix, value: /api/v1/files }
+        - path: { type: PathPrefix, value: /api/v1/feedback }
+      backendRefs:
+        - name: ingest-api
+          port: 8000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: query-api
+  namespace: cashato
+spec:
+  parentRefs:
+    - name: cashato
+      namespace: cashato-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /api/v1/summary }
+        - path: { type: PathPrefix, value: /api/v1/monthly }
+        - path: { type: PathPrefix, value: /api/v1/categories }
+        - path: { type: PathPrefix, value: /api/v1/transactions }
+        - path: { type: PathPrefix, value: /api/v1/transfers }
+      backendRefs:
+        - name: query-api
+          port: 8001
