@@ -41,3 +41,12 @@ spec:
       toPorts:
         - ports:
             - { port: "9000", protocol: TCP }
+    # KServe model predictor in cashato-ml (categorizer -> InferenceService).
+    # With kubeProxyReplacement, egress policy sees the BACKEND POD port (8080),
+    # not the Service port (80).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cashato-ml
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }

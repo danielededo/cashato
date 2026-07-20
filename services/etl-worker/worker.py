@@ -13,6 +13,7 @@ is deployed in phase C.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -27,7 +28,12 @@ from sqlalchemy import text  # noqa: E402
 import load  # noqa: E402  (reusable loader: parse -> bronze/silver + fast-path)
 from db.db import get_engine  # noqa: E402
 from libs import objstore  # noqa: E402
-from libs.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream  # noqa: E402
+from libs.messaging import (  # noqa: E402
+    SUBJECT_FEEDBACK,
+    SUBJECT_INGEST,
+    SUBJECT_RECATEGORIZE,
+    connect_jetstream,
+)
 from libs.obs import setup_logging, start_metrics_server  # noqa: E402
 from libs.parsers.detect import detect_source  # noqa: E402
 
@@ -39,7 +45,7 @@ PROC = Histogram("cashato_etl_process_seconds", "Job processing time (s)")
 FEEDBACK = Counter("cashato_etl_feedback_total", "Category corrections applied", ["status"])
 
 
-def _process(key: str, filename: str | None, source_override: str | None) -> None:
+def _process(key: str, filename: str | None, source_override: str | None) -> int:
     # Fetch the object from storage to a temp file (services are stateless — no
     # shared volume); parse it, then drop the temp. Keep the original extension so
     # content/format detection behaves as with a real upload.
@@ -52,12 +58,13 @@ def _process(key: str, filename: str | None, source_override: str | None) -> Non
         if not source:
             JOBS.labels(status="skipped").inc()
             log.warning("unrecognized source", extra={"fields": {"key": key}})
-            return
+            return 0
         with PROC.time():
             inserted = load.load(Path(dest), source)
         ROWS.inc(inserted)
         JOBS.labels(status="ok").inc()
         log.info("ingested", extra={"fields": {"key": key, "source": source, "inserted": inserted}})
+        return inserted
     finally:
         os.unlink(dest)
 
@@ -101,14 +108,16 @@ async def _consume(sub, handler) -> None:
             await m.ack()
 
 
-async def _handle_ingest(data: dict) -> None:
+async def _handle_ingest(data: dict) -> int:
+    """Process one ingest job. Returns the number of rows inserted (0 on error)."""
     try:
-        await asyncio.to_thread(
+        return await asyncio.to_thread(
             _process, data.get("key"), data.get("filename"), data.get("source")
         )
     except Exception as exc:  # noqa: BLE001
         JOBS.labels(status="error").inc()
         log.error("ingest failed", extra={"fields": {"key": data.get("key"), "error": str(exc)}})
+        return 0
 
 
 async def _handle_feedback(data: dict) -> None:
@@ -135,8 +144,17 @@ async def main() -> None:
         "etl-worker listening",
         extra={"fields": {"subjects": [SUBJECT_INGEST, SUBJECT_FEEDBACK], "metrics_port": port}},
     )
+
+    async def handle_ingest_and_notify(data: dict) -> None:
+        inserted = await _handle_ingest(data)
+        # New rows landed -> ask the categorizer to run the model over them.
+        if inserted:
+            with contextlib.suppress(Exception):
+                await js.publish(SUBJECT_RECATEGORIZE, b"{}")
+                log.info("recategorize requested", extra={"fields": {"inserted": inserted}})
+
     while True:
-        await _consume(ingest_sub, _handle_ingest)
+        await _consume(ingest_sub, handle_ingest_and_notify)
         await _consume(feedback_sub, _handle_feedback)
 
 

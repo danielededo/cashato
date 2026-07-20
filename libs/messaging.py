@@ -21,7 +21,10 @@ NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
 SUBJECT_INGEST = "ingest.jobs"
 SUBJECT_FEEDBACK = "category.feedback"
-SUBJECTS = [SUBJECT_INGEST, SUBJECT_FEEDBACK]
+# Emitted by the etl-worker after an ingest; consumed by the categorizer service
+# (C6d), which runs the model (via KServe) over the newly landed rows.
+SUBJECT_RECATEGORIZE = "category.recategorize"
+SUBJECTS = [SUBJECT_INGEST, SUBJECT_FEEDBACK, SUBJECT_RECATEGORIZE]
 STREAM = "CASHATO"
 
 # Backwards-compatible alias (ingest job subject was previously ``SUBJECT``).
@@ -54,7 +57,12 @@ async def connect_jetstream():
         retention=RetentionPolicy.WORK_QUEUE,
         max_age=STREAM_MAX_AGE_SECONDS,
     )
-    # stream may already exist (same config) -> ignore
-    with contextlib.suppress(Exception):
+    # Create the stream, or reconcile it if it already exists. update_stream picks
+    # up a NEWLY ADDED subject (allowed) on an existing stream; retention is
+    # unchanged here so the update stays legal (JetStream forbids retention changes).
+    try:
         await js.add_stream(config=config)
+    except Exception:
+        with contextlib.suppress(Exception):
+            await js.update_stream(config=config)
     return nc, js

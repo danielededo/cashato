@@ -10,5 +10,6 @@ resources:
   - sealedsecret-minio.yaml
   - ingest-api.yaml
   - etl-worker.yaml
+  - categorizer.yaml
   - query-api.yaml
   - httproutes.yaml

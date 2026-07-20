@@ -1,0 +1,46 @@
+# categorizer: consumes category.recategorize from NATS and runs the model (via
+# the KServe predictor) over the fast-path-unresolved silver rows, writing back as
+# etl_writer. No Service (consumer, not an HTTP server); metrics on :9100. Light
+# (svc image, no torch) — the heavy model lives in the KServe predictor pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: categorizer
+  namespace: cashato
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: categorizer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: categorizer
+    spec:
+      containers:
+        - name: categorizer
+          image: cashato/svc:dev
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ["python", "services/categorizer/worker.py"]
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: { name: etl-writer-db, key: username }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: etl-writer-db, key: password }
+            - name: DATABASE_URL
+              value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-rw.cashato-data.svc:5432/cashato
+            - { name: NATS_URL, value: nats://nats.nats.svc:4222 }
+            - name: PREDICTOR_URL
+              value: http://categorizer-predictor.cashato-ml.svc/v1/models/categorizer:predict
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          livenessProbe:
+            tcpSocket: { port: metrics }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
