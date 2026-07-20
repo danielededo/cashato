@@ -30,3 +30,6 @@ __pycache__/
 # kubeconfig generato dal provider kind (contiene certificati/chiavi del cluster)
 /infra/cashato-config
 /infra/*-config
+
+# Sealed Secrets pinned sealing key (SECRET ZERO — back up out-of-band, never commit)
+infra/secrets/
