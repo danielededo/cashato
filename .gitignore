@@ -33,3 +33,6 @@ __pycache__/
 
 # Sealed Secrets pinned sealing key (SECRET ZERO — back up out-of-band, never commit)
 infra/secrets/
+
+# Out-of-band Tofu secrets (secret-zero)
+infra/*.auto.tfvars

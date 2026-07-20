@@ -40,5 +40,33 @@ else
   chmod 600 "$PW"
 fi
 
-echo "secret-zero ready in $DIR (gitignored). BACK IT UP OUT-OF-BAND."
+MINIO="$DIR/minio-creds.env"
+if [[ -f "$MINIO" ]]; then
+  echo "[keep] minio creds already present"
+else
+  echo "[gen]  minio creds"
+  {
+    echo "minio_user=cashato"
+    echo "minio_password=$(openssl rand -hex 24)"
+  } > "$MINIO"
+  chmod 600 "$MINIO"
+fi
+
+# Platform bootstrap secret consumed by Tofu (NOT a SealedSecret: Argo needs the
+# Gitea repo credential to start, before the controller can decrypt anything).
+# Auto-loaded by Tofu as *.auto.tfvars; gitignored.
+TFVARS="$ROOT/infra/secret.auto.tfvars"
+if [[ -f "$TFVARS" ]]; then
+  echo "[keep] $TFVARS already present"
+else
+  echo "[gen]  infra/secret.auto.tfvars (Gitea/Argo bridge password)"
+  {
+    echo "# Out-of-band platform secrets (gitignored). Part of secret-zero."
+    echo "git_bridge_password = \"$(openssl rand -hex 24)\""
+  } > "$TFVARS"
+  chmod 600 "$TFVARS"
+  echo "       NOTE: on a fresh env, set the Gitea git remote to use this password."
+fi
+
+echo "secret-zero ready ($DIR + infra/secret.auto.tfvars, gitignored). BACK UP OUT-OF-BAND."
 echo "next: tofu apply (installs the pinned key) && ./scripts/seal-secrets.sh"

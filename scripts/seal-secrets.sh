@@ -19,14 +19,19 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 CERT="$ROOT/infra/secrets/sealed-secrets.crt"
 PW="$ROOT/infra/secrets/role-passwords.env"
+MINIO="$ROOT/infra/secrets/minio-creds.env"
 DATA="$ROOT/k8s/manifests/data/base"
 SERVICES="$ROOT/k8s/manifests/services/base"
-mkdir -p "$DATA" "$SERVICES"
+MINIO_DIR="$ROOT/k8s/manifests/minio/base"
+mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR"
 
-[[ -f "$CERT" ]] || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
-[[ -f "$PW" ]]   || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
+[[ -f "$CERT" ]]  || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
+[[ -f "$PW" ]]    || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
+[[ -f "$MINIO" ]] || { echo "missing $MINIO — run ./scripts/secret-zero.sh first"; exit 1; }
 # shellcheck disable=SC1090
-source "$PW"   # -> $etl_writer, $query_reader
+source "$PW"     # -> $etl_writer, $query_reader
+# shellcheck disable=SC1090
+source "$MINIO"  # -> $minio_user, $minio_password
 
 seal() { # <secret-name> <namespace> <username> <password> <out-file>
   kubectl create secret generic "$1" -n "$2" \
@@ -46,5 +51,11 @@ seal query-reader-db cashato-data query_reader "$query_reader" "$DATA/sealedsecr
 # ingest-api + etl-worker connect as etl_writer; query-api as query_reader.
 seal etl-writer-db   cashato etl_writer   "$etl_writer"   "$SERVICES/sealedsecret-etl-writer.yaml"
 seal query-reader-db cashato query_reader "$query_reader" "$SERVICES/sealedsecret-query-reader.yaml"
+
+# MinIO creds: same username/password sealed for the server (ns minio, mapped to
+# MINIO_ROOT_USER/PASSWORD) and the clients (ns cashato, mapped to
+# MINIO_ACCESS_KEY/SECRET_KEY in the deployments).
+seal minio-creds minio   "$minio_user" "$minio_password" "$MINIO_DIR/sealedsecret-minio.yaml"
+seal minio-creds cashato "$minio_user" "$minio_password" "$SERVICES/sealedsecret-minio.yaml"
 
 echo "done. review + commit the regenerated SealedSecrets."

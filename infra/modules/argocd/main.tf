@@ -16,8 +16,11 @@ resource "helm_release" "argocd" {
 
 # Repository registration. Argo CD has no Repository CRD: a repo is a Secret
 # labeled `argocd.argoproj.io/secret-type: repository`, read by the repo-server.
-# For the local bridge Tofu creates it directly (state is gitignored); it will
-# be sealed (Sealed Secrets) once that controller lands in C5.
+# This is a BOOTSTRAP secret — Argo needs it to pull the app-of-apps before the
+# Sealed Secrets controller could decrypt anything — so it CANNOT be a
+# SealedSecret. Tofu creates it directly from the git_bridge_password var, which
+# is supplied out-of-band via infra/secret.auto.tfvars (gitignored), so no secret
+# lands in git or in committed state.
 resource "kubernetes_secret" "gitea_repo" {
   metadata {
     name      = "gitea-repo"
