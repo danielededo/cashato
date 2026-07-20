@@ -1,0 +1,12 @@
+# Dependencies for the TRAINING/registry image (build/Dockerfile.train).
+# Heavy ML stack (torch + sentence-transformers) — kept OUT of the service image
+# on purpose. torch is installed CPU-only in the Dockerfile (separate index) to
+# avoid pulling CUDA. No pdfplumber/pandas: training never parses files, it reads
+# the already-normalized dataset from CNPG.
+scikit-learn==1.6.0
+joblib==1.4.2
+mlflow==2.19.0
+sentence-transformers==3.3.1
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3
+pyyaml==6.0.2

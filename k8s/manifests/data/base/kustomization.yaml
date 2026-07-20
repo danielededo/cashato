@@ -9,6 +9,7 @@ resources:
   - sealedsecret-etl-writer.yaml
   - sealedsecret-query-reader.yaml
   - sealedsecret-mlflow-db.yaml
+  - sealedsecret-ml-reader.yaml
   - cluster.yaml
   - migration-job.yaml
   - grant-job.yaml

@@ -1,0 +1,77 @@
+# Retrain CronJob (C6 / MLOps). SUSPENDED by default: it only makes sense once the
+# training dataset exists in CNPG (ingest data via the API, and/or label with
+# ml/label_llm.py) and does no good on every tick. Unsuspend for scheduled
+# retraining, or trigger on demand:
+#     kubectl -n cashato-ml create job --from=cronjob/train train-manual-$(date +%s)
+#
+# Each run trains a challenger, registers a new cashato-categorizer version, and
+# promotes it to @champion only if it beats the current champion on the holdout
+# (--promote if-better) — so a bad retrain never regresses what KServe serves.
+# Reads the dataset as the least-privilege ml_reader role (read-only silver+gold).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: train
+spec:
+  schedule: "0 3 * * 1" # Mondays 03:00 — only fires when unsuspended
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: train
+        spec:
+          restartPolicy: Never
+          initContainers:
+            - name: wait-deps
+              image: cashato/train:dev
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - -c
+                - |
+                  import os, sys, time, urllib.request
+                  import psycopg
+                  def ok_db():
+                      psycopg.connect(os.environ["PG_DSN"]).close()
+                  def ok_mlflow():
+                      urllib.request.urlopen("http://mlflow.mlflow.svc:5000/health", timeout=5)
+                  for _ in range(60):
+                      try:
+                          ok_db(); ok_mlflow(); print("deps ready"); sys.exit(0)
+                      except Exception as e:
+                          print("waiting for deps:", e); time.sleep(5)
+                  sys.exit(1)
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: ml-reader-db, key: password }
+                - name: PG_DSN
+                  value: postgresql://ml_reader:$(PGPASSWORD)@cashato-db-r.cashato-data.svc:5432/cashato
+          containers:
+            - name: train
+              image: cashato/train:dev
+              imagePullPolicy: IfNotPresent
+              workingDir: /app
+              command:
+                - sh
+                - -c
+                - >
+                  python ml/train.py --include-rules
+                  --stamp "$(date +%Y%m%d-%H%M)"
+                  --register --promote if-better
+              env:
+                - { name: MLFLOW_TRACKING_URI, value: http://mlflow.mlflow.svc:5000 }
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: ml-reader-db, key: password }
+                - name: DATABASE_URL
+                  value: postgresql+psycopg://ml_reader:$(PGPASSWORD)@cashato-db-r.cashato-data.svc:5432/cashato
+              resources:
+                requests: { cpu: 500m, memory: 1Gi }
+                limits: { cpu: "2", memory: 4Gi }

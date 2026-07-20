@@ -1,0 +1,28 @@
+# Child Application: ML training/registry workloads (C6 / MLOps).
+# sync-wave 3 — after MLflow (wave 2) and the data layer it reads from. Contains
+# the one-off model-import Job (register-champion) and the suspended retrain
+# CronJob. CreateNamespace=false: the namespace is a manifest (namespace.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: training
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/training/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cashato-ml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

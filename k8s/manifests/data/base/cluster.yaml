@@ -45,3 +45,8 @@ spec:
         login: true
         passwordSecret:
           name: mlflow-db
+      - name: ml_reader # training/retrain Jobs: read-only silver + gold (dataset)
+        ensure: present
+        login: true
+        passwordSecret:
+          name: ml-reader-db

@@ -4,10 +4,11 @@ Generates **canonical** labels (in OUR taxonomy) for the descriptions the
 fast-path leaves unresolved, so the training set does not depend on provider
 categories. Fully local (privacy). Requires a running Ollama:
     curl -fsSL https://ollama.com/install.sh | sh   # once
-    ollama pull qwen2.5:3b
+    ollama pull qwen2.5:7b   # labeling is offline+batch, so prefer the largest
+                             # model the GPU fits — label quality caps the model
 
 Usage:
-    ./.venv/bin/python ml/label_llm.py --model qwen2.5:3b --limit 500
+    ./.venv/bin/python ml/label_llm.py --model qwen2.5:7b --limit 500
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from db.db import get_engine  # noqa: E402
 from libs.parsers.categorize import Categorizer, build_text  # noqa: E402
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/") + "/api/chat"
-DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
 
 # Few-shot examples (Italian merchant text is real-world data, kept as-is).
 _FEWSHOT = [

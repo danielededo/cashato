@@ -24,13 +24,14 @@ DATA="$ROOT/k8s/manifests/data/base"
 SERVICES="$ROOT/k8s/manifests/services/base"
 MINIO_DIR="$ROOT/k8s/manifests/minio/base"
 MLFLOW_DIR="$ROOT/k8s/manifests/mlflow/base"
-mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR" "$MLFLOW_DIR"
+TRAINING_DIR="$ROOT/k8s/manifests/training/base"
+mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR" "$MLFLOW_DIR" "$TRAINING_DIR"
 
 [[ -f "$CERT" ]]  || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$PW" ]]    || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$MINIO" ]] || { echo "missing $MINIO — run ./scripts/secret-zero.sh first"; exit 1; }
 # shellcheck disable=SC1090
-source "$PW"     # -> $etl_writer, $query_reader
+source "$PW"     # -> $etl_writer, $query_reader, $mlflow, $ml_reader
 # shellcheck disable=SC1090
 source "$MINIO"  # -> $minio_user, $minio_password
 
@@ -64,5 +65,10 @@ seal minio-creds cashato "$minio_user" "$minio_password" "$SERVICES/sealedsecret
 seal mlflow-db cashato-data mlflow "$mlflow" "$DATA/sealedsecret-mlflow-db.yaml"
 seal mlflow-db mlflow       mlflow "$mlflow" "$MLFLOW_DIR/sealedsecret-mlflow-db.yaml"
 seal minio-creds mlflow "$minio_user" "$minio_password" "$MLFLOW_DIR/sealedsecret-minio.yaml"
+
+# ml_reader role (read-only silver+gold): sealed for CNPG (ns cashato-data,
+# managed.roles password) and for the training/retrain Jobs (ns cashato-ml).
+seal ml-reader-db cashato-data ml_reader "$ml_reader" "$DATA/sealedsecret-ml-reader.yaml"
+seal ml-reader-db cashato-ml   ml_reader "$ml_reader" "$TRAINING_DIR/sealedsecret-ml-reader.yaml"
 
 echo "done. review + commit the regenerated SealedSecrets."

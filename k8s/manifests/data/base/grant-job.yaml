@@ -45,6 +45,13 @@ spec:
               GRANT SELECT ON ALL TABLES IN SCHEMA gold TO query_reader;
               ALTER DEFAULT PRIVILEGES IN SCHEMA gold
                   GRANT SELECT ON TABLES TO query_reader;
+
+              -- ml_reader: read-only silver + gold (the training dataset:
+              -- rule/mcc anchors in silver + training_labels/feedback in gold)
+              GRANT USAGE ON SCHEMA silver, gold TO ml_reader;
+              GRANT SELECT ON ALL TABLES IN SCHEMA silver, gold TO ml_reader;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA silver, gold
+                  GRANT SELECT ON TABLES TO ml_reader;
               """
               with psycopg.connect() as conn:
                   with conn.cursor() as cur:
