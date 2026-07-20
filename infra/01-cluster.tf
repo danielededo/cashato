@@ -1,6 +1,8 @@
 # Layer 0 — the kind cluster itself.
-# Default CNI is disabled so Cilium (layer 1) takes over. kube-proxy is kept
-# (default) for a simple, reliable bootstrap; kubeProxyReplacement can come later.
+# Default CNI is disabled so Cilium (layer 1) takes over. kube-proxy is also
+# disabled (kube_proxy_mode = "none") so Cilium runs in full kubeProxyReplacement
+# mode — required for L2 announcements / LoadBalancer IPAM (C4). Cilium owns all
+# service routing; no kube-proxy iptables to conflict with.
 resource "kind_cluster" "default" {
   name           = var.cluster_name
   node_image     = var.node_image
@@ -11,8 +13,9 @@ resource "kind_cluster" "default" {
     api_version = "kind.x-k8s.io/v1alpha4"
 
     networking {
-      # Cilium replaces the default CNI.
+      # Cilium replaces the default CNI and kube-proxy.
       disable_default_cni = true
+      kube_proxy_mode     = "none"
     }
 
     # Control-plane also fronts host ports 80/443 so Envoy Gateway (C3) can be

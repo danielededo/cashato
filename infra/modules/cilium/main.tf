@@ -27,6 +27,36 @@ resource "helm_release" "cilium" {
       name  = "hubble.ui.enabled"
       value = "true"
     },
+    # kubeProxyReplacement (C4): kube-proxy is disabled in the kind config, so
+    # Cilium handles all service routing. Without kube-proxy, agents must dial the
+    # API server directly — hence k8sServiceHost/Port.
+    {
+      name  = "kubeProxyReplacement"
+      value = "true"
+    },
+    {
+      name  = "k8sServiceHost"
+      value = var.k8s_service_host
+    },
+    {
+      name  = "k8sServicePort"
+      value = tostring(var.k8s_service_port)
+    },
+    # L2 announcements (C4): answer ARP for LoadBalancer IPs so the Envoy Gateway
+    # service is reachable on the local (docker) network. Uses leader election →
+    # bump the client rate limit above the defaults (10/20).
+    {
+      name  = "l2announcements.enabled"
+      value = "true"
+    },
+    {
+      name  = "k8sClientRateLimit.qps"
+      value = "50"
+    },
+    {
+      name  = "k8sClientRateLimit.burst"
+      value = "100"
+    },
   ]
 
   # Wait until the CNI is actually up before Tofu considers the release done.

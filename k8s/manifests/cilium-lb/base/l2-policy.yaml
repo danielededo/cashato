@@ -1,0 +1,14 @@
+# Make the assigned LoadBalancer IPs reachable: Cilium answers ARP for them on
+# the node interface (eth0 on kind), so the host can route to the Gateway.
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: cashato-l2
+spec:
+  # Announce LoadBalancer IPs (not externalIPs — we don't use those).
+  loadBalancerIPs: true
+  interfaces:
+    - "^eth[0-9]+$"
+  nodeSelector:
+    matchLabels:
+      kubernetes.io/os: linux

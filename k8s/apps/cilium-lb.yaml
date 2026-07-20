@@ -1,0 +1,32 @@
+# Child Application: Cilium LoadBalancer IPAM pool + L2 announcement policy.
+# These are platform networking CRs but are delivered via Argo (not Tofu) to
+# sidestep the Terraform CRD chicken-and-egg: the Cilium CRDs only exist after
+# the operator (installed by Tofu) is up, and Argo simply retries until they do.
+# sync-wave "-1" — before everything, so LoadBalancer IPs can be assigned as soon
+# as the Gateway (wave 1) requests one.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium-lb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Gitea bridge now; switch to public GitHub later (repoURL only).
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/cilium-lb/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    # Cluster-scoped resources ignore this; Argo just needs a valid value.
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
