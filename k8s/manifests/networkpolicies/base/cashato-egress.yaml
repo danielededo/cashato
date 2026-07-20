@@ -1,0 +1,43 @@
+# Egress lock-down for ALL pods in cashato: they may only reach their own
+# backends (DNS, DB, NATS, MinIO) and nothing else. Selecting the pods with an
+# egress rule makes every other egress default-DENY (Cilium is per-direction).
+# This is the main enforcement point: "the services can't talk to anything but
+# their dependencies" — visible in Hubble as drops on anything else.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: cashato-egress
+  namespace: cashato
+spec:
+  endpointSelector: {} # all pods in cashato
+  egress:
+    # DNS resolution (CoreDNS) — without this, every service name fails.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: UDP }
+            - { port: "53", protocol: TCP }
+    # Postgres (CNPG) in cashato-data.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cashato-data
+      toPorts:
+        - ports:
+            - { port: "5432", protocol: TCP }
+    # NATS JetStream.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: nats
+      toPorts:
+        - ports:
+            - { port: "4222", protocol: TCP }
+    # MinIO object storage (S3 API).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: minio
+      toPorts:
+        - ports:
+            - { port: "9000", protocol: TCP }

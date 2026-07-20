@@ -1,0 +1,44 @@
+# Ingress lock-down for the HTTP APIs: reachable ONLY from the Envoy Gateway
+# (north-south), never pod-to-pod from elsewhere. fromEntities host/remote-node
+# keeps kubelet liveness/readiness probes working (they originate from the node).
+# etl-worker has NO ingress policy (no Service; only node-originated probes hit
+# it, which are allowed as host traffic), so its ingress stays open by default.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: ingest-api-ingress
+  namespace: cashato
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingest-api
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+      toPorts:
+        - ports:
+            - { port: "8000", protocol: TCP }
+    - fromEntities: # kubelet probes (node-originated)
+        - host
+        - remote-node
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: query-api-ingress
+  namespace: cashato
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: query-api
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+      toPorts:
+        - ports:
+            - { port: "8001", protocol: TCP }
+    - fromEntities:
+        - host
+        - remote-node

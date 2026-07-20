@@ -1,0 +1,27 @@
+# Child Application: Cilium NetworkPolicies for the cashato namespace.
+# sync-wave 3 — applied after the services (wave 2) are up, so the lock-down
+# layers on last (and any mistake is easy to spot/revert without blocking rollout).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: networkpolicies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/networkpolicies/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cashato
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
