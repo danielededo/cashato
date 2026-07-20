@@ -1,0 +1,56 @@
+# query-api: read-only spend aggregates over the gold views. Connects as
+# query_reader (SELECT gold only). No NATS/MinIO. Stateless.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: query-api
+  namespace: cashato
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: query-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: query-api
+    spec:
+      containers:
+        - name: query-api
+          image: cashato/svc:dev
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/services/query-api
+          command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: { name: query-reader-db, key: username }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: query-reader-db, key: password }
+            - name: DATABASE_URL
+              value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-ro.cashato-data.svc:5432/cashato
+          ports:
+            - { name: http, containerPort: 8001 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: query-api
+  namespace: cashato
+spec:
+  selector:
+    app.kubernetes.io/name: query-api
+  ports:
+    - { name: http, port: 8001, targetPort: http }

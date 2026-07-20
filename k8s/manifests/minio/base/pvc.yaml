@@ -1,0 +1,14 @@
+# MinIO data volume. RWO is fine: single-node MinIO, one pod on cashato-worker.
+# This is the only real long-term growth (retained raw files); tiny at personal
+# scale. Retention becomes a bucket lifecycle rule rather than app logic.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

@@ -1,0 +1,27 @@
+# Child Application: the three services (ingest-api, etl-worker, query-api).
+# sync-wave 2 — after data (0), minio/gateway (1). They connect to the DB roles,
+# NATS and MinIO, all of which are up by then.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/services/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cashato
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

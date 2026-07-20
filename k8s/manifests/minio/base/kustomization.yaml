@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Each resource carries its own namespace; no namespace transformer (protects the
+# strict-scoped SealedSecret).
+resources:
+  - namespace.yaml
+  - sealedsecret-minio.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml

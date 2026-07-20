@@ -1,0 +1,51 @@
+# Single-node MinIO (S3-compatible object storage). Standalone Deployment (no
+# operator) — enough for a personal kind platform. Root creds come from the
+# minio-creds Sealed Secret; the console is on :9001, the S3 API on :9000.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single RWO volume — don't run two pods at once
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+          ports:
+            - { name: api, containerPort: 9000 }
+            - { name: console, containerPort: 9001 }
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: api }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: api }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-data

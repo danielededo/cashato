@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Each resource carries its own namespace (cashato); no namespace transformer
+# (protects the strict-scoped SealedSecrets).
+resources:
+  - namespace.yaml
+  - sealedsecret-etl-writer.yaml
+  - sealedsecret-query-reader.yaml
+  - sealedsecret-minio.yaml
+  - ingest-api.yaml
+  - etl-worker.yaml
+  - query-api.yaml
