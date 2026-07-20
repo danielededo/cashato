@@ -1,0 +1,30 @@
+# Child Application: the north-south Gateway (GatewayClass + Gateway).
+# sync-wave 1 — after the data layer (wave 0), before the services (wave 2) that
+# will attach HTTPRoutes to this Gateway in C5.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Gitea bridge now; switch to public GitHub later (repoURL only).
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/gateway/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    # Cluster-scoped resources (GatewayClass) ignore this; the Gateway/Namespace
+    # carry their own namespace. Argo just needs a valid default here.
+    namespace: cashato-gateway
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

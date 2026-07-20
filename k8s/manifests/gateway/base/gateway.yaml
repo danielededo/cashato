@@ -1,0 +1,18 @@
+# The north-south entrypoint. A single HTTP listener on :80 for now; TLS and
+# host-based routing can be added later. HTTPRoutes arrive in C5 (they need the
+# service backends), attaching from the cashato namespace — hence
+# allowedRoutes.namespaces.from: All (revisit with a Selector in C5 if desired).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cashato
+  namespace: cashato-gateway
+spec:
+  gatewayClassName: cashato
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All

@@ -1,0 +1,9 @@
+# Cluster-scoped binding to the Envoy Gateway controller (installed by Tofu in
+# envoy-gateway-system). Every Gateway that references this class is programmed
+# by that controller.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: cashato
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

@@ -1,0 +1,19 @@
+# NATS server — the JetStream messaging backbone (ingest.jobs + category.feedback).
+# Single instance (no HA cluster) is right for a personal, single-node kind
+# platform. Streams themselves are created in app code (libs/messaging.py), not
+# here — so retention/limits live there. The PVC size comes in via `set`.
+config:
+  # Single server: no clustered routes. JetStream still persists to the PVC.
+  cluster:
+    enabled: false
+
+  jetstream:
+    enabled: true
+    fileStore:
+      enabled: true
+      dir: /data
+      pvc:
+        enabled: true
+    # In-memory store off: we want durable jobs that survive a pod restart.
+    memoryStore:
+      enabled: false

@@ -1,0 +1,7 @@
+# Dedicated namespace for the north-south Gateway. Kept separate from the app
+# namespace (cashato) so HTTPRoutes in cashato attach across namespaces to this
+# shared entrypoint — the explicit, didactic multi-namespace Gateway pattern.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cashato-gateway
