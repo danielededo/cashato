@@ -1,0 +1,28 @@
+# KServe custom-predictor image (C6c). Heavy ML stack (torch + sentence-
+# transformers) + the kserve SDK. Serves our EmbeddingKNN via ml/predictor.py.
+# The model itself is NOT baked in — it is pulled from the MLflow @champion alias
+# at startup, so a new champion is served by restarting the pod (no rebuild).
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/opt/hf \
+    HF_HUB_DISABLE_TELEMETRY=1
+
+# CPU-only torch first (no CUDA), then the serving stack.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+COPY requirements-predict.txt .
+RUN pip install --no-cache-dir -r requirements-predict.txt
+
+COPY libs ./libs
+COPY config ./config
+COPY ml ./ml
+
+# Pre-cache the embedding model (offline, fast cold start).
+RUN python -c "from sentence_transformers import SentenceTransformer; \
+    SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
+
+# KServe custom predictors listen on 8080 and must be the "kserve-container".
+EXPOSE 8080
+ENTRYPOINT ["python", "ml/predictor.py"]

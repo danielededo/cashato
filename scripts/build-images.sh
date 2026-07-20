@@ -9,6 +9,7 @@
 #   cashato/migrate:dev — Alembic migrator (migration Job + grant Job)
 #   cashato/mlflow:dev  — MLflow tracking server + registry
 #   cashato/train:dev   — training/retrain + model import (heavy: torch + ST)
+#   cashato/predict:dev — KServe custom predictor (heavy: torch + ST + kserve)
 #
 # Run after changing service/migrator code or dependencies, then restart the
 # affected Deployments so they pick up the reloaded :dev tag.
@@ -31,6 +32,7 @@ build_load cashato/svc:dev     Dockerfile.svc
 build_load cashato/migrate:dev Dockerfile.migrate
 build_load cashato/mlflow:dev  Dockerfile.mlflow
 build_load cashato/train:dev   Dockerfile.train
+build_load cashato/predict:dev Dockerfile.predict
 
 echo "done. kind reloaded the :dev tags — restart pods to use them, e.g.:"
 echo "  kubectl -n cashato rollout restart deploy"

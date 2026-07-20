@@ -1,0 +1,10 @@
+# Dependencies for the KServe custom predictor image (build/Dockerfile.predict).
+# The model is our custom EmbeddingKNN, so KServe serves it via a custom predictor
+# (the kserve SDK implements the inference protocol) — NOT a built-in runtime.
+# torch is installed CPU-only in the Dockerfile. mlflow client pulls the
+# @champion model from the registry at startup.
+kserve==0.15.0
+scikit-learn==1.6.0
+joblib==1.4.2
+mlflow==2.19.0
+sentence-transformers==3.3.1

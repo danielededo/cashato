@@ -1,0 +1,26 @@
+# KServe InferenceService for the categorization model (C6c). Custom predictor
+# (our EmbeddingKNN via ml/predictor.py) — a plain container named kserve-container
+# (required by KServe). RawDeployment (cluster default) → a normal Deployment +
+# Service, no Knative. The pod pulls the @champion model from MLflow at startup, so
+# promoting a new champion + restarting is enough to serve it (no image rebuild).
+#
+# --model-name matches the InferenceService name so the served endpoint is
+#   /v1/models/categorizer:predict  and KServe's readiness probe path lines up.
+# Lives in cashato-ml (no strict egress policy) so it can reach mlflow + HF cache.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: categorizer
+  namespace: cashato-ml
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: cashato/predict:dev
+        imagePullPolicy: IfNotPresent
+        args: ["--model-name", "categorizer"]
+        env:
+          - { name: MLFLOW_TRACKING_URI, value: http://mlflow.mlflow.svc:5000 }
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits: { cpu: "2", memory: 4Gi }
