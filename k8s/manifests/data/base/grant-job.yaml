@@ -5,6 +5,11 @@
 # objects. Idempotent (GRANT / ALTER DEFAULT PRIVILEGES re-run safely) and retried
 # (backoffLimit) so it survives racing the CNPG role reconciliation.
 # sync-wave 2 = after the migration (wave 1), so the tables already exist.
+# Run as an Argo **Sync hook** (not a plain Job): a Job's pod template is
+# immutable, so editing the GRANTs would otherwise never re-apply on an existing
+# cluster. As a hook it is deleted+recreated on every sync (BeforeHookCreation),
+# so grant changes always reconcile. Idempotent SQL makes re-runs safe; the
+# backoffLimit lets it retry until CNPG has finished reconciling the roles.
 # NOTE (future): a declarative alternative is Crossplane provider-sql (grants as
 # reconciled CRDs) — noted as a later learning milestone.
 apiVersion: batch/v1
@@ -12,7 +17,7 @@ kind: Job
 metadata:
   name: db-grants
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 10
