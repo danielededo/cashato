@@ -28,8 +28,10 @@ spec:
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef: { name: query-reader-db, key: password }
+            # cashato-db-r = any instance (read). NOT -ro: with a single instance
+            # there is no replica, so -ro has no endpoints. -r routes to the primary.
             - name: DATABASE_URL
-              value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-ro.cashato-data.svc:5432/cashato
+              value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-r.cashato-data.svc:5432/cashato
           ports:
             - { name: http, containerPort: 8001 }
           livenessProbe:
