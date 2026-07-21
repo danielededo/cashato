@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from db.db import get_engine  # noqa: E402
-from libs.obs import setup_logging  # noqa: E402
+from libs.obs import setup_logging, start_metrics_server  # noqa: E402
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
@@ -46,8 +46,11 @@ app = FastAPI(
 _CAT = Categorizer.load()
 _engine = get_engine()
 
-# Prometheus HTTP metrics at /metrics (scraped by Prometheus in phase C)
-Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["health"])
+# Prometheus metrics on a dedicated port (:9100), uniform across all services.
+# The Instrumentator still records HTTP request metrics into the default registry;
+# start_metrics_server serves that registry on :9100 instead of the business port.
+Instrumentator().instrument(app)
+start_metrics_server()
 
 
 # --- response models (typed OpenAPI schema + examples) ---

@@ -1,8 +1,8 @@
 # Ingress lock-down for the HTTP APIs: reachable ONLY from the Envoy Gateway
 # (north-south), never pod-to-pod from elsewhere. fromEntities host/remote-node
 # keeps kubelet liveness/readiness probes working (they originate from the node).
-# etl-worker has NO ingress policy (no Service; only node-originated probes hit
-# it, which are allowed as host traffic), so its ingress stays open by default.
+# etl-worker/categorizer have NO ingress policy (no Service), so their ingress
+# stays open by default — which also lets Alloy scrape their metrics on :9100.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -19,6 +19,12 @@ spec:
       toPorts:
         - ports:
             - { port: "8000", protocol: TCP }
+    - fromEndpoints: # Alloy scrapes metrics only (:9100), never the API port
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
+      toPorts:
+        - ports:
+            - { port: "9100", protocol: TCP }
     - fromEntities: # kubelet probes (node-originated)
         - host
         - remote-node
@@ -39,6 +45,12 @@ spec:
       toPorts:
         - ports:
             - { port: "8001", protocol: TCP }
+    - fromEndpoints: # Alloy scrapes metrics only (:9100), never the API port
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
+      toPorts:
+        - ports:
+            - { port: "9100", protocol: TCP }
     - fromEntities:
         - host
         - remote-node

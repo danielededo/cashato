@@ -25,13 +25,14 @@ SERVICES="$ROOT/k8s/manifests/services/base"
 MINIO_DIR="$ROOT/k8s/manifests/minio/base"
 MLFLOW_DIR="$ROOT/k8s/manifests/mlflow/base"
 TRAINING_DIR="$ROOT/k8s/manifests/training/base"
-mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR" "$MLFLOW_DIR" "$TRAINING_DIR"
+OBS_DIR="$ROOT/k8s/manifests/observability/base"
+mkdir -p "$DATA" "$SERVICES" "$MINIO_DIR" "$MLFLOW_DIR" "$TRAINING_DIR" "$OBS_DIR"
 
 [[ -f "$CERT" ]]  || { echo "missing $CERT — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$PW" ]]    || { echo "missing $PW — run ./scripts/secret-zero.sh first"; exit 1; }
 [[ -f "$MINIO" ]] || { echo "missing $MINIO — run ./scripts/secret-zero.sh first"; exit 1; }
 # shellcheck disable=SC1090
-source "$PW"     # -> $etl_writer, $query_reader, $mlflow, $ml_reader
+source "$PW"     # -> $etl_writer, $query_reader, $mlflow, $ml_reader, $grafana_admin
 # shellcheck disable=SC1090
 source "$MINIO"  # -> $minio_user, $minio_password
 
@@ -70,5 +71,10 @@ seal minio-creds mlflow "$minio_user" "$minio_password" "$MLFLOW_DIR/sealedsecre
 # managed.roles password) and for the training/retrain Jobs (ns cashato-ml).
 seal ml-reader-db cashato-data ml_reader "$ml_reader" "$DATA/sealedsecret-ml-reader.yaml"
 seal ml-reader-db cashato-ml   ml_reader "$ml_reader" "$TRAINING_DIR/sealedsecret-ml-reader.yaml"
+
+# Observability (C7a): Mimir uses the MinIO creds for its S3 (blocks) backend;
+# Grafana's admin login comes from grafana-admin (username "admin" + password).
+seal minio-creds   observability "$minio_user" "$minio_password" "$OBS_DIR/sealedsecret-minio.yaml"
+seal grafana-admin observability admin         "$grafana_admin"  "$OBS_DIR/sealedsecret-grafana-admin.yaml"
 
 echo "done. review + commit the regenerated SealedSecrets."

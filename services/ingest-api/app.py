@@ -33,7 +33,7 @@ from db.db import get_engine  # noqa: E402
 from libs import objstore  # noqa: E402
 from libs.config import SOURCE_NAMES, setting  # noqa: E402
 from libs.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream  # noqa: E402
-from libs.obs import setup_logging  # noqa: E402
+from libs.obs import setup_logging, start_metrics_server  # noqa: E402
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
@@ -113,8 +113,11 @@ class FeedbackAccepted(BaseModel):
     category: str
 
 
-# Prometheus HTTP metrics at /metrics
-Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["health"])
+# Prometheus metrics on a dedicated port (:9100), uniform across all services.
+# The Instrumentator still records HTTP request metrics into the default registry;
+# start_metrics_server serves that registry on :9100 instead of the business port.
+Instrumentator().instrument(app)
+start_metrics_server()
 
 
 @app.get("/healthz", tags=["health"], summary="Liveness probe")

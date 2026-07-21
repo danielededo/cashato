@@ -1,0 +1,28 @@
+# Child Application: LGTM observability (C7a — metrics slice: Mimir + Grafana +
+# Alloy). sync-wave 5 — after MinIO (wave 1, Mimir's S3 backend) and the services
+# it scrapes (wave 2). Alloy tolerates targets that don't exist yet (it retries),
+# so ordering is a nicety, not a hard dependency.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/observability/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

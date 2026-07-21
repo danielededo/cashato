@@ -38,6 +38,7 @@ else
     echo "query_reader=$(openssl rand -hex 24)"
     echo "mlflow=$(openssl rand -hex 24)"
     echo "ml_reader=$(openssl rand -hex 24)"
+    echo "grafana_admin=$(openssl rand -hex 24)"
   } > "$PW"
   chmod 600 "$PW"
 fi
@@ -47,6 +48,10 @@ fi
 if ! grep -q '^ml_reader=' "$PW"; then
   echo "[gen]  ml_reader password (appended)"
   echo "ml_reader=$(openssl rand -hex 24)" >> "$PW"
+fi
+if ! grep -q '^grafana_admin=' "$PW"; then
+  echo "[gen]  grafana_admin password (appended)"
+  echo "grafana_admin=$(openssl rand -hex 24)" >> "$PW"
 fi
 
 MINIO="$DIR/minio-creds.env"

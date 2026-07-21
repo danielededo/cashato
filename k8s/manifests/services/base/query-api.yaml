@@ -14,6 +14,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: query-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: /metrics
     spec:
       containers:
         - name: query-api
@@ -34,6 +38,7 @@ spec:
               value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-r.cashato-data.svc:5432/cashato
           ports:
             - { name: http, containerPort: 8001 }
+            - { name: metrics, containerPort: 9100 }
           livenessProbe:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 5
