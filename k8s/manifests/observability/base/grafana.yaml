@@ -19,6 +19,10 @@ data:
         isDefault: true
         jsonData:
           httpMethod: POST
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.observability.svc:3100
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -1,7 +1,9 @@
 # Grafana Alloy — the unified collector (successor of Grafana Agent + Promtail +
-# OTel Collector). Here it does METRICS only (C7a): discovers pods, scrapes those
-# annotated prometheus.io/scrape=true, and remote_writes to Mimir. Logs (Loki)
-# and traces (Tempo/OTLP) are added to this same Alloy in the C7a follow-up.
+# OTel Collector). Here it does METRICS (scrape pods annotated
+# prometheus.io/scrape=true → remote_write to Mimir) and LOGS (tail every pod's
+# logs via the Kubernetes API → push to Loki). Traces (Tempo/OTLP) are added in a
+# later slice. Logs are tailed through the API server (loki.source.kubernetes),
+# not host files, so a single Deployment suffices (no DaemonSet / hostPath).
 # Telemetry reporting is disabled (--disable-reporting): nothing phones home.
 apiVersion: v1
 kind: ServiceAccount
@@ -16,6 +18,10 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [nodes, nodes/proxy, nodes/metrics, services, endpoints, pods]
+    verbs: [get, list, watch]
+  # loki.source.kubernetes streams container logs via the API server.
+  - apiGroups: [""]
+    resources: [pods/log]
     verbs: [get, list, watch]
   - nonResourceURLs: [/metrics]
     verbs: [get]
@@ -104,6 +110,56 @@ data:
     prometheus.remote_write "mimir" {
       endpoint {
         url = "http://mimir.observability.svc:8080/api/v1/push"
+      }
+    }
+
+    // ---- LOGS ----------------------------------------------------------------
+    // Reuse the same pod discovery, but relabel for log labels (keep cardinality
+    // low: namespace/pod/container/app only). loki.source.kubernetes tails each
+    // pod's logs through the API server, so no host mounts / DaemonSet needed.
+    discovery.relabel "pod_logs" {
+      targets = discovery.kubernetes.pods.targets
+
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+        target_label  = "app"
+      }
+    }
+
+    loki.source.kubernetes "pods" {
+      targets    = discovery.relabel.pod_logs.output
+      forward_to = [loki.process.default.receiver]
+    }
+
+    // Our services emit structured JSON logs (libs.obs); lift "level" to a label
+    // so log lines are filterable by severity in Grafana. Non-JSON lines (Mimir,
+    // Grafana, operators) pass through unchanged — the stage extracts nothing.
+    loki.process "default" {
+      forward_to = [loki.write.loki.receiver]
+
+      stage.json {
+        expressions = { level = "level" }
+      }
+      stage.labels {
+        values = { level = "" }
+      }
+    }
+
+    loki.write "loki" {
+      endpoint {
+        url = "http://loki.observability.svc:3100/loki/api/v1/push"
       }
     }
 ---

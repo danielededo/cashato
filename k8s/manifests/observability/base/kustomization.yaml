@@ -6,5 +6,6 @@ resources:
   - sealedsecret-minio.yaml
   - sealedsecret-grafana-admin.yaml
   - mimir.yaml
+  - loki.yaml
   - grafana.yaml
   - alloy.yaml

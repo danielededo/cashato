@@ -1,0 +1,175 @@
+# Grafana Loki — the "L" of the LGTM stack: log aggregation. Run in MONOLITHIC
+# single-binary mode (-target=all, one process) — the size-appropriate topology
+# for kind, mirroring the Mimir deployment. Chunks + index (TSDB v13) live on
+# MinIO (S3), the same object store Mimir/MLflow use; the ruler (unused) stays on
+# local disk. Alloy tails every pod's logs via the Kubernetes API and pushes them
+# here; Grafana queries them through the Loki datasource.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: observability
+data:
+  loki.yaml: |
+    # Single-tenant local install (auth handled by the cluster, not Loki); no
+    # telemetry leaves the machine.
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+      log_level: info
+
+    # Single replica → replication factor 1 and an in-memory ring (no external
+    # KV store). path_prefix is the local working dir on the PVC.
+    common:
+      path_prefix: /data
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+      storage:
+        s3:
+          endpoint: minio.minio.svc:9000
+          bucketnames: loki
+          access_key_id: ${MINIO_USER}
+          secret_access_key: ${MINIO_PASSWORD}
+          s3forcepathstyle: true
+          insecure: true
+
+    # TSDB + schema v13 is the current Loki storage (required for structured
+    # metadata); chunks and index both go to the S3 (MinIO) "loki" bucket.
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      tsdb_shipper:
+        active_index_directory: /data/tsdb-index
+        cache_location: /data/tsdb-cache
+
+    # 7-day retention (matches the JetStream max_age spirit); the compactor
+    # enforces deletes against the object store.
+    limits_config:
+      retention_period: 168h
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      allow_structured_metadata: true
+      volume_enabled: true
+
+    compactor:
+      working_directory: /data/compactor
+      retention_enabled: true
+      delete_request_store: s3
+
+    # Ruler is unused at this stage; keep it on local disk (no extra bucket).
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /data/ruler
+
+    analytics:
+      reporting_enabled: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: observability
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: observability
+spec:
+  replicas: 1
+  # RWO PVC: replace the pod outright (a rolling update would deadlock on the
+  # mount), same as Mimir.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loki
+    spec:
+      initContainers:
+        - name: create-bucket
+          image: minio/mc
+          command:
+            - sh
+            - -c
+            - >
+              mc alias set m http://minio.minio.svc:9000 "$MINIO_USER" "$MINIO_PASSWORD" &&
+              mc mb --ignore-existing m/loki
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+      containers:
+        - name: loki
+          image: grafana/loki:3.4.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/loki/loki.yaml
+            - -target=all
+            - -config.expand-env=true
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+          ports:
+            - { name: http, containerPort: 3100 }
+            - { name: grpc, containerPort: 9096 }
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          volumeMounts:
+            - { name: config, mountPath: /etc/loki }
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+      volumes:
+        - name: config
+          configMap: { name: loki-config }
+        - name: data
+          persistentVolumeClaim: { claimName: loki-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: observability
+spec:
+  selector:
+    app.kubernetes.io/name: loki
+  ports:
+    - { name: http, port: 3100, targetPort: http }
+    - { name: grpc, port: 9096, targetPort: grpc }
