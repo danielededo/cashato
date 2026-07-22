@@ -181,5 +181,6 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 - Platform (phase C): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
   (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/
   Tempo/**Mimir**, backends on MinIO S3; collector **Grafana Alloy**) — NOT
-  kube-prometheus-stack. Metrics slice deployed (C7a); logs/traces next.
+  kube-prometheus-stack. Full LGTM deployed (C7a): metrics + logs + OTel
+  cross-service traces (context propagated through NATS). CI/CD (Harbor, Tekton) next.
 - Multi-user/household is future work (RLS + OIDC), not yet built.
