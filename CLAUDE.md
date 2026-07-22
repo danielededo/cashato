@@ -177,10 +177,13 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 - Medallion = schemas in one Postgres. Dedup by canonical key (description
   excluded). Income/expense by sign. Provider-agnostic categorization.
 - CI/CD: **Tekton + Argo CD** (not GitHub Actions). Registries: **MLflow**
-  (models), **Harbor** (images/Helm). Secrets: **Sealed Secrets**. Code on GitHub.
+  (models); for container images, **Gitea's built-in OCI registry** (Harbor was
+  cut — too heavy for solo/local; the image-registry concern is folded into C7c
+  Tekton). Secrets: **Sealed Secrets**. Code on GitHub.
 - Platform (phase C): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
   (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/
   Tempo/**Mimir**, backends on MinIO S3; collector **Grafana Alloy**) — NOT
   kube-prometheus-stack. Full LGTM deployed (C7a): metrics + logs + OTel
-  cross-service traces (context propagated through NATS). CI/CD (Harbor, Tekton) next.
+  cross-service traces (context propagated through NATS). CI (Tekton, C7c) next —
+  it pushes images to Gitea's registry; no separate image registry.
 - Multi-user/household is future work (RLS + OIDC), not yet built.
