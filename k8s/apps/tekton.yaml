@@ -10,6 +10,12 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "6"
+    # The operator's CRDs get several fields server-defaulted (spec.conversion,
+    # preserveUnknownFields, schema bits) that the release YAML omits. `kubectl
+    # diff` (server-side) sees no change, but Argo's client-side diff flags them
+    # as permanent drift. ServerSideDiff makes Argo diff via the apiserver dry-run
+    # like kubectl does, so the app reports Synced without enumerating fields.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
