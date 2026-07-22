@@ -17,3 +17,11 @@ minio==7.2.15
 # Observability (metrics)
 prometheus-client==0.21.1
 prometheus-fastapi-instrumentator==7.0.0
+
+# Observability (distributed tracing -> OTLP -> Alloy -> Tempo). Core 1.29.0 pairs
+# with the 0.50b0 instrumentation packages. gRPC OTLP exporter (port 4317).
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-grpc==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-psycopg==0.50b0
+opentelemetry-instrumentation-urllib==0.50b0

@@ -1,0 +1,149 @@
+# Grafana Tempo — the "T" of the LGTM stack: distributed-tracing backend. Run as
+# the single-binary (monolithic) process — all components in one pod, the
+# size-appropriate topology for kind, mirroring Mimir/Loki. Trace blocks live on
+# MinIO (S3, bucket `tempo`); the WAL is on the local PVC. Services export OTLP
+# to Alloy, which batches and forwards here; Grafana queries traces via the
+# Tempo datasource (and can jump trace<->logs against Loki).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: observability
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+      grpc_listen_port: 9095
+      log_level: info
+
+    # Tempo receives OTLP itself, but in this stack Alloy is the single collector
+    # front door (services push to Alloy, Alloy forwards here over OTLP/gRPC).
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+
+    ingester:
+      max_block_duration: 5m
+
+    compactor:
+      compaction:
+        block_retention: 168h  # 7d, matching Loki/JetStream
+
+    # S3 (MinIO) trace storage; creds injected via env and expanded with
+    # -config.expand-env=true so no secret is written to this file. WAL on the PVC.
+    storage:
+      trace:
+        backend: s3
+        s3:
+          endpoint: minio.minio.svc:9000
+          bucket: tempo
+          access_key: ${MINIO_USER}
+          secret_key: ${MINIO_PASSWORD}
+          insecure: true
+          forcepathstyle: true
+        wal:
+          path: /data/wal
+
+    # No telemetry leaves the machine.
+    usage_report:
+      reporting_enabled: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tempo-data
+  namespace: observability
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: observability
+spec:
+  replicas: 1
+  # RWO PVC: replace the pod outright (same as Mimir/Loki).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tempo
+    spec:
+      initContainers:
+        - name: create-bucket
+          image: minio/mc
+          command:
+            - sh
+            - -c
+            - >
+              mc alias set m http://minio.minio.svc:9000 "$MINIO_USER" "$MINIO_PASSWORD" &&
+              mc mb --ignore-existing m/tempo
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+      containers:
+        - name: tempo
+          image: grafana/tempo:2.7.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/tempo/tempo.yaml
+            - -config.expand-env=true
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }
+          ports:
+            - { name: http, containerPort: 3200 }
+            - { name: otlp-grpc, containerPort: 4317 }
+            - { name: otlp-http, containerPort: 4318 }
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          volumeMounts:
+            - { name: config, mountPath: /etc/tempo }
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+      volumes:
+        - name: config
+          configMap: { name: tempo-config }
+        - name: data
+          persistentVolumeClaim: { claimName: tempo-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: observability
+spec:
+  selector:
+    app.kubernetes.io/name: tempo
+  ports:
+    - { name: http, port: 3200, targetPort: http }        # Grafana query API
+    - { name: otlp-grpc, port: 4317, targetPort: otlp-grpc }  # Alloy -> Tempo

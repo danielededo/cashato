@@ -39,6 +39,8 @@ spec:
             - { name: NATS_URL, value: nats://nats.nats.svc:4222 }
             - name: PREDICTOR_URL
               value: http://categorizer-predictor.cashato-ml.svc/v1/models/categorizer:predict
+            # Distributed tracing: export OTLP spans to Alloy (unset = tracing off).
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://alloy.observability.svc:4317 }
           ports:
             - { name: metrics, containerPort: 9100 }
           livenessProbe:

@@ -44,6 +44,8 @@ spec:
                 secretKeyRef: { name: minio-creds, key: password }
             - { name: MINIO_BUCKET, value: cashato-uploads }
             - { name: MINIO_SECURE, value: "false" }
+            # Distributed tracing: export OTLP spans to Alloy (unset = tracing off).
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://alloy.observability.svc:4317 }
           ports:
             - { name: http, containerPort: 8000 }
             - { name: metrics, containerPort: 9100 }

@@ -50,3 +50,10 @@ spec:
       toPorts:
         - ports:
             - { port: "8080", protocol: TCP }
+    # OTLP traces -> Grafana Alloy in observability (the collector front door).
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
+      toPorts:
+        - ports:
+            - { port: "4317", protocol: TCP }

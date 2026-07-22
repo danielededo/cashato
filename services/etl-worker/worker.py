@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from opentelemetry import trace  # noqa: E402
 from prometheus_client import Counter, Histogram  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
@@ -34,10 +35,24 @@ from libs.messaging import (  # noqa: E402
     SUBJECT_RECATEGORIZE,
     connect_jetstream,
 )
-from libs.obs import setup_logging, start_metrics_server  # noqa: E402
+from libs.obs import (  # noqa: E402
+    extract_trace_context,
+    inject_trace_headers,
+    setup_logging,
+    setup_tracing,
+    start_metrics_server,
+    tracing_enabled,
+)
 from libs.parsers.detect import detect_source  # noqa: E402
 
 log = setup_logging("etl-worker")
+setup_tracing("etl-worker")
+if tracing_enabled():
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+    PsycopgInstrumentor().instrument()
+# Safe no-op tracer when tracing is disabled (no provider installed).
+tracer = trace.get_tracer("etl-worker")
 
 JOBS = Counter("cashato_etl_jobs_total", "ETL jobs processed", ["status"])
 ROWS = Counter("cashato_etl_rows_ingested_total", "New rows inserted into silver")
@@ -95,17 +110,23 @@ def _apply_feedback(natural_key: str, category: str, corrected_by: str | None) -
     return res.rowcount
 
 
-async def _consume(sub, handler) -> None:
-    """Pull one message from ``sub`` (if any) and run ``handler(data)``."""
+async def _consume(sub, handler, span_name: str) -> None:
+    """Pull one message from ``sub`` (if any) and run ``handler(data)``.
+
+    The span is rooted at the producer's trace context (carried in the NATS
+    message headers), so the ingest request and this job appear in one trace.
+    """
     try:
         msgs = await sub.fetch(1, timeout=1)
     except Exception:
         return  # no message within the timeout
     for m in msgs:
-        try:
-            await handler(json.loads(m.data))
-        finally:
-            await m.ack()
+        ctx = extract_trace_context(m.headers)
+        with tracer.start_as_current_span(span_name, context=ctx):
+            try:
+                await handler(json.loads(m.data))
+            finally:
+                await m.ack()
 
 
 async def _handle_ingest(data: dict) -> int:
@@ -150,12 +171,16 @@ async def main() -> None:
         # New rows landed -> ask the categorizer to run the model over them.
         if inserted:
             with contextlib.suppress(Exception):
-                await js.publish(SUBJECT_RECATEGORIZE, b"{}")
+                # Propagate the current trace context so the categorizer's run
+                # links back to this ingest (one end-to-end trace).
+                await js.publish(
+                    SUBJECT_RECATEGORIZE, b"{}", headers=inject_trace_headers()
+                )
                 log.info("recategorize requested", extra={"fields": {"inserted": inserted}})
 
     while True:
-        await _consume(ingest_sub, handle_ingest_and_notify)
-        await _consume(feedback_sub, _handle_feedback)
+        await _consume(ingest_sub, handle_ingest_and_notify, "etl.ingest")
+        await _consume(feedback_sub, _handle_feedback, "etl.feedback")
 
 
 if __name__ == "__main__":

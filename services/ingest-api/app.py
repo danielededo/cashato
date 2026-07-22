@@ -33,7 +33,13 @@ from db.db import get_engine  # noqa: E402
 from libs import objstore  # noqa: E402
 from libs.config import SOURCE_NAMES, setting  # noqa: E402
 from libs.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream  # noqa: E402
-from libs.obs import setup_logging, start_metrics_server  # noqa: E402
+from libs.obs import (  # noqa: E402
+    inject_trace_headers,
+    setup_logging,
+    setup_tracing,
+    start_metrics_server,
+    tracing_enabled,
+)
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
@@ -119,6 +125,17 @@ class FeedbackAccepted(BaseModel):
 Instrumentator().instrument(app)
 start_metrics_server()
 
+# Distributed tracing: auto-instrument HTTP handlers + the psycopg driver so
+# every request and DB query is a span; trace context then rides the NATS
+# message headers to the etl-worker (see inject_trace_headers on publish).
+setup_tracing("ingest-api")
+if tracing_enabled():
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+    FastAPIInstrumentor.instrument_app(app)
+    PsycopgInstrumentor().instrument()
+
 
 @app.get("/healthz", tags=["health"], summary="Liveness probe")
 async def healthz():
@@ -173,7 +190,9 @@ async def create_upload(
         finally:
             os.unlink(tmp.name)
     job = {"key": key, "filename": file.filename, "source": source}
-    await app.state.js.publish(SUBJECT_INGEST, json.dumps(job).encode())
+    await app.state.js.publish(
+        SUBJECT_INGEST, json.dumps(job).encode(), headers=inject_trace_headers()
+    )
     return UploadAccepted(
         status="queued", filename=file.filename, stored_as=key, source=source
     )
@@ -200,7 +219,9 @@ async def submit_feedback(req: FeedbackRequest):
             detail=f"unknown category code: {req.category!r}. Valid: {sorted(_CATEGORY_CODES)}",
         )
     event = req.model_dump()
-    await app.state.js.publish(SUBJECT_FEEDBACK, json.dumps(event).encode())
+    await app.state.js.publish(
+        SUBJECT_FEEDBACK, json.dumps(event).encode(), headers=inject_trace_headers()
+    )
     return FeedbackAccepted(status="queued", natural_key=req.natural_key, category=req.category)
 
 

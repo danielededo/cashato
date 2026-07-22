@@ -36,6 +36,8 @@ spec:
             # there is no replica, so -ro has no endpoints. -r routes to the primary.
             - name: DATABASE_URL
               value: postgresql+psycopg://$(PGUSER):$(PGPASSWORD)@cashato-db-r.cashato-data.svc:5432/cashato
+            # Distributed tracing: export OTLP spans to Alloy (unset = tracing off).
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://alloy.observability.svc:4317 }
           ports:
             - { name: http, containerPort: 8001 }
             - { name: metrics, containerPort: 9100 }

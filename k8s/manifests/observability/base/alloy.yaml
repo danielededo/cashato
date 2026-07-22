@@ -1,10 +1,10 @@
 # Grafana Alloy — the unified collector (successor of Grafana Agent + Promtail +
-# OTel Collector). Here it does METRICS (scrape pods annotated
-# prometheus.io/scrape=true → remote_write to Mimir) and LOGS (tail every pod's
-# logs via the Kubernetes API → push to Loki). Traces (Tempo/OTLP) are added in a
-# later slice. Logs are tailed through the API server (loki.source.kubernetes),
-# not host files, so a single Deployment suffices (no DaemonSet / hostPath).
-# Telemetry reporting is disabled (--disable-reporting): nothing phones home.
+# OTel Collector). It does all three LGTM signals: METRICS (scrape pods annotated
+# prometheus.io/scrape=true → remote_write to Mimir), LOGS (tail every pod's logs
+# via the Kubernetes API → push to Loki), and TRACES (receive OTLP from the
+# services → batch → forward to Tempo). Logs are tailed through the API server
+# (loki.source.kubernetes), not host files, so a single Deployment suffices (no
+# DaemonSet / hostPath). Telemetry reporting is off (--disable-reporting).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -162,6 +162,30 @@ data:
         url = "http://loki.observability.svc:3100/loki/api/v1/push"
       }
     }
+
+    // ---- TRACES --------------------------------------------------------------
+    // Single OTLP front door for the services (they export to alloy:4317). Batch
+    // spans, then forward to Tempo over OTLP/gRPC.
+    otelcol.receiver.otlp "default" {
+      grpc { endpoint = "0.0.0.0:4317" }
+      http { endpoint = "0.0.0.0:4318" }
+      output {
+        traces = [otelcol.processor.batch.default.input]
+      }
+    }
+
+    otelcol.processor.batch "default" {
+      output {
+        traces = [otelcol.exporter.otlp.tempo.input]
+      }
+    }
+
+    otelcol.exporter.otlp "tempo" {
+      client {
+        endpoint = "tempo.observability.svc:4317"
+        tls { insecure = true }
+      }
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -191,6 +215,8 @@ spec:
             - --disable-reporting
           ports:
             - { name: http, containerPort: 12345 }
+            - { name: otlp-grpc, containerPort: 4317 }
+            - { name: otlp-http, containerPort: 4318 }
           readinessProbe:
             httpGet: { path: /-/ready, port: http }
             initialDelaySeconds: 10
@@ -214,3 +240,5 @@ spec:
     app.kubernetes.io/name: alloy
   ports:
     - { name: http, port: 12345, targetPort: http }
+    - { name: otlp-grpc, port: 4317, targetPort: otlp-grpc }
+    - { name: otlp-http, port: 4318, targetPort: otlp-http }

@@ -24,7 +24,12 @@ from pydantic import BaseModel, Field  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from db.db import get_engine  # noqa: E402
-from libs.obs import setup_logging, start_metrics_server  # noqa: E402
+from libs.obs import (  # noqa: E402
+    setup_logging,
+    setup_tracing,
+    start_metrics_server,
+    tracing_enabled,
+)
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
@@ -51,6 +56,16 @@ _engine = get_engine()
 # start_metrics_server serves that registry on :9100 instead of the business port.
 Instrumentator().instrument(app)
 start_metrics_server()
+
+# Distributed tracing: auto-instrument HTTP handlers + the psycopg driver
+# (driver-level, so the module-level engine created above is still traced).
+setup_tracing("query-api")
+if tracing_enabled():
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+    FastAPIInstrumentor.instrument_app(app)
+    PsycopgInstrumentor().instrument()
 
 
 # --- response models (typed OpenAPI schema + examples) ---

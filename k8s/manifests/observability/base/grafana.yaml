@@ -23,6 +23,10 @@ data:
         type: loki
         access: proxy
         url: http://loki.observability.svc:3100
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo.observability.svc:3200
 ---
 apiVersion: apps/v1
 kind: Deployment

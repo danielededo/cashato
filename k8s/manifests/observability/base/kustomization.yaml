@@ -7,5 +7,6 @@ resources:
   - sealedsecret-grafana-admin.yaml
   - mimir.yaml
   - loki.yaml
+  - tempo.yaml
   - grafana.yaml
   - alloy.yaml

@@ -19,16 +19,32 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from opentelemetry import trace  # noqa: E402
 from prometheus_client import Counter, Histogram  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from db.db import get_engine  # noqa: E402
 from libs.messaging import SUBJECT_RECATEGORIZE, connect_jetstream  # noqa: E402
 from libs.model_client import KServeModel  # noqa: E402
-from libs.obs import setup_logging, start_metrics_server  # noqa: E402
+from libs.obs import (  # noqa: E402
+    extract_trace_context,
+    setup_logging,
+    setup_tracing,
+    start_metrics_server,
+    tracing_enabled,
+)
 from libs.parsers.categorize import Categorizer  # noqa: E402
 
 log = setup_logging("categorizer")
+setup_tracing("categorizer")
+if tracing_enabled():
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+    from opentelemetry.instrumentation.urllib import URLLibInstrumentor
+
+    PsycopgInstrumentor().instrument()
+    URLLibInstrumentor().instrument()  # traces the KServe predictor HTTP call
+# Safe no-op tracer when tracing is disabled (no provider installed).
+tracer = trace.get_tracer("categorizer")
 
 RUNS = Counter("cashato_categorizer_runs_total", "Recategorize runs", ["status"])
 ROWS = Counter("cashato_categorizer_rows_total", "Rows recategorized")
@@ -76,13 +92,17 @@ async def _consume(sub) -> None:
     except Exception:
         return  # no message within the timeout
     for m in msgs:
-        try:
-            await _handle(json.loads(m.data or b"{}"))
-        except Exception as exc:  # noqa: BLE001
-            RUNS.labels(status="error").inc()
-            log.error("recategorize failed", extra={"fields": {"error": str(exc)}})
-        finally:
-            await m.ack()
+        # Root the span at the etl-worker's trace context (from the message
+        # headers) so the recategorize + KServe call join the ingest trace.
+        ctx = extract_trace_context(m.headers)
+        with tracer.start_as_current_span("categorizer.recategorize", context=ctx):
+            try:
+                await _handle(json.loads(m.data or b"{}"))
+            except Exception as exc:  # noqa: BLE001
+                RUNS.labels(status="error").inc()
+                log.error("recategorize failed", extra={"fields": {"error": str(exc)}})
+            finally:
+                await m.ack()
 
 
 async def main() -> None:
