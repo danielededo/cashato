@@ -1,0 +1,29 @@
+# Child Application: Tekton (C7c — CI engine). sync-wave 6 — after everything
+# else (observability is 5); Tekton is independent of the app stack. Installs the
+# Tekton Operator from its pinned release YAML + a TektonConfig CR that reconciles
+# into Pipelines + Triggers + Dashboard + pruner. The operator creates its own
+# namespaces (tekton-operator, tekton-pipelines), so CreateNamespace=false.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tekton
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/tekton/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tekton-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

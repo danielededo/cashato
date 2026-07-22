@@ -1,0 +1,17 @@
+# Tekton (CI engine, C7c) via Argo. Tekton publishes no versioned Helm chart, so
+# — like the observability stack — the operator's version-pinned release YAML is
+# referenced as a remote kustomize resource (immutable URL = reproducible; a
+# version bump is a one-line change). Argo's repo-server fetches and applies it,
+# handling CRD-before-CR ordering and retries natively — which is exactly why this
+# is simpler than pushing chartless YAML through OpenTofu's kubectl provider.
+#
+# The operator (release YAML, sync-wave 0) comes up first; the TektonConfig CR
+# (sync-wave 1) then tells it to install Pipelines + Triggers + Dashboard + pruner.
+#
+# Operator v0.74.0.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://storage.googleapis.com/tekton-releases/operator/previous/v0.74.0/release.yaml
+  - tektonconfig.yaml

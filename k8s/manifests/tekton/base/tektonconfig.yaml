@@ -1,0 +1,30 @@
+# TektonConfig — the single CR the Tekton Operator reconciles into the actual
+# components. This is the operator(Tofu-less→Argo here) / CR(Argo) split's CR half.
+#
+# profile: all  -> Pipelines + Triggers + Dashboard (+ Chains). Triggers is needed
+#   for the Gitea webhook (C7c-d), the Dashboard for visibility, Pipelines for CI.
+# targetNamespace: components install into tekton-pipelines (the conventional ns).
+# pruner: auto-delete old TaskRuns/PipelineRuns so a busy CI doesn't pile up
+#   objects on kind — the operator runs this on a schedule (something the raw
+#   release YAMLs don't give you).
+#
+# sync-wave "1": apply AFTER the operator + its CRDs (wave 0) are healthy, so the
+#   TektonConfig CRD exists and the operator is running to act on it.
+# SkipDryRunOnMissingResource: on the very first sync the CRD may not exist yet
+#   when Argo dry-runs this manifest; skip that dry-run instead of erroring.
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  profile: all
+  targetNamespace: tekton-pipelines
+  pruner:
+    resources:
+      - taskrun
+      - pipelinerun
+    keep: 20
+    schedule: "0 8 * * *"
