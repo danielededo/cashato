@@ -1,0 +1,100 @@
+# CI pipeline (C7c-c): clone -> ruff/mypy/pytest -> buildah build+push of the two
+# light images (svc, migrate) to Gitea's OCI registry, tagged by commit SHA.
+#
+# The git-clone and buildah Tasks are resolved at runtime from the Tekton catalog
+# via the HUB RESOLVER (enable-hub-resolver=true, profile=all). The lint/test Task
+# is project-specific (cashato-lint-test, same namespace).
+#
+# Push target = gitea-http.gitea.svc:3000/cashato/<img>:<sha> — the same ref the
+# nodes' containerd mirror resolves for pulls (C7c-b). Plain HTTP -> TLSVERIFY=false.
+# STORAGE_DRIVER=vfs for buildah-in-pod on kind.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: cashato-ci
+spec:
+  params:
+    - name: repo-url
+      type: string
+      default: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    - name: revision
+      type: string
+      default: main
+    - name: registry
+      type: string
+      default: gitea-http.gitea.svc:3000
+  workspaces:
+    - name: shared        # cloned source, shared across tasks
+    - name: basic-auth    # git-clone HTTP creds (.gitconfig + .git-credentials)
+    - name: dockerconfig  # buildah push creds (config.json)
+  results:
+    - name: svc-image
+      value: $(tasks.build-push-svc.results.IMAGE_URL)
+    - name: migrate-image
+      value: $(tasks.build-push-migrate.results.IMAGE_URL)
+    - name: commit
+      value: $(tasks.fetch-source.results.commit)
+  tasks:
+    - name: fetch-source
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: artifact }
+          - { name: kind, value: task }
+          - { name: name, value: git-clone }
+          - { name: version, value: "0.9" }
+      params:
+        - { name: url, value: $(params.repo-url) }
+        - { name: revision, value: $(params.revision) }
+        - { name: depth, value: "1" }
+      workspaces:
+        - { name: output, workspace: shared }
+        - { name: basic-auth, workspace: basic-auth }
+
+    - name: lint-test
+      runAfter: [fetch-source]
+      taskRef:
+        name: cashato-lint-test
+      workspaces:
+        - { name: source, workspace: shared }
+
+    - name: build-push-svc
+      runAfter: [lint-test]
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: artifact }
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: version, value: "0.9" }
+      params:
+        - { name: IMAGE, value: "$(params.registry)/cashato/svc:$(tasks.fetch-source.results.commit)" }
+        - { name: DOCKERFILE, value: ./build/Dockerfile.svc }
+        - { name: CONTEXT, value: . }
+        - { name: TLSVERIFY, value: "false" }
+        - { name: STORAGE_DRIVER, value: vfs }
+      workspaces:
+        - { name: source, workspace: shared }
+        - { name: dockerconfig, workspace: dockerconfig }
+
+    - name: build-push-migrate
+      runAfter: [lint-test]
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: artifact }
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: version, value: "0.9" }
+      params:
+        - { name: IMAGE, value: "$(params.registry)/cashato/migrate:$(tasks.fetch-source.results.commit)" }
+        - { name: DOCKERFILE, value: ./build/Dockerfile.migrate }
+        - { name: CONTEXT, value: . }
+        - { name: TLSVERIFY, value: "false" }
+        - { name: STORAGE_DRIVER, value: vfs }
+      workspaces:
+        - { name: source, workspace: shared }
+        - { name: dockerconfig, workspace: dockerconfig }
