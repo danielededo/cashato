@@ -44,3 +44,10 @@ python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = "(^data/|^output/|^models/|^\\.venv/)"
+# libs/db/ml are PEP 420 namespace packages (no top-level __init__.py). Without a
+# fixed base, `mypy libs db ml` sees e.g. libs/config.py as both "config" and
+# "libs.config" ("source file found twice") in a clean checkout. Pin the base to
+# the repo root so module names are unambiguous — makes `make typecheck` hermetic
+# (was relying on an incremental cache) and reproducible in CI.
+explicit_package_bases = true
+mypy_path = "."
