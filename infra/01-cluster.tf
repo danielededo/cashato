@@ -12,6 +12,28 @@ resource "kind_cluster" "default" {
     kind        = "Cluster"
     api_version = "kind.x-k8s.io/v1alpha4"
 
+    # C7c-b node-pull wiring: teach every node's containerd to pull images tagged
+    # `gitea-http.gitea.svc:3000/...` from Gitea's built-in OCI registry. The nodes
+    # cannot resolve that in-cluster DNS name themselves, so the mirror KEY (the
+    # name in the image ref) is redirected to the registry's NodePort, reachable
+    # from the node netns via Cilium's kubeProxyReplacement (127.0.0.1:<nodePort>).
+    # nodePort 30300 must match the gitea-registry Service (modules/gitea/values.yaml).
+    #
+    # Plain-HTTP endpoint = insecure pull (no TLS); fine for a local single-user
+    # bridge. This is the inline `registry.mirrors` form, valid on the node image's
+    # containerd 1.7.x (deprecated but honored). NOTE: containerd 2.x REMOVED this
+    # CRI field — if node_image is bumped to a containerd-2.x kindest/node, switch to
+    # the `config_path = "/etc/containerd/certs.d"` + hosts.toml form (via extra_mounts).
+    # NOTE: applying this forces a cluster REPLACE (kind bakes containerd config at
+    # node creation). The running cluster carries the equivalent config as a manual
+    # hot-patch; this block reproduces it on the next intentional rebuild.
+    containerd_config_patches = [
+      <<-TOML
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gitea-http.gitea.svc:3000"]
+        endpoint = ["http://127.0.0.1:30300"]
+      TOML
+    ]
+
     networking {
       # Cilium replaces the default CNI and kube-proxy.
       disable_default_cni = true

@@ -30,3 +30,32 @@ gitea:
     service:
       # Single-user bridge: no open sign-ups.
       DISABLE_REGISTRATION: true
+
+# Dedicated NodePort Service exposing Gitea's HTTP port (3000) — which also serves
+# the built-in OCI registry (/v2/) — to the kind NODES so containerd can pull
+# images from it (C7c-b node-pull wiring). We do NOT flip gitea-http to NodePort:
+# that Service is HEADLESS (clusterIP: None) and headless + NodePort is invalid.
+# A separate Service is additive and leaves the git bridge (Argo's in-cluster
+# ClusterIP path) untouched.
+#
+# The mirror endpoint baked into containerd (infra/01-cluster.tf,
+# containerd_config_patches) points at 127.0.0.1:<nodePort>, so nodePort is PINNED
+# to 30300 — the two must stay in sync.
+extraDeploy:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: gitea-registry
+      labels:
+        app.kubernetes.io/name: gitea
+        cashato/purpose: oci-registry-nodeport
+    spec:
+      type: NodePort
+      selector:
+        app.kubernetes.io/instance: gitea
+        app.kubernetes.io/name: gitea
+      ports:
+        - name: http
+          port: 3000
+          targetPort: 3000
+          nodePort: 30300
