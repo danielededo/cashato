@@ -14,6 +14,7 @@ loaded lazily (sentence-transformers cache).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
@@ -33,7 +34,7 @@ class EmbeddingKNN:
         self.k = k
         self._vectors: np.ndarray | None = None
         self._labels: list[str] | None = None
-        self._st = None  # SentenceTransformer, lazy
+        self._st: Any = None  # SentenceTransformer, lazy
 
     # --- embedding (lazy model load) ---
     def _encode(self, texts: list[str]) -> np.ndarray:
@@ -60,7 +61,7 @@ class EmbeddingKNN:
         scores: dict[str, float] = {}
         for i in idx:
             scores[self._labels[i]] = scores.get(self._labels[i], 0.0) + float(sims[i])
-        best = max(scores, key=scores.get)
+        best = max(scores, key=lambda kk: scores[kk])
         # confidence = similarity of the best neighbor (0..1)
         conf = float(sims[idx[0]])
         return best, conf
@@ -79,7 +80,7 @@ class EmbeddingKNN:
             scores: dict[str, float] = {}
             for i in idx:
                 scores[self._labels[i]] = scores.get(self._labels[i], 0.0) + float(row[i])
-            best = max(scores, key=scores.get)
+            best = max(scores, key=lambda kk: scores[kk])
             out.append((best, float(row[idx[0]])))
         return out
 

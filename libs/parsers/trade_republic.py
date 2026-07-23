@@ -21,7 +21,7 @@ import bisect
 import csv
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -147,18 +147,14 @@ class _Block:
     day: int | None = None
     month: int | None = None
     year: int | None = None
-    desc_tokens: list[tuple[float, float, str]] = None  # (top, x0, text)
+    desc_tokens: list[tuple[float, float, str]] = field(default_factory=list)  # (top, x0, text)
     amount: Decimal | None = None
     amount_kind: str | None = None  # 'entrata' | 'uscita'
     saldo: Decimal | None = None
 
-    def __post_init__(self):
-        if self.desc_tokens is None:
-            self.desc_tokens = []
-
     @property
     def complete(self) -> bool:
-        return (
+        return bool(
             self.day
             and self.month
             and self.year
@@ -167,6 +163,7 @@ class _Block:
         )
 
     def to_date(self) -> date:
+        assert self.year is not None and self.month is not None and self.day is not None
         return date(self.year, self.month, self.day)
 
     def description(self) -> str:
@@ -269,6 +266,7 @@ def _parse_pdf(path: str | Path) -> list[Transaction]:
     for b in blocks:
         if not b.complete:
             continue
+        assert b.amount is not None  # guaranteed by b.complete
         d = b.to_date()
         amount = b.amount if b.amount_kind == "entrata" else -b.amount
         desc = b.description()

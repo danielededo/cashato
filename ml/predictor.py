@@ -37,6 +37,7 @@ except Exception:  # noqa: BLE001
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from libs.parsers.categorize import build_text  # noqa: E402
+from ml.model import EmbeddingKNN  # noqa: E402
 from ml.registry import load_champion  # noqa: E402
 
 DEFAULT_NAME = "cashato-categorizer"
@@ -46,7 +47,7 @@ class CategorizerModel(kserve.Model):
     def __init__(self, name: str):
         super().__init__(name)
         self.name = name
-        self._model = None
+        self._model: EmbeddingKNN | None = None
         self.load()
 
     def load(self) -> None:
@@ -65,6 +66,7 @@ class CategorizerModel(kserve.Model):
             build_text(x if isinstance(x, str) else (x.get("description", "")))
             for x in instances
         ]
+        assert self._model is not None  # set in load(), which raises otherwise
         preds = self._model.predict_batch(texts)
         out = [
             {"category": p[0], "confidence": round(p[1], 4)}

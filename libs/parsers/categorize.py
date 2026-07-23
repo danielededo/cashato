@@ -85,7 +85,7 @@ class Categorizer:
     ) -> Categorizer:
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        mcc_map = {}
+        mcc_map: dict = {}
         if Path(mcc_path).exists():
             with open(mcc_path, encoding="utf-8") as f:
                 mcc_map = yaml.safe_load(f) or {}
