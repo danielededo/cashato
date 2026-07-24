@@ -15,7 +15,12 @@ variable "namespace" {
 }
 
 variable "repo_url" {
-  description = "Git repo URL Argo CD pulls app manifests from (Gitea now)."
+  description = "Git repo URL the ROOT app-of-apps pulls from (the config/deploy repo)."
+  type        = string
+}
+
+variable "creds_url" {
+  description = "URL prefix for the Argo repo-creds credential template — covers every Gitea repo under it (source + deploy) with one Secret."
   type        = string
 }
 

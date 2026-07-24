@@ -11,6 +11,7 @@ resources:
   - sealedsecret-webhook-secret.yaml
   - sealedsecret-gitea-admin.yaml
   - task-lint-test.yaml
+  - task-bump-deploy.yaml
   - pipeline.yaml
   # Triggers (C7c-d): build-on-push via a Gitea webhook → in-cluster EventListener.
   - triggers-rbac.yaml

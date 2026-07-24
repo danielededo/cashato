@@ -6,8 +6,11 @@ module "argocd" {
   chart_version       = local.chart_versions.argocd
   argocd_apps_version = local.chart_versions.argocd_apps
 
-  # Register the Gitea repo (labeled Secret) and seed the root app-of-apps.
-  repo_url      = "${module.gitea.http_url}/${var.git_bridge_username}/${var.git_bridge_repo}.git"
+  # Root app-of-apps watches the CONFIG/deploy repo (cashato-deploy); the child
+  # apps it finds there pull manifests from the source repo. One repo-creds Secret
+  # (creds_url = the Gitea owner prefix) authenticates BOTH repos (C7c-e).
+  repo_url      = "${module.gitea.http_url}/${var.git_bridge_username}/${var.git_deploy_repo}.git"
+  creds_url     = "${module.gitea.http_url}/${var.git_bridge_username}"
   repo_username = var.git_bridge_username
   repo_password = var.git_bridge_password
   apps_path     = "k8s/apps"

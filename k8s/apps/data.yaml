@@ -17,6 +17,11 @@ spec:
     repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
     targetRevision: main
     path: k8s/manifests/data/overlays/kind
+    # Image tag pinned by CI (C7c-e): the bump-deploy pipeline step rewrites this
+    # line in the cashato-deploy copy to cashato/migrate:<commit-sha>. `:dev` = seed.
+    kustomize:
+      images:
+        - cashato/migrate:dev
   destination:
     server: https://kubernetes.default.svc
     namespace: cashato-data

@@ -1,0 +1,66 @@
+# C7c-e: after the images are built+pushed, pin the services/data Argo apps in the
+# cashato-deploy config repo to the freshly built commit-SHA image refs, then push.
+# This is the ONLY writer of cashato-deploy; the source repo is never touched by CI
+# (keeps its history human-only). No webhook on cashato-deploy → no build loop.
+#
+# The pin points at the REGISTRY-qualified ref (gitea-http.gitea.svc:3000/cashato/
+# <img>:<sha>) that the nodes' containerd mirror resolves — NOT the local kind-loaded
+# `cashato/<img>:dev`. A targeted regex edit preserves the file's comments/indent.
+# Runs on cashato/migrate:dev (already node-local, has Python) + apt-installs git.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cashato-bump-deploy
+spec:
+  params:
+    - name: deploy-repo-url
+      type: string
+    - name: registry
+      type: string
+    - name: revision
+      type: string
+  workspaces:
+    - name: source       # reuse the pipeline's shared PVC (clone into a subdir)
+    - name: basic-auth   # git HTTP creds (.gitconfig + .git-credentials)
+  steps:
+    - name: bump-and-push
+      image: cashato/migrate:dev
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        apt-get update -qq && apt-get install -y -qq git >/dev/null
+
+        # Writable HOME with the Gitea creds (credential.helper=store reads
+        # ~/.git-credentials; the token in it matches the Gitea host → push works).
+        export HOME=/tmp/githome
+        mkdir -p "$HOME"
+        cp "$(workspaces.basic-auth.path)/.gitconfig" "$HOME/.gitconfig"
+        cp "$(workspaces.basic-auth.path)/.git-credentials" "$HOME/.git-credentials"
+
+        D="$(workspaces.source.path)/cashato-deploy"
+        rm -rf "$D"
+        git clone "$(params.deploy-repo-url)" "$D"
+
+        python3 - "$D" "$(params.registry)" "$(params.revision)" <<'PY'
+        import re, sys, pathlib
+        deploy, registry, sha = sys.argv[1:4]
+        targets = {
+            "k8s/apps/services.yaml": ("cashato/svc", f"cashato/svc={registry}/cashato/svc:{sha}"),
+            "k8s/apps/data.yaml": ("cashato/migrate", f"cashato/migrate={registry}/cashato/migrate:{sha}"),
+        }
+        for rel, (img, newval) in targets.items():
+            p = pathlib.Path(deploy) / rel
+            text = p.read_text()
+            # match the kustomize.images list entry, whether `- cashato/svc:dev`
+            # (seed) or a prior `- cashato/svc=.../svc:<oldsha>` (idempotent re-run)
+            new = re.sub(rf"(?m)^(\s*)- {re.escape(img)}[:=].*$", rf"\g<1>- {newval}", text)
+            if new == text:
+                raise SystemExit(f"ERROR: no image line matched in {rel}")
+            p.write_text(new)
+            print(f"{rel} -> - {newval}")
+        PY
+
+        cd "$D"
+        git -c user.email=ci@cashato.local -c user.name=cashato-ci \
+          commit -am "ci: deploy $(params.revision)" || { echo "no change to push"; exit 0; }
+        git push

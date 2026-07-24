@@ -35,6 +35,9 @@ spec:
     - name: registry
       type: string
       default: gitea-http.gitea.svc:3000
+    - name: deploy-repo-url
+      type: string
+      default: http://gitea-http.gitea.svc:3000/cashato/cashato-deploy.git
   workspaces:
     - name: shared        # cloned source, shared across tasks
     - name: basic-auth    # git-clone HTTP creds (.gitconfig + .git-credentials)
@@ -115,3 +118,18 @@ spec:
       workspaces:
         - { name: source, workspace: shared }
         - { name: dockerconfig, workspace: dockerconfig }
+
+    # After BOTH images are pushed, pin the services/data Argo apps in the
+    # cashato-deploy config repo to this commit's registry image refs (kustomize
+    # .images) + push. Argo then redeploys onto :<sha>. Only writer of cashato-deploy.
+    - name: bump-deploy
+      runAfter: [build-push-svc, build-push-migrate]
+      taskRef:
+        name: cashato-bump-deploy
+      params:
+        - { name: deploy-repo-url, value: $(params.deploy-repo-url) }
+        - { name: registry, value: $(params.registry) }
+        - { name: revision, value: $(tasks.fetch-source.results.commit) }
+      workspaces:
+        - { name: source, workspace: shared }
+        - { name: basic-auth, workspace: basic-auth }

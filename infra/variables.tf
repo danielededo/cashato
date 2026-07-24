@@ -28,7 +28,13 @@ variable "git_bridge_password" {
 }
 
 variable "git_bridge_repo" {
-  description = "Repository name pushed to Gitea for GitOps."
+  description = "Source repository name in Gitea (code + manifests)."
   type        = string
   default     = "cashato"
+}
+
+variable "git_deploy_repo" {
+  description = "Config/deploy repository name in Gitea — the app-of-apps Argo watches; CI pins image tags here (C7c-e)."
+  type        = string
+  default     = "cashato-deploy"
 }
