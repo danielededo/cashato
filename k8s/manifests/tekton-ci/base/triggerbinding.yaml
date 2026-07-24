@@ -1,0 +1,13 @@
+# Extracts the commit SHA from the Gitea push payload. We DELIBERATELY do NOT bind
+# repo-url from the payload: `repository.clone_url` carries Gitea's configured base
+# URL (the external/localhost one), which the in-cluster git-clone can't resolve.
+# The TriggerTemplate leaves repo-url unset so the Pipeline's default — the in-cluster
+# svc DNS gitea-http.gitea.svc:3000 — is used. Only the SHA varies per push.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: cashato-ci-push
+spec:
+  params:
+    - name: revision
+      value: $(body.after)

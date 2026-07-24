@@ -1,0 +1,39 @@
+# Mints a PipelineRun of cashato-ci per accepted webhook — the Triggers equivalent
+# of pipelinerun-example.yaml, parametrized by the pushed commit SHA. Same
+# workspaces as the manual run: an ephemeral shared PVC + the two Gitea cred
+# SealedSecrets. repo-url/registry are left to the Pipeline defaults (in-cluster).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: cashato-ci
+spec:
+  params:
+    - name: revision
+      description: Commit SHA to check out and build/tag.
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: cashato-ci-
+      spec:
+        taskRunTemplate:
+          serviceAccountName: cashato-ci
+        pipelineRef:
+          name: cashato-ci
+        params:
+          - name: revision
+            value: $(tt.params.revision)
+        workspaces:
+          - name: shared
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: basic-auth
+            secret:
+              secretName: gitea-basic-auth
+          - name: dockerconfig
+            secret:
+              secretName: gitea-dockerconfig

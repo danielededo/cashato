@@ -1,0 +1,78 @@
+# Ensures the Gitea repo webhook that drives build-on-push (C7c-d) — the GitOps
+# way, mirroring db-grants: an Argo **Sync hook** (deleted+recreated each sync via
+# BeforeHookCreation), so re-running always reconciles the desired webhook. Chosen
+# over a host script (needs a port-forward, out of GitOps) and over the Tofu gitea
+# provider (would depend cross-tool on the Argo-created EventListener Service and
+# duplicate the HMAC secret). Everything stays in-cluster and tracked.
+#
+# Runs a pure-stdlib Python (urllib+json) on cashato/migrate:dev (already node-local,
+# has Python) — no curl/jq, no extra image. Idempotent: deletes any hook already
+# pointing at our sink, then creates a fresh one.
+#
+# Reuses the SAME token as the EventListener (gitea-webhook-secret/secretToken) for
+# the HMAC — single source, no duplication. Gitea admin creds come from gitea-admin.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitea-webhook
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-webhook
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: ensure-webhook
+          image: cashato/migrate:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -c
+            - |
+              import json, os, base64
+              import urllib.request as u
+              base = os.environ["GITEA"]
+              owner, repo, sink = os.environ["OWNER"], os.environ["REPO"], os.environ["SINK"]
+              secret = os.environ["WEBHOOK_SECRET"]
+              auth = base64.b64encode(
+                  f'{os.environ["GITEA_USER"]}:{os.environ["GITEA_PW"]}'.encode()
+              ).decode()
+              hdr = {"Authorization": "Basic " + auth, "Content-Type": "application/json"}
+              api = f"{base}/api/v1/repos/{owner}/{repo}/hooks"
+
+              def req(method, url, body=None):
+                  data = json.dumps(body).encode() if body is not None else None
+                  with u.urlopen(u.Request(url, data=data, headers=hdr, method=method)) as r:
+                      raw = r.read()
+                      return json.loads(raw) if raw else None
+
+              for h in req("GET", api) or []:
+                  if h.get("config", {}).get("url") == sink:
+                      req("DELETE", f"{api}/{h['id']}")
+                      print("removed existing hook", h["id"], flush=True)
+
+              created = req("POST", api, {
+                  "type": "gitea", "active": True, "events": ["push"],
+                  "branch_filter": "main",
+                  "config": {"url": sink, "content_type": "json", "secret": secret},
+              })
+              print("webhook ensured: id", created["id"], "->", sink, flush=True)
+          env:
+            - { name: GITEA, value: http://gitea-http.gitea.svc:3000 }
+            - { name: OWNER, value: cashato }
+            - { name: REPO, value: cashato }
+            - { name: SINK, value: http://el-cashato-ci.cashato-ci.svc:8080 }
+            - name: WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef: { name: gitea-webhook-secret, key: secretToken }
+            - name: GITEA_USER
+              valueFrom:
+                secretKeyRef: { name: gitea-admin, key: username }
+            - name: GITEA_PW
+              valueFrom:
+                secretKeyRef: { name: gitea-admin, key: password }

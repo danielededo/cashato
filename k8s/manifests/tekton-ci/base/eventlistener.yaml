@@ -1,0 +1,42 @@
+# The webhook sink (C7c-d). Creating this spins up a Deployment + Service named
+# `el-cashato-ci` (port 8080). Both sender (Gitea) and receiver live IN the cluster,
+# so Gitea POSTs to el-cashato-ci.cashato-ci.svc:8080 over cluster DNS — no ingress,
+# no Gateway, no public exposure (a real advantage of the in-cluster Gitea bridge).
+#
+# Two interceptors gate every delivery:
+#   1. github  — verifies the HMAC-SHA256 signature (X-Hub-Signature-256) against
+#                the shared secret AND filters to push events. Gitea sends
+#                GitHub-compatible headers (X-Hub-Signature-256 / X-GitHub-Event),
+#                so the stock `github` ClusterInterceptor works against Gitea.
+#   2. cel     — accepts only pushes to main (drops branch/tag pushes).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: cashato-ci
+spec:
+  serviceAccountName: cashato-ci-triggers
+  triggers:
+    - name: gitea-push-main
+      interceptors:
+        - name: verify-signature-and-push
+          ref:
+            name: github
+            kind: ClusterInterceptor
+          params:
+            - name: secretRef
+              value:
+                secretName: gitea-webhook-secret
+                secretKey: secretToken
+            - name: eventTypes
+              value: ["push"]
+        - name: only-branch-main
+          ref:
+            name: cel
+            kind: ClusterInterceptor
+          params:
+            - name: filter
+              value: "body.ref == 'refs/heads/main'"
+      bindings:
+        - ref: cashato-ci-push
+      template:
+        ref: cashato-ci

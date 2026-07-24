@@ -1,0 +1,37 @@
+# RBAC for the EventListener (C7c-d). The EventListener sink runs under this
+# dedicated ServiceAccount (NOT the pipeline SA cashato-ci): it must create
+# PipelineRuns and read trigger resources in this namespace, plus read the
+# cluster-scoped ClusterInterceptors/ClusterTriggerBindings. The two ClusterRoles
+# ship with Tekton Triggers (tekton-triggers-eventlistener-{roles,clusterroles})
+# — we only bind them, never define them.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cashato-ci-triggers
+---
+# Namespaced perms: create/get PipelineRuns + get/list/watch the trigger CRs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cashato-ci-triggers-eventlistener
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+subjects:
+  - kind: ServiceAccount
+    name: cashato-ci-triggers
+---
+# Cluster-scoped perms: read ClusterInterceptors (github/cel) + ClusterTriggerBindings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cashato-ci-triggers-eventlistener-clusterroles
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles
+subjects:
+  - kind: ServiceAccount
+    name: cashato-ci-triggers
+    namespace: cashato-ci
