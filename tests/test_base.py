@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from libs.parsers.base import (
+from cashato.parsers.base import (
     MoneyParseError,
     Transaction,
     assign_occurrence_keys,

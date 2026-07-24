@@ -17,18 +17,19 @@ spec:
       env:
         - name: PIP_DISABLE_PIP_VERSION_CHECK
           value: "1"
+        # Config lives at the repo root in the cloned workspace (not baked); the
+        # unit tests load categorie/mcc/settings from here.
+        - name: CASHATO_CONFIG_DIR
+          value: config
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
-        echo "== install (svc runtime + dev tools + pytest) =="
-        pip install --no-cache-dir -q \
-          -r requirements-svc.txt \
-          -r requirements-dev.txt \
-          pytest==8.3.4
+        echo "== install (package + svc runtime + dev tools) =="
+        pip install --no-cache-dir -q '.[svc,dev]'
         # Mirror the project's own make targets (Makefile: lint/typecheck/test).
         echo "== ruff (make lint) =="
         ruff check .
         echo "== mypy (make typecheck) =="
-        mypy libs db ml
+        mypy src
         echo "== pytest (make test) =="
         python -m pytest

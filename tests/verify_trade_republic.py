@@ -14,11 +14,9 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import pdfplumber
 
-import pdfplumber  # noqa: E402
-
-from libs.parsers import trade_republic as tr  # noqa: E402
+from cashato.parsers import trade_republic as tr
 
 DEFAULT_PDF = "data/trade_republic/Account statement.pdf"
 

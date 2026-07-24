@@ -24,8 +24,7 @@ spec:
         - name: etl-worker
           image: cashato/svc:dev
           imagePullPolicy: IfNotPresent
-          workingDir: /app
-          command: ["python", "services/etl-worker/worker.py"]
+          command: ["python", "-m", "cashato.services.etl_worker.worker"]
           env:
             - name: PGUSER
               valueFrom:

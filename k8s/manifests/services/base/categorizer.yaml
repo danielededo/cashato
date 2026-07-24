@@ -25,8 +25,7 @@ spec:
         - name: categorizer
           image: cashato/svc:dev
           imagePullPolicy: IfNotPresent
-          workingDir: /app
-          command: ["python", "services/categorizer/worker.py"]
+          command: ["python", "-m", "cashato.services.categorizer.worker"]
           env:
             - name: PGUSER
               valueFrom:

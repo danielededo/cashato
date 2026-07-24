@@ -57,12 +57,11 @@ spec:
             - name: train
               image: cashato/train:dev
               imagePullPolicy: IfNotPresent
-              workingDir: /app
               command:
                 - sh
                 - -c
                 - >
-                  python ml/train.py --include-rules
+                  python -m cashato.ml.train --include-rules
                   --stamp "$(date +%Y%m%d-%H%M)"
                   --register --promote if-better
               env:

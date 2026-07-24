@@ -37,8 +37,7 @@ spec:
         - name: register
           image: cashato/train:dev
           imagePullPolicy: IfNotPresent
-          workingDir: /app
-          command: ["python", "ml/register_model.py", "--if-absent"]
+          command: ["python", "-m", "cashato.ml.register_model", "--if-absent"]
           env:
             - { name: MLFLOW_TRACKING_URI, value: http://mlflow.mlflow.svc:5000 }
           resources:

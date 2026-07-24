@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cashato"
 version = "0.1.0"
@@ -8,8 +12,70 @@ license = { text = "MIT" }
 authors = [{ name = "Daniele De Dominicis" }]
 keywords = ["finance", "bank-statements", "etl", "categorization", "pdf-parsing"]
 
-# Le dipendenze runtime sono elencate in requirements.txt (pin espliciti).
-# Qui teniamo solo metadati e configurazione strumenti.
+# Minimal shared base: config (pyyaml) + DB (SQLAlchemy/psycopg) + the base
+# categorizer. Everything format/web/ML-specific lives in an extra below, so
+# migrate/train/predict images stay lean. torch is installed separately in the
+# train/predict Dockerfiles (CPU wheel index).
+dependencies = [
+    "pyyaml==6.0.2",
+    "SQLAlchemy==2.0.36",
+    "psycopg[binary]==3.2.3",
+]
+
+[project.optional-dependencies]
+# svc image: the 4 services (parsers + FastAPI + NATS + MinIO + OTel).
+svc = [
+    "pdfplumber==0.11.4",
+    "pandas==2.2.3",
+    "python-dateutil==2.9.0.post0",
+    "openpyxl==3.1.5",
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "python-multipart==0.0.20",
+    "nats-py==2.9.0",
+    "minio==7.2.15",
+    "prometheus-client==0.21.1",
+    "prometheus-fastapi-instrumentator==7.0.0",
+    "opentelemetry-sdk==1.29.0",
+    "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
+    "opentelemetry-instrumentation-fastapi==0.50b0",
+    "opentelemetry-instrumentation-psycopg==0.50b0",
+    "opentelemetry-instrumentation-urllib==0.50b0",
+]
+# migrate image: Alembic one-shot Job (base already has SQLAlchemy/psycopg).
+migrate = ["alembic==1.14.0"]
+# train image: offline training/registry (torch via Dockerfile).
+train = [
+    "scikit-learn==1.6.0",
+    "joblib==1.4.2",
+    "mlflow==2.19.0",
+    "sentence-transformers==3.3.1",
+]
+# predict image: KServe custom predictor (torch via Dockerfile).
+predict = [
+    "kserve==0.15.0",
+    "scikit-learn==1.6.0",
+    "joblib==1.4.2",
+    "mlflow==2.19.0",
+    "sentence-transformers==3.3.1",
+]
+# dev/CI tooling (installed alongside .[svc] for lint/type/test).
+dev = [
+    "ruff==0.8.4",
+    "mypy==1.14.0",
+    "pre-commit==4.0.1",
+    "types-PyYAML==6.0.12.20240917",
+    "types-python-dateutil==2.9.0.20241206",
+    "pytest==8.3.4",
+]
+
+[project.scripts]
+cashato-load = "cashato.cli.load:main"
+cashato-export = "cashato.cli.export:main"
+cashato-link-transfers = "cashato.cli.link_transfers:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 100
@@ -18,10 +84,10 @@ extend-exclude = [".venv", "data", "output", "models", "mlruns"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
-ignore = ["E501"]  # lunghezza riga gestita dal formatter
+ignore = ["E501"]  # line length handled by the formatter
 
 [tool.ruff.lint.isort]
-known-first-party = ["libs", "db", "ml"]
+known-first-party = ["cashato"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI idiom: dependency-injection markers used as argument defaults.
@@ -34,9 +100,8 @@ extend-immutable-calls = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
-# gli script di verifica end-to-end richiedono dati/DB reali: esclusi dai test unitari
+# end-to-end verify scripts need real data/DB: excluded from the unit tests
 addopts = "-q --ignore=tests/verify_revolut.py --ignore=tests/verify_trade_republic.py --ignore=tests/verify_intesa.py"
 
 [tool.mypy]
@@ -44,10 +109,3 @@ python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = "(^data/|^output/|^models/|^\\.venv/)"
-# libs/db/ml are PEP 420 namespace packages (no top-level __init__.py). Without a
-# fixed base, `mypy libs db ml` sees e.g. libs/config.py as both "config" and
-# "libs.config" ("source file found twice") in a clean checkout. Pin the base to
-# the repo root so module names are unambiguous — makes `make typecheck` hermetic
-# (was relying on an incremental cache) and reproducible in CI.
-explicit_package_bases = true
-mypy_path = "."

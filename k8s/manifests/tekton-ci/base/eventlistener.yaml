@@ -29,13 +29,19 @@ spec:
                 secretKey: secretToken
             - name: eventTypes
               value: ["push"]
-        - name: only-branch-main
+        # Only push to main, AND only when a source-relevant path changed — so a
+        # docs/k8s/infra/config-only push does NOT rebuild the images (config is a
+        # runtime ConfigMap now; only src/**, build/**, or pyproject.toml matter).
+        - name: only-main-and-source-changes
           ref:
             name: cel
             kind: ClusterInterceptor
           params:
             - name: filter
-              value: "body.ref == 'refs/heads/main'"
+              value: >-
+                body.ref == 'refs/heads/main' &&
+                body.commits.exists(c, (c.added + c.modified + c.removed).exists(f,
+                  f.startsWith('src/') || f.startsWith('build/') || f == 'pyproject.toml'))
       bindings:
         - ref: cashato-ci-push
       template:

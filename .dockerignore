@@ -1,0 +1,20 @@
+# Keep the Docker build context small and free of secrets/bank data.
+# Images need only: pyproject.toml, README.md, src/, alembic.ini, build/,
+# models/latest.joblib (train). Everything below is excluded.
+.venv/
+.git/
+data/
+output/
+mlruns/
+frontend/
+node_modules/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+infra/
+k8s/
+tests/
+.claude/

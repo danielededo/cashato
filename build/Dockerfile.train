@@ -1,10 +1,10 @@
 # Training / registry image (C6 / MLOps). Heavy ML stack — deliberately separate
-# from the light service image (Dockerfile.svc). Runs the retrain CronJob/Job
-# (ml/train.py) and the one-off model import (ml/register_model.py).
+# from the light service image. Runs the retrain CronJob/Job
+# (python -m cashato.ml.train) and the one-off import (python -m cashato.ml.register_model).
 #
-# torch is installed CPU-only from the dedicated index (kind has no GPU; keeps the
-# image off CUDA). The sentence-transformers embedding model is pre-downloaded at
-# build time so training runs are reproducible and need no internet at run time.
+# torch is installed CPU-only from the dedicated index (kind has no GPU). The
+# sentence-transformers embedding model is pre-downloaded at build time so runs
+# are reproducible and need no internet. config/*.yaml is a runtime ConfigMap.
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -13,17 +13,13 @@ ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf \
     HF_HUB_DISABLE_TELEMETRY=1
 
-# CPU-only torch first (avoid pulling CUDA), then the rest of the ML stack.
+# CPU-only torch first (avoid pulling CUDA), then the package + ML stack.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-COPY requirements-train.txt .
-RUN pip install --no-cache-dir -r requirements-train.txt
-
-COPY libs ./libs
-COPY db ./db
-COPY config ./config
-COPY ml ./ml
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir '.[train]'
 # The model we already have — imported into the registry as the incumbent
-# @champion by ml/register_model.py (models/ is gitignored; baked in at build).
+# @champion by cashato.ml.register_model (models/ is gitignored; baked in here).
 COPY models/latest.joblib ./models/latest.joblib
 
 # Pre-cache the embedding model into the image (offline, reproducible runs).

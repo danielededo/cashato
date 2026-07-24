@@ -3,7 +3,7 @@
 from datetime import date
 from decimal import Decimal
 
-from libs.transfers import Leg, find_pairs
+from cashato.transfers import Leg, find_pairs
 
 
 def _leg(id, acc, amount, d=(2025, 1, 10), desc="x"):

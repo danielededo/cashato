@@ -14,6 +14,12 @@ metadata:
   namespace: cashato-ml
 spec:
   predictor:
+    # Runtime config mounted from the cashato-config ConfigMap (created by the
+    # training app in this namespace; stable name, no hash suffix).
+    volumes:
+      - name: config
+        configMap:
+          name: cashato-config
     containers:
       - name: kserve-container
         image: cashato/predict:dev
@@ -21,10 +27,15 @@ spec:
         args: ["--model-name", "categorizer"]
         env:
           - { name: MLFLOW_TRACKING_URI, value: http://mlflow.mlflow.svc:5000 }
+          - { name: CASHATO_CONFIG_DIR, value: /etc/cashato/config }
           # Match torch/OpenMP threads to the CPU limit (avoid oversubscription
           # thrashing — torch otherwise spawns ~half the host cores).
           - { name: OMP_NUM_THREADS, value: "4" }
           - { name: MKL_NUM_THREADS, value: "4" }
+        volumeMounts:
+          - name: config
+            mountPath: /etc/cashato/config
+            readOnly: true
         resources:
           requests: { cpu: "1", memory: 1Gi }
           limits: { cpu: "4", memory: 4Gi }

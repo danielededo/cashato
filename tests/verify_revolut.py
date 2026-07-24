@@ -18,9 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 
 # Rende importabile libs/ senza installazione
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from libs.parsers import revolut  # noqa: E402
+from cashato.parsers import revolut
 
 DEFAULT_CSV = "data/Revolut/consolidated-statement-v2_2023-10-10_2026-07-18_en_4941b1.csv"
 

@@ -13,3 +13,42 @@ resources:
   - categorizer.yaml
   - query-api.yaml
   - httproutes.yaml
+
+# Runtime config (settings/categorie/mcc) as a ConfigMap — no longer baked into
+# the image, so editing a rule/threshold no longer requires a rebuild. Stable name
+# (no hash suffix) so the same object can be referenced across namespaces/apps;
+# a config change is applied by Argo, then `kubectl rollout restart` to pick it up.
+# NOTE: the source files live at the repo root (../../../../config), outside the
+# kustomize root → Argo must run with `--load-restrictor LoadRestrictionsNone`.
+configMapGenerator:
+  - name: cashato-config
+    files:
+      - ../../../../config/settings.yaml
+      - ../../../../config/categorie.yaml
+      - ../../../../config/mcc.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+
+# One JSON patch mounts the ConfigMap into all four services (container 0) and
+# points CASHATO_CONFIG_DIR at the mount.
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/volumes
+        value:
+          - name: config
+            configMap:
+              name: cashato-config
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts
+        value:
+          - name: config
+            mountPath: /etc/cashato/config
+            readOnly: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CASHATO_CONFIG_DIR
+          value: /etc/cashato/config

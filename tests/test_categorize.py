@@ -1,6 +1,6 @@
 """Test unitari del Categorizer (senza modello ML: MCC + regole + default)."""
 
-from libs.parsers.categorize import Categorizer, build_text
+from cashato.parsers.categorize import Categorizer, build_text
 
 
 def _cat():

@@ -15,12 +15,10 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import pdfplumber
 
-import pdfplumber  # noqa: E402
-
-from libs.parsers import intesa  # noqa: E402
-from libs.parsers.base import parse_money  # noqa: E402
+from cashato.parsers import intesa
+from cashato.parsers.base import parse_money
 
 DEFAULT_DIR = "data/intesa"
 PATTERN = "*Estratto conto trimestrale*.pdf"

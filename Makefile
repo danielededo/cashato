@@ -12,11 +12,11 @@ help: ## Mostra questo aiuto
 venv: ## Crea il virtualenv
 	python3 -m venv .venv
 
-install: ## Installa le dipendenze runtime
-	$(PIP) install -r requirements.txt
+install: ## Installa il package + deps servizio in editable
+	$(PIP) install -e '.[svc,dev]'
 
-install-dev: ## Installa le dipendenze di sviluppo (lint/test)
-	$(PIP) install -r requirements-dev.txt
+install-dev: ## Installa solo i tool di sviluppo (lint/test)
+	$(PIP) install -e '.[dev]'
 
 db-up: ## Avvia Postgres (docker-compose)
 	docker compose -f deploy/docker-compose.yml up -d
@@ -34,19 +34,19 @@ fmt: ## Ruff (format + autofix)
 	./.venv/bin/ruff format . && ./.venv/bin/ruff check --fix .
 
 typecheck: ## Mypy
-	./.venv/bin/mypy libs db ml
+	./.venv/bin/mypy src
 
 test: ## Test unitari (pytest)
-	$(PY) -m pytest
+	CASHATO_CONFIG_DIR=config $(PY) -m pytest
 
 export: ## Export unificato (LANG=it|en)
-	$(PY) export.py --lang $(or $(LANG),it)
+	CASHATO_CONFIG_DIR=config $(PY) -m cashato.cli.export --lang $(or $(LANG),it)
 
 train: ## Costruisce l'indice a embedding (M2)
-	$(PY) ml/train.py --include-rules --stamp "$$(date +%Y%m%d-%H%M)"
+	CASHATO_CONFIG_DIR=config CASHATO_MODEL_DIR=models $(PY) -m cashato.ml.train --include-rules --stamp "$$(date +%Y%m%d-%H%M)"
 
 recategorize: ## Ri-categorizza il DB con il modello (M3)
-	$(PY) ml/recategorize.py
+	CASHATO_CONFIG_DIR=config CASHATO_MODEL_DIR=models $(PY) -m cashato.ml.recategorize
 
 clean: ## Rimuove cache e artefatti temporanei
 	find . -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true

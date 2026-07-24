@@ -10,3 +10,8 @@ configs:
     # Serve UI/API over plain HTTP; TLS is terminated upstream (port-forward now,
     # Envoy Gateway later). Avoids the self-signed-cert friction on kind.
     server.insecure: true
+  cm:
+    # Let kustomize's configMapGenerator read files outside the kustomize root:
+    # the cashato-config ConfigMap is generated from config/*.yaml at the repo
+    # root (../../../../config), which the default RootOnly restrictor forbids.
+    kustomize.buildOptions: --load-restrictor LoadRestrictionsNone

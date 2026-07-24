@@ -9,3 +9,59 @@ resources:
   - sealedsecret-ml-reader.yaml
   - register-champion-job.yaml
   - cronjob.yaml
+
+# Runtime config ConfigMap in cashato-ml (also consumed by the serving app, which
+# references it by this stable name). Stable name = no hash suffix. Source files
+# live at the repo root → Argo needs `--load-restrictor LoadRestrictionsNone`.
+configMapGenerator:
+  - name: cashato-config
+    files:
+      - ../../../../config/settings.yaml
+      - ../../../../config/categorie.yaml
+      - ../../../../config/mcc.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+
+# Mount the ConfigMap into the register Job (containers[0]) and the train CronJob
+# (jobTemplate → containers[0]); point CASHATO_CONFIG_DIR at the mount.
+patches:
+  - target:
+      kind: Job
+    patch: |-
+      - op: add
+        path: /spec/template/spec/volumes
+        value:
+          - name: config
+            configMap:
+              name: cashato-config
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts
+        value:
+          - name: config
+            mountPath: /etc/cashato/config
+            readOnly: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CASHATO_CONFIG_DIR
+          value: /etc/cashato/config
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/volumes
+        value:
+          - name: config
+            configMap:
+              name: cashato-config
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/volumeMounts
+        value:
+          - name: config
+            mountPath: /etc/cashato/config
+            readOnly: true
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: CASHATO_CONFIG_DIR
+          value: /etc/cashato/config
