@@ -1,0 +1,65 @@
+# Frontend SPA (phase E) — the built React bundle served by hardened, non-root
+# nginx. Reached only through the Envoy Gateway (`/` route); it serves static files
+# + the SPA fallback and does NOT proxy the API (the gateway path-splits /api/v1).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cashato
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: cashato/frontend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          # Hardened: non-root (nginx-unprivileged runs as UID 101), read-only root
+          # FS with writable dirs mounted as emptyDir, no capabilities, no privesc.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - { name: cache, mountPath: /var/cache/nginx }
+            - { name: run, mountPath: /var/run }
+            - { name: tmp, mountPath: /tmp }
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+      volumes:
+        - { name: cache, emptyDir: {} }
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: cashato
+spec:
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - { name: http, port: 80, targetPort: http }

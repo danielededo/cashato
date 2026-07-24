@@ -41,7 +41,7 @@ spec:
               value: >-
                 body.ref == 'refs/heads/main' &&
                 body.commits.exists(c, (c.added + c.modified + c.removed).exists(f,
-                  f.startsWith('src/') || f.startsWith('build/') || f == 'pyproject.toml'))
+                  f.startsWith('src/') || f.startsWith('frontend/') || f.startsWith('build/') || f == 'pyproject.toml'))
       bindings:
         - ref: cashato-ci-push
       template:

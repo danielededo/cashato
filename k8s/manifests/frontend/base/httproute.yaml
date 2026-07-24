@@ -1,0 +1,19 @@
+# Serves the SPA at the gateway root. PathPrefix `/` is the LEAST specific rule, so
+# Gateway API longest-prefix matching still sends `/api/v1/...` to the API routes
+# (in services/httproutes.yaml); everything else — `/`, `/dashboard`, `/assets/...`,
+# client-router paths — falls through to the frontend. Same host, no rewrite.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend
+  namespace: cashato
+spec:
+  parentRefs:
+    - name: cashato
+      namespace: cashato-gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: frontend
+          port: 80

@@ -1,0 +1,23 @@
+# Ingress lock-down for the frontend SPA: reachable ONLY from the Envoy Gateway
+# (north-south) on the nginx port 8080; kubelet probes via fromEntities. The SPA
+# calls the API from the BROWSER (which hits the gateway directly), so the frontend
+# pod needs no pod-to-pod egress to the APIs (and cashato-egress {} allows only DNS).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: frontend-ingress
+  namespace: cashato
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }
+    - fromEntities: # kubelet probes (node-originated)
+        - host
+        - remote-node

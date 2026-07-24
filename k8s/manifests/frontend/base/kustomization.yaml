@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Dedicated component (not folded into `services/`) so the SPA stays free of the
+# services' config-mount patch. ns cashato — so the HTTPRoute attaches to the shared
+# gateway and the frontend-ingress NetworkPolicy applies. No ConfigMap: the SPA is
+# static and calls the API same-origin from the browser.
+resources:
+  - deployment.yaml
+  - httproute.yaml

@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - cashato-egress.yaml
   - api-ingress.yaml
+  - frontend-ingress.yaml

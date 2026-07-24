@@ -1,0 +1,153 @@
+/* Palette from the dataviz skill (validated light + dark). Vars swap by OS theme
+   and by an optional data-theme stamp on <html> (toggle-ready). SVG marks read
+   these via var(--series-N), so charts theme automatically. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --cat-other: #898781;
+  --income: #008300;
+  --expense: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --cat-other: #898781;
+    --income: #0ca30c;
+    --expense: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --income: #0ca30c;
+  --expense: #e66767;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+a { color: inherit; }
+
+.app { min-height: 100%; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; gap: 24px;
+  padding: 12px 24px; background: var(--surface-1);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.topbar .brand { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.topbar nav { display: flex; gap: 4px; }
+.topbar nav a {
+  padding: 6px 12px; border-radius: 8px; text-decoration: none;
+  color: var(--text-secondary); font-weight: 500;
+}
+.topbar nav a:hover { background: var(--page); }
+.topbar nav a.active { background: var(--series-1); color: #fff; }
+
+.content { padding: 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+h2 { font-size: 15px; margin: 0 0 12px; color: var(--text-secondary); font-weight: 600; }
+
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; margin-bottom: 16px;
+}
+.grid { display: grid; gap: 16px; }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 800px) { .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; } }
+
+/* KPI stat tiles */
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.tile .label { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tile .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+.tile .value.pos { color: var(--income); }
+.tile .value.neg { color: var(--expense); }
+
+/* table */
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+td.num, th.num { text-align: right; }
+td .amt.neg { color: var(--expense); }
+td .amt.pos { color: var(--income); }
+.desc { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* chip / legend swatch */
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.legend span { color: var(--text-secondary); font-size: 12px; }
+
+/* forms / filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+label.field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-secondary); }
+input, select, button {
+  font: inherit; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--baseline); background: var(--surface-1); color: var(--text-primary);
+}
+button { cursor: pointer; font-weight: 500; }
+button.primary { background: var(--series-1); color: #fff; border-color: transparent; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.state { padding: 24px; text-align: center; color: var(--text-secondary); }
+.state.error { color: var(--expense); }
+.pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); }
+.pill.parsed { color: var(--income); }
+.pill.failed { color: var(--expense); }
+.pill.pending { color: var(--muted); }
+
+.dropzone {
+  border: 2px dashed var(--baseline); border-radius: 12px; padding: 40px;
+  text-align: center; color: var(--text-secondary); background: var(--surface-1);
+}
+.dropzone.over { border-color: var(--series-1); background: var(--page); }
+.pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; }

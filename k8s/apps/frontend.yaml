@@ -1,0 +1,32 @@
+# Child Application: the frontend SPA (phase E). sync-wave 2 — alongside services,
+# after the wave-1 Gateway (it attaches an HTTPRoute) and wave-0 data. Its manifests
+# live in the SOURCE repo; the CI pins the image tag in the cashato-deploy copy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: frontend
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
+    targetRevision: main
+    path: k8s/manifests/frontend/overlays/kind
+    # Image tag pinned by CI (C7c-e): bump-deploy rewrites this to
+    # cashato/frontend:<commit-sha> in the cashato-deploy copy. `:dev` = seed.
+    kustomize:
+      images:
+        - cashato/frontend:dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cashato
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -119,11 +119,33 @@ spec:
         - { name: source, workspace: shared }
         - { name: dockerconfig, workspace: dockerconfig }
 
-    # After BOTH images are pushed, pin the services/data Argo apps in the
+    # cashato/frontend — the SPA (phase E). CONSUMED BY the frontend Deployment
+    # (ns cashato). Multi-stage node→nginx build. (build/Dockerfile.frontend)
+    - name: build-push-frontend
+      runAfter: [lint-test]
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: type, value: artifact }
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: version, value: "0.9" }
+      params:
+        - { name: IMAGE, value: "$(params.registry)/cashato/frontend:$(tasks.fetch-source.results.commit)" }
+        - { name: DOCKERFILE, value: ./build/Dockerfile.frontend }
+        - { name: CONTEXT, value: . }
+        - { name: TLSVERIFY, value: "false" }
+        - { name: STORAGE_DRIVER, value: vfs }
+      workspaces:
+        - { name: source, workspace: shared }
+        - { name: dockerconfig, workspace: dockerconfig }
+
+    # After ALL images are pushed, pin the services/data/frontend Argo apps in the
     # cashato-deploy config repo to this commit's registry image refs (kustomize
     # .images) + push. Argo then redeploys onto :<sha>. Only writer of cashato-deploy.
     - name: bump-deploy
-      runAfter: [build-push-svc, build-push-migrate]
+      runAfter: [build-push-svc, build-push-migrate, build-push-frontend]
       taskRef:
         name: cashato-bump-deploy
       params:

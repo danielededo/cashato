@@ -47,6 +47,7 @@ spec:
         targets = {
             "k8s/apps/services.yaml": ("cashato/svc", f"cashato/svc={registry}/cashato/svc:{sha}"),
             "k8s/apps/data.yaml": ("cashato/migrate", f"cashato/migrate={registry}/cashato/migrate:{sha}"),
+            "k8s/apps/frontend.yaml": ("cashato/frontend", f"cashato/frontend={registry}/cashato/frontend:{sha}"),
         }
         for rel, (img, newval) in targets.items():
             p = pathlib.Path(deploy) / rel

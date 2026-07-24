@@ -6,7 +6,10 @@
 data/
 output/
 mlruns/
-frontend/
+# frontend source IS needed by build/Dockerfile.frontend — exclude only its build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 node_modules/
 **/__pycache__/
 *.pyc

@@ -36,3 +36,8 @@ infra/secrets/
 
 # Out-of-band Tofu secrets (secret-zero)
 infra/*.auto.tfvars
+
+# frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

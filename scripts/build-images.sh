@@ -28,11 +28,12 @@ build_load() { # <image:tag> <dockerfile-name>
   kind load docker-image "$1" --name "$CLUSTER"
 }
 
-build_load cashato/svc:dev     Dockerfile.svc
-build_load cashato/migrate:dev Dockerfile.migrate
-build_load cashato/mlflow:dev  Dockerfile.mlflow
-build_load cashato/train:dev   Dockerfile.train
-build_load cashato/predict:dev Dockerfile.predict
+build_load cashato/svc:dev      Dockerfile.svc
+build_load cashato/migrate:dev  Dockerfile.migrate
+build_load cashato/frontend:dev Dockerfile.frontend
+build_load cashato/mlflow:dev   Dockerfile.mlflow
+build_load cashato/train:dev    Dockerfile.train
+build_load cashato/predict:dev  Dockerfile.predict
 
 echo "done. kind reloaded the :dev tags — restart pods to use them, e.g.:"
 echo "  kubectl -n cashato rollout restart deploy"
