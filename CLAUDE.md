@@ -45,7 +45,7 @@ Schemas within a single database (not separate DBs):
   `v_transactions` (projection of silver so the read API stays gold-only). Plus
   ML tables `training_labels`, `category_feedback` (active learning).
 
-Migrations: Alembic (`db/migrations`), currently through **0009**.
+Migrations: Alembic (`src/cashato/db/migrations`), currently through **0009**.
 
 ### Common schema (`silver.transactions`) — English
 
@@ -83,7 +83,7 @@ identical same-day operations.
 ## The three sources (multi-format)
 
 Each source accepts more than one format; routing is content-based
-(`libs/parsers/detect.py`, no filename guessing) with an optional explicit
+(`src/cashato/parsers/detect.py`, no filename guessing) with an optional explicit
 `source` override at upload. Inspect a real file before writing/adjusting a parser
 — never guess a PDF layout.
 
@@ -111,7 +111,7 @@ Never depend on providers' native categories (inconsistent, often absent, biasin
 Resolver chain (order = priority) over **universal** signals:
 
 1. **MCC** (ISO 18245, `config/mcc.yaml`) — exact, high precision.
-2. **Embedding model** — `EmbeddingKNN` (`ml/model.py`): multilingual
+2. **Embedding model** — `EmbeddingKNN` (`src/cashato/ml/model.py`): multilingual
    sentence-transformers + kNN; used if `confidence ≥ threshold`. Feature text =
    `normalize_desc` only (no regex cleaning). This does the bulk of the work.
 3. **Rules** — thin bilingual keyword safety net (`config/categorie.yaml`).
@@ -129,7 +129,7 @@ does model categorization off an event, keeping the etl-worker light.
 
 ## Internal transfers
 
-`libs/transfers.py` pairs opposite-amount legs on different own-accounts within a
+`src/cashato/transfers.py` pairs opposite-amount legs on different own-accounts within a
 window (`transfers.window_days`), guarded by same-day OR a transfer hint; tags
 both legs with `transfer_group`. Gold spend views **exclude** these (they net to
 zero, not spending). `link_transfers.py` runs the batch.
@@ -140,7 +140,7 @@ zero, not spending). `link_transfers.py` runs the batch.
 
 FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 `/readyz`), business API under `/api/v1`, `ROOT_PATH` for the gateway, OpenAPI at
-`/docs`. Structured JSON logging + Prometheus `/metrics` (`libs/obs.py`).
+`/docs`. Structured JSON logging + Prometheus `/metrics` (`src/cashato/obs.py`).
 
 - **ingest-api** — `POST /uploads` (stores file, validates extension → 415 and
   per-file size cap → 413, enqueues a NATS job); `GET /files` (status +
@@ -157,14 +157,18 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 
 ## Extensibility, config, stack
 
-- **Add a source** (fork/monorepo model, no plugin machinery): add an entry to
-  `config/sources.yaml` + a `libs/parsers/<name>.py` exposing `parse(path) ->
-  list[Transaction]` (module name == source name; the registry auto-wires it).
-  See CONTRIBUTING.
-- **Parametrized**: `config/sources.yaml` (sources + detection + currency),
+- **Add a source** (fork/monorepo model, no plugin machinery): drop in a
+  `src/cashato/parsers/<name>.py` exposing `parse(path) -> list[Transaction]` +
+  `DETECTION: list[list[str]]` (content-detection marker groups) + `CURRENCY`.
+  The registry (`registry.py`) auto-discovers it by scanning the package (module
+  name == source id). No config entry needed — detection is parser-coupled, so it
+  lives with the parser. See CONTRIBUTING.
+- **Parametrized** (runtime `config/*.yaml`, mounted as the `cashato-config`
+  ConfigMap — NOT baked into images, loaded via `CASHATO_CONFIG_DIR`):
   `config/settings.yaml` (thresholds, embed model, transfer window, upload caps),
-  `config/categorie.yaml`, `config/mcc.yaml`. These become ConfigMaps in phase C;
-  infra endpoints/secrets stay env/Secret.
+  `config/categorie.yaml`, `config/mcc.yaml`. Editing one deploys via Argo with no
+  image rebuild. Infra endpoints/secrets stay env/Secret. (There is no
+  `sources.yaml` — the source registry is code, see "Add a source".)
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
   pytest, MIT license. Dev: a local Postgres for the data core; the full platform
