@@ -57,6 +57,17 @@ resource "helm_release" "cilium" {
       name  = "k8sClientRateLimit.burst"
       value = "100"
     },
+    # Disable the L7 (Envoy) proxy. We only use L3/L4 CiliumNetworkPolicies (no
+    # toFQDNs / L7 DNS rules), so the DNS proxy is dead weight — and on the WSL2
+    # kernel it can't even install its rules: `xt_TPROXY` is missing, so Cilium
+    # loops forever on "iptables ... cilium-dns-egress ... TPROXY revision 0 not
+    # supported, missing kernel module". Turning off l7Proxy stops those attempts.
+    # Re-enable this if L7 policy or toFQDNs is ever needed (requires a TPROXY-
+    # capable kernel).
+    {
+      name  = "l7Proxy"
+      value = "false"
+    },
   ]
 
   # Wait until the CNI is actually up before Tofu considers the release done.

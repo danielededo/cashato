@@ -13,5 +13,6 @@ locals {
     sealed_secrets = "2.19.1"  # C5 — Sealed Secrets controller (app v0.38.4)
     cert_manager   = "v1.21.0" # C6b — webhook certs (KServe dependency)
     kserve         = "v0.15.0" # C6b — model serving (RawDeployment, OCI chart)
+    metrics_server = "3.12.2"  # C7 — metrics.k8s.io API for HPA + kubectl top (app v0.7.2)
   }
 }
