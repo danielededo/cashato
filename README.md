@@ -11,7 +11,7 @@ machine.
 
 | Tool | Use | Required |
 |------|-----|:--------:|
-| **Docker + Docker Compose** | local Postgres, NATS | yes |
+| **Docker** | local Postgres (data core); kind (full platform) | yes |
 | **Python 3.12** | parsers, loader, services, ML | yes |
 | **Ollama** | offline LLM labeling (ML phase) | ML only |
 
@@ -19,7 +19,7 @@ machine.
 
 ```bash
 python3 -m venv .venv
-./.venv/bin/pip install -r requirements.txt          # or requirements-dev.txt
+./.venv/bin/pip install -e '.[svc,dev]'              # installs the cashato package + deps
 docker run -d --name cashato-pg -p 5432:5432 \
   -e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato \
   postgres:17-alpine                                 # local Postgres for the data core
@@ -32,8 +32,8 @@ The DB URL is configurable via `DATABASE_URL` (default
 ## Data ingestion
 
 Put files under `data/<source>/` (`data/` is git-ignored for privacy). Each
-source accepts **multiple formats**; the source is detected by **content**
-(configurable in `config/sources.yaml`), no filename guessing.
+source accepts **multiple formats**; the source is detected by **content** (each
+parser module declares its own `DETECTION` markers), no filename guessing.
 
 | Source | Supported formats |
 |--------|-------------------|
@@ -42,9 +42,9 @@ source accepts **multiple formats**; the source is detected by **content**
 | Intesa Sanpaolo | 21 quarterly PDF statements · 13-month PDF/XLSX export |
 
 ```bash
-./.venv/bin/python load.py --source revolut        "data/Revolut/consolidated-....csv"
-./.venv/bin/python load.py --source trade_republic "data/trade_republic/Transaction export.csv"
-./.venv/bin/python load.py --source intesa         "data/intesa/....pdf"
+./.venv/bin/cashato-load --source revolut        "data/Revolut/consolidated-....csv"
+./.venv/bin/cashato-load --source trade_republic "data/trade_republic/Transaction export.csv"
+./.venv/bin/cashato-load --source intesa         "data/intesa/....pdf"
 ```
 
 The loader is **idempotent**: the same file (or overlapping exports, or different
@@ -76,21 +76,22 @@ guard) and tags both legs with a shared `transfer_group`; the GOLD spend views
 exclude them.
 
 ```bash
-./.venv/bin/python link_transfers.py        # run after loading
+./.venv/bin/cashato-link-transfers        # run after loading
 ```
 
 ## Unified export
 
 ```bash
-./.venv/bin/python export.py --lang it   # -> output/transazioni.csv
-./.venv/bin/python export.py --lang en --out output/transactions_en.csv
+./.venv/bin/cashato-export --lang it   # -> output/transazioni.csv
+./.venv/bin/cashato-export --lang en --out output/transactions_en.csv
 ```
 
-## Services (local, docker-compose)
+## Services
 
 `ingest-api` (upload → NATS) → `etl-worker` (detect → parse → persist) →
-`query-api` (spend aggregates). OpenAPI at `/docs` · `/redoc` · `/openapi.json`;
-probes at `/healthz` · `/readyz`; business API under `/api/v1`.
+`query-api` (spend aggregates) + `categorizer` (ML categorization off an event).
+OpenAPI at `/docs` · `/redoc` · `/openapi.json`; probes at `/healthz` · `/readyz`;
+business API under `/api/v1`.
 
 The full stack runs on the local **kind** cluster (phase C, IaC) — see `infra/`
 (OpenTofu) and `k8s/` (GitOps via Argo CD). Once deployed, the services are
@@ -129,9 +130,9 @@ export PATH="$HOME/.local/bin:$PATH" && ollama serve &
 ### Run the ML pipeline
 
 ```bash
-./.venv/bin/python ml/label_llm.py --model qwen2.5:3b --limit 1000   # M1: label the long tail
-./.venv/bin/python ml/train.py --include-rules --stamp "$(date +%Y%m%d-%H%M)"  # M2: train embedding kNN
-./.venv/bin/python ml/recategorize.py                                # M3: apply + measure `other` drop
+./.venv/bin/python -m cashato.ml.label_llm --model qwen2.5:3b --limit 1000   # M1: label the long tail
+./.venv/bin/python -m cashato.ml.train --include-rules --stamp "$(date +%Y%m%d-%H%M)"  # M2: train embedding kNN
+./.venv/bin/python -m cashato.ml.recategorize                                # M3: apply + measure `other` drop
 ```
 
 Metrics are tracked with **MLflow** if installed, otherwise the step is skipped.
@@ -149,16 +150,19 @@ totals: `tests/verify_{revolut,trade_republic,intesa}.py`.
 ## Repository layout
 
 ```
-libs/           config.py (settings/sources loader) · messaging.py (NATS) · transfers.py
-libs/parsers/   base.py (Transaction, Decimal, dedup) · registry.py (auto-wired adapters)
-                revolut.py · trade_republic.py · intesa.py · detect.py · categorize.py
-ml/             label_llm.py (M1) · train.py (M2) · model.py (EmbeddingKNN) · recategorize.py (M3)
-config/         sources.yaml · settings.yaml · categorie.yaml · mcc.yaml   (ConfigMaps in phase C)
-services/       ingest-api · etl-worker · query-api        db/  Alembic migrations + engine
-load.py  export.py  link_transfers.py                      tests/  unit + verification
-build/          Dockerfile.svc · Dockerfile.migrate        (bootstrap images; Harbor in C7)
-infra/          OpenTofu (kind + operators)   k8s/         GitOps manifests (Argo CD)
-scripts/        secret-zero.sh · seal-secrets.sh · build-images.sh
+src/cashato/      the installable package (pip install -e .)
+  config.py (settings loader) · obs.py (logs/metrics/traces) · messaging.py (NATS) · objstore.py (MinIO) · transfers.py
+  parsers/        base.py (Transaction, Decimal, dedup) · registry.py (auto-discovered adapters)
+                  revolut.py · trade_republic.py · intesa.py (each: parse + DETECTION) · detect.py · categorize.py
+  ml/             label_llm.py (M1) · train.py (M2) · model.py (EmbeddingKNN) · recategorize.py (M3) · predictor.py
+  db/             db.py (engine) · migrations/ (Alembic)
+  services/       ingest_api · etl_worker · query_api · categorizer   (launched via python -m / uvicorn)
+  cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
+config/           settings.yaml · categorie.yaml · mcc.yaml   (runtime `cashato-config` ConfigMap; not baked)
+pyproject.toml    package metadata + deps (base + svc/migrate/train/predict/dev extras)
+build/            Dockerfile.{svc,migrate,train,predict,mlflow}   (bootstrap images)
+infra/            OpenTofu (kind + operators)   k8s/   GitOps manifests (Argo CD)
+scripts/          secret-zero.sh · seal-secrets.sh · build-images.sh    tests/  unit + verification
 data/  output/  models/   (git-ignored)
 ```
 

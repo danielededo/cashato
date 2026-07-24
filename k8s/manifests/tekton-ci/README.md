@@ -15,7 +15,7 @@ fetch-source ──▶ lint-test ──┬──▶ build-push-svc      (cashato
 | Task | What it does | Source |
 |------|--------------|--------|
 | `fetch-source` | shallow clone of the repo (private → `basic-auth` workspace) | hub: `git-clone` 0.9 |
-| `lint-test` | `ruff check .` → `mypy libs db ml` → `pytest` (mirrors the [Makefile](../../../Makefile) targets) | local Task `cashato-lint-test` |
+| `lint-test` | `pip install .[svc,dev]` → `ruff check .` → `mypy src` → `pytest` (mirrors the [Makefile](../../../Makefile) targets) | local Task `cashato-lint-test` |
 | `build-push-svc` | build+push `cashato/svc` | hub: `buildah` 0.9 |
 | `build-push-migrate` | build+push `cashato/migrate` | hub: `buildah` 0.9 |
 

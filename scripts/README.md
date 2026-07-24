@@ -36,7 +36,7 @@ in-cluster and tracked — no host scripts:
 | Import the existing model as the incumbent | `register-champion` Job (runs automatically on sync; idempotent `--if-absent`). |
 | Retrain on a schedule | Unsuspend the `train` CronJob (`kubectl -n cashato-ml patch cronjob train -p '{"spec":{"suspend":false}}'`). |
 | Retrain on demand | `kubectl -n cashato-ml create job --from=cronjob/train train-manual-$(date +%s)`. |
-| Enrich the dataset (long tail) | host + Ollama: `ml/label_llm.py` (offline, GPU) → `gold.training_labels`. |
+| Enrich the dataset (long tail) | host + Ollama: `python -m cashato.ml.label_llm` (offline, GPU) → `gold.training_labels`. |
 
 Each retrain trains a *challenger*, registers a new version, and promotes it to
 `@champion` only if it beats the current champion on the holdout (`--promote

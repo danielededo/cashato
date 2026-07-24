@@ -7,9 +7,11 @@ Thanks for your interest! cashato normalizes and categorizes bank transactions
 
 ```bash
 make venv
-make install-dev          # runtime + tools (ruff, mypy, pytest, pre-commit)
+make install              # editable install: cashato package + svc deps + dev tools
 ./.venv/bin/pre-commit install
-make db-up && make migrate
+docker run -d --name cashato-pg -p 5432:5432 \
+  -e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato postgres:17-alpine
+make migrate
 ```
 
 ## Workflow
@@ -29,7 +31,7 @@ Before opening a PR: `make lint && make test` must pass.
 ## Conventions
 
 - **Python 3.12+**, max line length 100 (ruff / `.editorconfig`).
-- Monetary amounts are **always `Decimal`**, never `float` (see `libs/parsers/base.py`).
+- Monetary amounts are **always `Decimal`**, never `float` (see `src/cashato/parsers/base.py`).
 - **No bank data in the repo**: `data/`, `output/`, `models/` are git-ignored.
 - **Code in English** (comments, docstrings, identifiers). Italian is allowed only
   in string literals that must match real (Italian) document text (detection
@@ -41,18 +43,20 @@ Before opening a PR: `make lint && make test` must pass.
 
 ## Add a new source/bank (for forks & contributors)
 
-The design is built so adding a bank touches **config + one adapter module**,
-nothing else (`SOURCE_NAMES`, detection and the adapter registry all derive from
-config):
+The design is built so adding a bank touches **one adapter module**, nothing else
+(`SOURCE_NAMES`, detection and the registry all auto-derive from the parser modules):
 
-1. **Add the source to `config/sources.yaml`**: an entry `<name>` with `display`,
-   `currency`, and `detection` (content marker groups used to auto-detect the file).
-2. **Create `libs/parsers/<name>.py`** exposing `parse(path) -> list[Transaction]`.
-   The module name **must equal** the source name (the registry auto-wires it —
-   no edit to `load.py`). **Inspect a real file first**; don't guess the layout.
-3. **Reuse the toolkit**: `base.parse_money`, `normalize_desc`,
+1. **Create `src/cashato/parsers/<name>.py`** exposing:
+   - `parse(path) -> list[Transaction]` — the adapter;
+   - `DETECTION: list[list[str]]` — content marker groups used to auto-detect the
+     file (a file matches if, for ANY group, ALL its markers are in the head text);
+   - `CURRENCY` — e.g. `"EUR"`.
+   The module name **is** the source id; the registry auto-discovers it by scanning
+   the package (no config entry, no edit to the loader). **Inspect a real file first**;
+   don't guess the layout.
+2. **Reuse the toolkit**: `base.parse_money`, `normalize_desc`,
    `assign_occurrence_keys`, and (for PDFs) the position-aware helpers as a model.
-4. **Add a verification** in `tests/` (reconcile against the statement's declared
+3. **Add a verification** in `tests/` (reconcile against the statement's declared
    totals when available) and unit tests where useful.
 
 No changes to the core, the services, or the categorizer are needed: the new
