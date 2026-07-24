@@ -22,11 +22,13 @@ A local, provider-agnostic pipeline that ingests bank statements (any of several
 formats per source), normalizes them into a common schema, deduplicates across
 formats/sources, categorizes them with an ML model (not provider taxonomies),
 detects internal transfers, and exposes spending aggregates via APIs — packaged
-as microservices, heading toward a Kubernetes (kind) platform, all as IaC.
+as microservices running on a Kubernetes (kind) platform, all as IaC.
 
-**Phases:** A (data core) and B (adapters + microservices + ML) are **done and
-verified**. **Phase C (platform, IaC) is next.** Then E (frontend SPA) and D
-(CDC, optional). See the plan for the full breakdown.
+**Phases:** A (data core), B (adapters + microservices + ML) and **C (platform,
+IaC — kind/Cilium, Gitea+Argo GitOps, CNPG, NATS, Envoy Gateway, MinIO, Sealed
+Secrets, LGTM, MLflow+KServe, and Tekton CI/CD with build-on-push + automatic
+SHA-image deploy) are done and verified.** **Phase E (frontend SPA) is next**;
+D (CDC) optional. See the plan for the full breakdown.
 
 ---
 
@@ -180,14 +182,17 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 
 - Medallion = schemas in one Postgres. Dedup by canonical key (description
   excluded). Income/expense by sign. Provider-agnostic categorization.
-- CI/CD: **Tekton + Argo CD** (not GitHub Actions). Registries: **MLflow**
-  (models); for container images, **Gitea's built-in OCI registry** (Harbor was
-  cut — too heavy for solo/local; the image-registry concern is folded into C7c
-  Tekton). Secrets: **Sealed Secrets**. Code on GitHub.
-- Platform (phase C): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
+- CI/CD: **Tekton + Argo CD** (not GitHub Actions), **done (C7c)**. On every push
+  to `main` a Gitea webhook drives an in-cluster Tekton pipeline: lint/type/test →
+  buildah build+push `svc`+`migrate` to **Gitea's built-in OCI registry** (Harbor
+  was cut) tagged by commit SHA → a `bump-deploy` step pins those tags in a
+  **separate `cashato-deploy` config repo** (Argo watches it), so the build deploys
+  automatically. The **source repo stays human-only** (no CI commits); a CEL
+  path-filter only builds on `src/**`/`build/**`/`pyproject.toml` changes. Model
+  registry = **MLflow**. Secrets: **Sealed Secrets**. Code → GitHub later (mirror).
+- Platform (phase C, DONE): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
   (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/
   Tempo/**Mimir**, backends on MinIO S3; collector **Grafana Alloy**) — NOT
-  kube-prometheus-stack. Full LGTM deployed (C7a): metrics + logs + OTel
-  cross-service traces (context propagated through NATS). CI (Tekton, C7c) next —
-  it pushes images to Gitea's registry; no separate image registry.
+  kube-prometheus-stack: metrics + logs + OTel cross-service traces (context
+  propagated through NATS). metrics-server added (HPA/`kubectl top`).
 - Multi-user/household is future work (RLS + OIDC), not yet built.

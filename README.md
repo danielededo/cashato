@@ -94,8 +94,10 @@ OpenAPI at `/docs` · `/redoc` · `/openapi.json`; probes at `/healthz` · `/rea
 business API under `/api/v1`.
 
 The full stack runs on the local **kind** cluster (phase C, IaC) — see `infra/`
-(OpenTofu) and `k8s/` (GitOps via Argo CD). Once deployed, the services are
-reached through the Envoy Gateway:
+(OpenTofu) and `k8s/` (GitOps via Argo CD). CI/CD is **Tekton + Argo CD**: a push
+to `main` lints/tests, builds+pushes SHA-tagged images to Gitea's registry, and a
+separate `cashato-deploy` config repo pins the tags so Argo auto-deploys the build.
+Once deployed, the services are reached through the Envoy Gateway:
 
 ```bash
 curl -F "file=@data/.../file.csv" http://<gateway-ip>/api/v1/uploads

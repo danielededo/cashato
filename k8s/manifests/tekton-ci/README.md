@@ -1,15 +1,18 @@
-# Tekton CI (`cashato-ci`) — C7c-c
+# Tekton CI/CD (`cashato-ci`) — C7c
 
-Continuous integration for the cashato monorepo: on every commit it lints,
-type-checks, tests, then builds and pushes the two container images to Gitea's
-built-in OCI registry. Delivered as GitOps (Argo app `tekton-ci`, sync-wave 7);
-the pipeline definitions live here, a run is a separate on-demand object.
+Continuous integration **and delivery** for the cashato monorepo. On every push to
+`main` a Gitea webhook hits an in-cluster Tekton EventListener, which starts a
+pipeline that lints/type-checks/tests, builds+pushes the two container images to
+Gitea's built-in OCI registry (tagged by commit SHA), then **pins those tags in the
+`cashato-deploy` config repo** so Argo CD deploys the fresh build automatically.
+Delivered as GitOps (Argo app `tekton-ci`, sync-wave 7); the pipeline/trigger
+definitions live here, a run is a separate object (webhook-created, or on-demand).
 
 ## Pipeline DAG
 
 ```
-fetch-source ──▶ lint-test ──┬──▶ build-push-svc      (cashato/svc)
-                             └──▶ build-push-migrate  (cashato/migrate)
+fetch-source ─▶ lint-test ─┬─▶ build-push-svc      (cashato/svc)     ─┐
+                           └─▶ build-push-migrate  (cashato/migrate) ─┴─▶ bump-deploy
 ```
 
 | Task | What it does | Source |
@@ -18,51 +21,55 @@ fetch-source ──▶ lint-test ──┬──▶ build-push-svc      (cashato
 | `lint-test` | `pip install .[svc,dev]` → `ruff check .` → `mypy src` → `pytest` (mirrors the [Makefile](../../../Makefile) targets) | local Task `cashato-lint-test` |
 | `build-push-svc` | build+push `cashato/svc` | hub: `buildah` 0.9 |
 | `build-push-migrate` | build+push `cashato/migrate` | hub: `buildah` 0.9 |
+| `bump-deploy` | pin `services`/`data` app image tags → `<sha>` in `cashato-deploy`, commit+push | local Task `cashato-bump-deploy` |
 
-The two builds run **in parallel** once `lint-test` passes (both `runAfter: [lint-test]`),
-so a lint/test failure blocks *all* image publishing.
+The two builds run **in parallel** once `lint-test` passes; `bump-deploy` runs after
+both, so a lint/test failure blocks all publishing and any lone build failure blocks
+the deploy.
 
-## Which services depend on each image
+## Build-on-push (C7c-d) — Triggers + Gitea webhook
 
-This is the key coupling: the CI builds **2 images**, but they back **6 workloads**
-across 2 namespaces. Change any of the code below and that image (and its consumers)
-is what a green pipeline republishes.
+An **EventListener** (`el-cashato-ci.cashato-ci.svc:8080`) receives the webhook.
+Interceptors: `github` (HMAC-SHA256 via `X-Hub-Signature-256` — Gitea sends
+GitHub-compatible headers — + push filter) then `cel` (branch == `main` **and** a
+changed file under `src/**`, `build/**`, or `pyproject.toml`). So docs/k8s/infra/
+config-only pushes don't rebuild. Both sender (Gitea) and sink live in the cluster →
+no public exposure. The webhook is created by an Argo Sync-hook Job (`webhook-job.yaml`).
 
-| Built image | Dockerfile | Consumed by | Namespace |
-|-------------|-----------|-------------|-----------|
-| **`cashato/svc`** | `build/Dockerfile.svc` | `ingest-api`, `etl-worker`, `query-api`, `categorizer` (Deployments) | `cashato` |
-| **`cashato/migrate`** | `build/Dockerfile.migrate` | `migration-job`, `grant-job` (Jobs) | `cashato-data` |
+## Auto-deploy (C7c-e) — the `cashato-deploy` config repo
 
-`cashato/svc` is the **shared** service image (one image, four Deployments — they
-differ only by command/env, see `k8s/manifests/services/`). `cashato/migrate`
-carries Alembic + the DB tooling for the migration and grant Jobs
-(`k8s/manifests/data/`).
-
-> Out of CI scope (built manually via `scripts/build-images.sh`): the heavy
-> `cashato/train`, `cashato/predict`, `cashato/mlflow` images (torch/ST — too slow
-> for buildah-on-kind). They can be added as further `build-push-*` tasks later.
-
-## Image tags & registry
-
-Images are pushed to Gitea's OCI registry, tagged by **commit SHA**:
+`bump-deploy` writes to a **separate** `cashato-deploy` repo (Argo watches it), never
+to the source repo — so the source history stays human-only. It sets
+`spec.source.kustomize.images` on the `services` and `data` Argo Applications to the
+registry-qualified SHA refs:
 
 ```
 gitea-http.gitea.svc:3000/cashato/svc:<commit-sha>
 gitea-http.gitea.svc:3000/cashato/migrate:<commit-sha>
 ```
 
-That ref is exactly what the nodes' containerd mirror resolves for pulls (C7c-b),
-so a pushed image is immediately pullable in-cluster. Registry is plain-HTTP
-(`TLSVERIFY=false`); buildah uses `STORAGE_DRIVER=vfs` to build unprivileged in a
-pod on kind.
+That ref is what the nodes' containerd mirror resolves for pulls (C7c-b), so a pushed
+image is immediately deployable. Registry is plain-HTTP (`TLSVERIFY=false`); buildah
+uses `STORAGE_DRIVER=vfs` to build unprivileged on kind. `cashato-deploy` has no
+webhook and the source `k8s/apps/` change doesn't match the path-filter → no loop.
+`k8s/apps/` stays in the source repo as the canonical seed (see `scripts/gitea-repos.sh`).
 
-> The service manifests still pin `cashato/svc:dev` / `cashato/migrate:dev`
-> (kind-loaded). Wiring them to the CI-published SHA tags is **C7c-e**
-> (config-repo split + tag bump) — not done here.
+## Which services depend on each built image
+
+The CI builds **2 images** backing **6 workloads** across 2 namespaces:
+
+| Built image | Dockerfile | Consumed by | Namespace |
+|-------------|-----------|-------------|-----------|
+| **`cashato/svc`** | `build/Dockerfile.svc` | `ingest-api`, `etl-worker`, `query-api`, `categorizer` (Deployments) | `cashato` |
+| **`cashato/migrate`** | `build/Dockerfile.migrate` | `migration-job`, `grant-job` (Jobs) | `cashato-data` |
+
+> Out of CI scope (built manually via `scripts/build-images.sh`): the heavy
+> `cashato/train`, `cashato/predict`, `cashato/mlflow` images (torch/ST — too slow for
+> buildah-on-kind); they stay `:dev`. Can be added as further `build-push-*` tasks later.
 
 ## Running a build
 
-Until Gitea webhooks are wired via Tekton Triggers (**C7c-d**), start a run by hand:
+Normally automatic (push to `main`). To start one by hand (e.g. to rebuild HEAD):
 
 ```sh
 kubectl -n cashato-ci create -f base/pipelinerun-example.yaml   # `create`, not `apply` (generateName)
@@ -76,10 +83,16 @@ The `TektonConfig` pruner keeps the last 20 runs.
 | File | Purpose |
 |------|---------|
 | `base/namespace.yaml` | `cashato-ci` namespace |
-| `base/serviceaccount.yaml` | run identity (auth via workspaces, not SA secrets) |
-| `base/sealedsecret-git-basic-auth.yaml` | git clone creds (`.gitconfig` + `.git-credentials`) |
+| `base/serviceaccount.yaml` | pipeline run identity (auth via workspaces) |
+| `base/triggers-rbac.yaml` | EventListener SA + RBAC (create PipelineRuns) |
+| `base/sealedsecret-git-basic-auth.yaml` | git clone/push creds (`.gitconfig` + `.git-credentials`) |
 | `base/sealedsecret-dockerconfig.yaml` | buildah push creds (`config.json`) |
+| `base/sealedsecret-webhook-secret.yaml` | HMAC secret for the github interceptor |
+| `base/sealedsecret-gitea-admin.yaml` | Gitea admin creds for the webhook Job |
 | `base/task-lint-test.yaml` | the ruff/mypy/pytest Task |
+| `base/task-bump-deploy.yaml` | the config-repo image-tag pin Task |
 | `base/pipeline.yaml` | the `cashato-ci` Pipeline (DAG above) |
+| `base/triggerbinding.yaml` · `triggertemplate.yaml` · `eventlistener.yaml` | Tekton Triggers (build-on-push) |
+| `base/webhook-job.yaml` | Argo Sync-hook that ensures the Gitea webhook |
 | `base/pipelinerun-example.yaml` | reference PipelineRun (NOT synced — manual trigger) |
 | `overlays/kind/` | environment overlay |

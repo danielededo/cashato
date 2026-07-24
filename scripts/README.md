@@ -19,11 +19,17 @@ everything.** No ad-hoc commands.
 controller) → `seal-secrets.sh` → commit the SealedSecrets → Argo applies them →
 the controller decrypts them in-cluster.
 
+## Git repos (GitOps bridge)
+
+| Script | What it does | When to run |
+|--------|--------------|-------------|
+| `gitea-repos.sh` | Idempotently create the `cashato` (source) and `cashato-deploy` (config) Gitea repos via the API, and seed `cashato-deploy` from the source `k8s/apps/`. | On a fresh cluster (bootstrap), or after a structural app-of-apps change (re-seed; resets CI image pins to `:dev`, next build re-pins). |
+
 ## Images
 
 | Script | What it does | When to run |
 |--------|--------------|-------------|
-| `build-images.sh` | Build `cashato/svc:dev`, `cashato/migrate:dev`, `cashato/mlflow:dev`, `cashato/train:dev` from `build/` and `kind load` them into the cluster. | After changing service/migrator/training code or deps (until Tekton/Harbor in C7). |
+| `build-images.sh` | Build all five `cashato/*:dev` images from `build/` and `kind load` them. | Bootstrap / fast local iteration. In steady state the **CI (Tekton) builds+deploys `svc`+`migrate` by SHA** on every push (C7c); this script is still the path for the heavy `train`/`predict`/`mlflow` images (out of CI scope) and for a from-scratch `:dev` load. |
 
 ## MLOps — retraining (C6)
 
@@ -52,5 +58,5 @@ These manual procedures are documented in the memory/rebuild recipe and will mov
 here as we formalize them:
 
 - **cluster rebuild** (kind delete → state reset → `tofu apply` → `build-images.sh`
-  → re-seed Gitea repo → `git push`).
+  → `gitea-repos.sh` → `git push` → CI re-pins the SHA images).
 - **workstation tools** install (`kubeseal`, `kind` to `~/.local/bin`).
