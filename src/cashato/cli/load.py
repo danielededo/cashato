@@ -187,6 +187,31 @@ def load(path: Path, source: str, force: bool = False) -> int:
             )
         raise
 
+    # 2b. A parse that yields nothing is treated as a FAILURE, not as an empty
+    #     success. Content detection is first-match-wins over marker strings, so
+    #     a document can be routed to the wrong adapter; that adapter then finds
+    #     none of its table headers and returns [] perfectly quietly, and the
+    #     file would land as 'parsed' with 0 rows and no error — nothing to
+    #     alert on, and indistinguishable from "this statement was empty".
+    #     Catching it here covers every future collision, whatever the markers.
+    if not txs:
+        reason = (
+            f"Parsed as '{source}' but produced 0 transactions. The file was most "
+            f"likely routed to the wrong parser (its content matched '{source}' "
+            f"detection markers); re-upload choosing the source explicitly if it "
+            f"belongs to a supported bank."
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE bronze.raw_files SET status = 'failed', error = :e, "
+                    "rows_total = 0, rows_new = 0 WHERE id = :id"
+                ),
+                {"e": reason, "id": file_id},
+            )
+        print(reason)
+        return 0
+
     # 3. Load into silver (dedup on natural_key) and finalize the file status.
     with engine.begin() as conn:
         _upsert_accounts(conn, path, source)

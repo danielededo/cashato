@@ -1,7 +1,38 @@
 # Finding: Intesa's content-detection markers collide with other Italian banks' documents
 
-Status: confirmed with reproducible evidence (2026-07-25). No code change made —
-this is a briefing for whoever hardens detection or adds new source parsers.
+Status: **FIXED (2026-07-25)**. Kept as the record of the problem and of why the
+fix is the shape it is. The demo files under `demo/other_banks/` are now the
+regression test: their pinned expectation is `None` (unclaimed), and it was
+`intesa` before.
+
+**What was done.** Intesa's detection was cut from six marker groups to two, both
+Intesa-specific. The decisive measurement: all 21 real quarterly statements
+already match the specific `["intesa sanpaolo"]` group — their page-1 footer
+carries "App Intesa Sanpaolo Mobile" — so `estratto conto`, `dettaglio
+movimenti`, `data contabile` and `["operazione","importo"]` were matching **no
+real Intesa file that the specific groups did not already cover**, while
+stealing other banks' documents. They were pure liability, not a trade-off.
+
+The two 13-month exports (PDF + XLSX) were the only files needing a second
+group; they are covered by `["conti e carte"]`, the filter-recap header of
+Intesa's own web export, present in both and in none of the ten other-bank
+files. Verified: 23/23 real Intesa files still detected, 0 false positives,
+Revolut and Trade Republic unaffected.
+
+Recommendation 1 below (anchor on the IBAN's ABI) was **checked and rejected as
+the primary fix**: neither 13-month export prints an IBAN, so ABI cannot anchor
+them. The document flagged that as an open caveat; it is now settled.
+
+Recommendation 2 (guard the 0-rows outcome) was **also implemented**, as defence
+in depth — `cli/load.py` now marks a file `failed` with an explanatory error when
+a parse yields zero transactions, instead of storing an empty parse as success.
+
+Recommendations 3 and 4 remain open and still apply to whoever adds a parser.
+
+---
+
+## Original briefing (2026-07-25, before the fix)
+
 
 ## How detection works today (context)
 

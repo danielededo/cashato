@@ -988,9 +988,11 @@ def write_ing_pdf(path: Path, rng: random.Random) -> None:
     parser's closed list, a RECT_ footer closing every page, and SALDO
     INIZIALE/FINALE that must balance to the cent.
 
-    NOTE: "estratto conto" / "lista movimenti" are Intesa detection markers in
-    cashato — a REAL ING statement would be misrouted the same way; the demo
-    keeps the faithful text and the verify step pins detection to "intesa"."""
+    NOTE: this file used to be misrouted to the Intesa parser, because Intesa's
+    markers included the generic "estratto conto" / "lista movimenti". Those
+    were removed once it was shown that no real Intesa file needs them, so this
+    document is now correctly unclaimed. Keep the text faithful: it is the
+    regression test for that collision."""
     movs = [m for m in _ob_history(rng, n=45) if date(2026, 4, 1) <= m[0] <= date(2026, 6, 30)]
     opening = eur(1500)
     balance = opening
@@ -1046,8 +1048,8 @@ def write_other_banks(outdir: Path, rng: random.Random) -> list[tuple[Path, str 
         (ob / "widiba_movimenti.xlsx", write_widiba_xlsx, None),
         (ob / "webank_movimentiConto.xls", write_webank_xls, None),
         (ob / "bancoposta_estratto_conto.pdf", write_poste_ec_pdf, None),
-        (ob / "hype_lista_movimenti.pdf", write_hype_pdf, "intesa"),
-        (ob / "ing_estratto_trimestrale.pdf", write_ing_pdf, "intesa"),
+        (ob / "hype_lista_movimenti.pdf", write_hype_pdf, None),
+        (ob / "ing_estratto_trimestrale.pdf", write_ing_pdf, None),
     ]
     for path, writer, _expected in writers:
         writer(path, rng)
@@ -1138,9 +1140,9 @@ def verify(outdir: Path, paths: dict[str, list[Path]],
             missing += 1
     check(missing == 0, "xfer   monthly Intesa->Revolut opposite legs present in every month")
 
-    # other-bank files (future adapters): pin what the CURRENT detection does
-    # with them — None (unclaimed) for most; the ING/Hype PDFs carry text that
-    # legitimately collides with Intesa's generic markers (real-world issue)
+    # other-bank files (future adapters): all must be UNCLAIMED. The ING and
+    # Hype PDFs used to be stolen by Intesa's generic markers; these two pins
+    # are the regression test for that fix, so keep their text faithful.
     for p, expected in other:
         det = detect_source(p)
         check(det == expected, f"detect other_banks/{p.name} -> {det} (expected {expected})")

@@ -43,13 +43,22 @@ CURRENCY = "EUR"
 # Content-detection marker groups (was config/sources.yaml). A file is Intesa if,
 # for ANY group, ALL markers appear in its lowercased head text. Italian markers
 # match the real document text — keep them in Italian.
+# Both groups are Intesa-SPECIFIC on purpose. The earlier set also carried
+# "estratto conto", "dettaglio movimenti", "data contabile" and
+# ["operazione","importo"] — generic Italian banking vocabulary that matched no
+# real Intesa file that these two do not already cover (checked against all 23),
+# while stealing other banks' documents: an ING quarterly says "Estratto conto
+# trimestrale", a Hype movements table has a "Data Contabile" column. Detection
+# is first-match-wins in alphabetical registry order, so `intesa` is tried first
+# and misrouting is silent — the wrong parser finds no table and returns 0 rows.
 DETECTION: list[list[str]] = [
+    # The quarterly statement never names the bank in a field, but its page-1
+    # footer does ("App Intesa Sanpaolo Mobile", intesasanpaolo.com).
     ["intesa sanpaolo"],
-    ["estratto conto"],
-    ["dettaglio movimenti"],
-    ["lista movimenti"],
-    ["data contabile"],
-    ["operazione", "importo"],  # Intesa 13-month XLSX header
+    # 13-month export, PDF and XLSX alike: the filter-recap header of Intesa's
+    # own web export. Those two files carry no IBAN, so the ABI cannot anchor
+    # them — this is the specific string they do have.
+    ["conti e carte"],
 ]
 
 _DATE_RE = re.compile(r"^\d{2}\.\d{2}\.\d{4}$")

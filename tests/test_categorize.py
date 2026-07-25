@@ -62,3 +62,40 @@ class TestWealthDestinations:
         # una polizza di puro rischio E' consumo: classificarla come patrimonio
         # cancellerebbe una spesa reale dal tasso di risparmio
         assert _cat().resolve("Premio polizza RC auto").code == "insurance"
+
+
+class TestDetectionSpecificity:
+    """Intesa's markers must identify Intesa, not Italian banking in general.
+
+    Detection is first-match-wins in alphabetical registry order, so `intesa`
+    is probed first and a generic marker silently steals other banks' files.
+    """
+
+    def test_generic_italian_banking_words_do_not_match_intesa(self):
+        from cashato.parsers import intesa
+
+        def matches(text: str) -> bool:
+            t = text.lower()
+            return any(all(m in t for m in g) for g in intesa.DETECTION)
+
+        # An ING quarterly says exactly this; a Hype movements table has that
+        # column. Both used to be routed to the Intesa parser, which then found
+        # no table and returned 0 rows without an error.
+        assert not matches("Estratto conto trimestrale al 30/06/2026")
+        assert not matches("LISTA MOVIMENTI\nData Contabile  Descrizione  Importo")
+        assert not matches("Data operazione  Importo (EUR)")
+
+    def test_real_intesa_markers_still_match(self):
+        from cashato.parsers import intesa
+
+        def matches(text: str) -> bool:
+            t = text.lower()
+            return any(all(m in t for m in g) for g in intesa.DETECTION)
+
+        # quarterly: the page-1 footer names the bank. NB it is the app name
+        # that matches — the domain "intesasanpaolo.com" has no space, so it
+        # does NOT satisfy the "intesa sanpaolo" marker on its own.
+        assert matches("Cell: 333 App Intesa Sanpaolo Mobile Orari:")
+        assert not matches("www.intesasanpaolo.com")
+        # 13-month export (PDF and XLSX): filter-recap header of the web export
+        assert matches("Conti e Carte: Conto 1000 / 00014132")
