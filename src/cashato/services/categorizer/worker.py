@@ -63,8 +63,12 @@ def _recategorize() -> int:
         results = cat.resolve_many([(r.description, r.source, r.mcc) for r in rows])
         conn.execute(
             text(
+                # Repeat the provenance filter from the SELECT: a POST /feedback
+                # can flip a row to 'manual' while the model inference runs, and
+                # an id-only UPDATE would clobber that correction on the way back.
                 "UPDATE silver.transactions SET category = :c, "
-                "category_confidence = :cf, category_source = :s WHERE id = :id"
+                "category_confidence = :cf, category_source = :s "
+                "WHERE id = :id AND category_source IN ('rule', 'default')"
             ),
             [
                 {"c": res.code, "cf": res.confidence, "s": res.source, "id": r.id}

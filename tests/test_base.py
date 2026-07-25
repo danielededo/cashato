@@ -207,3 +207,30 @@ class TestAccountHolder:
         assert format_holder("ROSSI MARIO") == "Rossi Mario"
         # già in maiuscolo/minuscolo: la fonte sa meglio di str.title()
         assert format_holder("Mario de Rossi") == "Mario de Rossi"
+
+
+class TestParserRegressions:
+    """Cases that used to lose or corrupt money, from the 2026-07-25 review."""
+
+    def test_crypto_sale_over_one_thousand(self):
+        # Revolut amounts use "," as the THOUSANDS separator, so splitting the
+        # two legs on a bare comma cut inside the number: a 1,150.00 sale was
+        # stored as 1.00 — and with a matching wrong natural_key, so a corrected
+        # re-import would not even dedup against it.
+        from cashato.parsers.revolut import _crypto_sale_value
+
+        assert _crypto_sale_value("+ €1,150.00, - €1,000.00") == Decimal("1150.00")
+        assert _crypto_sale_value("+ €150.00, - €100.00") == Decimal("150.00")
+        assert _crypto_sale_value("- €100.00") is None
+
+    def test_movement_rows_are_not_skipped_for_containing_banking_words(self):
+        # The skip filter matched anywhere in the row, so a real card-settlement
+        # debit was discarded as if it were a header, and a transfer's
+        # continuation line was dropped from its description.
+        from cashato.parsers.intesa import _SKIP_RE
+
+        assert not _SKIP_RE.search("PAGAMENTO ESTRATTO CONTO CARTA NEXI")
+        assert not _SKIP_RE.search("Bonifico a favore di ROSSI MARIO IBAN IT60X0542811101")
+        # structural rows still go: they lead with the keyword
+        for row in ("Saldo iniziale al 31.12.2023", "Pagina 1 di 13", "Totale accrediti"):
+            assert _SKIP_RE.search(row), row

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -134,14 +135,14 @@ class TransactionsResponse(BaseModel):
 class TransferPair(BaseModel):
     transfer_group: str
     value_date: date = Field(description="Value date of the transfer legs")
-    amount: float = Field(description="Absolute transferred amount", examples=[400.0])
+    amount: Decimal = Field(description="Absolute transferred amount", examples=[400.0])
     from_account: str | None = Field(default=None, description="Debited account (negative leg)")
     to_account: str | None = Field(default=None, description="Credited account (positive leg)")
 
 
 class TransfersResponse(BaseModel):
     n_pairs: int
-    total_volume: float = Field(description="Sum of transferred amounts (absolute)")
+    total_volume: Decimal = Field(description="Sum of transferred amounts (absolute)")
     transfers: list[TransferPair]
 
 
@@ -160,6 +161,10 @@ class Account(BaseModel):
     )
     currency: str | None = None
     iban: str | None = None
+    #: The user's chosen name, when set. Must be declared: response_model strips
+    #: anything absent here, so omitting it left the client seeing `undefined`
+    #: and the Reset button permanently disabled after a rename.
+    display_name_override: str | None = None
     display_name: str = Field(examples=["Revolut Bank UAB · Joint Account (Joint)"])
     transactions: int
     first_movement: date | None = None
@@ -244,33 +249,37 @@ class TransactionDetail(BaseModel):
 
 
 class Holding(BaseModel):
-    """A position, aggregated from the trades a source disclosed."""
+    """A position, aggregated from the trades a source disclosed.
+
+    Money stays ``Decimal`` all the way to the wire: the gold views compute it
+    exactly, and the project's founding rule is Decimal, never float.
+    """
 
     isin: str | None = None
     instrument: str | None = None
     asset_class: str | None = None
-    units: float = Field(description="Net units held (buys minus sells).")
-    invested: float = Field(description="Cash cost basis: what actually left the account.")
+    units: Decimal = Field(description="Net units held (buys minus sells).")
+    invested: Decimal = Field(description="Cash cost basis: what actually left the account.")
     n_trades: int
     first_trade: date | None = None
     last_trade: date | None = None
-    last_price: float | None = Field(
+    last_price: Decimal | None = Field(
         default=None,
         description="Last price seen ON A STATEMENT, not a market quote — it ages.",
     )
-    value_at_last_price: float | None = None
+    value_at_last_price: Decimal | None = None
 
 
 class InvestmentMonth(BaseModel):
     month: date
     category: str = Field(description="Wealth destination kind: investments, pension_fund, …")
-    contributed: float | None = Field(default=None, description="Money in (outflows).")
-    returned: float | None = Field(default=None, description="Money back (sales, dividends).")
-    net_invested: float | None = None
-    into_known: float | None = Field(
+    contributed: Decimal | None = Field(default=None, description="Money in (outflows).")
+    returned: Decimal | None = Field(default=None, description="Money back (sales, dividends).")
+    net_invested: Decimal | None = None
+    into_known: Decimal | None = Field(
         default=None, description="Contributions whose instrument the source disclosed."
     )
-    into_unknown: float | None = Field(
+    into_unknown: Decimal | None = Field(
         default=None,
         description="Contributions with no instrument detail — e.g. a transfer to an "
         "outside broker. Real money invested, contents not in our documents.",
@@ -283,9 +292,9 @@ class WealthKind(BaseModel):
 
     category: str
     category_label: str
-    net_invested: float
-    contributed: float
-    returned: float
+    net_invested: Decimal
+    contributed: Decimal
+    returned: Decimal
     n_movements: int
     #: Instruments are only knowable for kinds whose source discloses them; a
     #: pension fund reached by bank transfer never will.
@@ -298,14 +307,14 @@ class InvestmentsResponse(BaseModel):
     kinds: list[WealthKind]
     #: Gross money in. `total_in_known_instruments + total_in_unknown` equals
     #: this by construction — they are the same sum split by available detail.
-    total_contributed: float
-    total_returned: float = Field(description="Money back: sales, dividends, maturities.")
-    total_invested: float = Field(
+    total_contributed: Decimal
+    total_returned: Decimal = Field(description="Money back: sales, dividends, maturities.")
+    total_invested: Decimal = Field(
         description="NET of returns, i.e. total_contributed - total_returned. Reported "
         "separately because the gross figure is what the known/unknown split adds up to."
     )
-    total_in_known_instruments: float
-    total_in_unknown: float
+    total_in_known_instruments: Decimal
+    total_in_unknown: Decimal
 
 
 _LANG = Query(default="it", description="Category label language", examples=["it", "en"])
@@ -446,30 +455,32 @@ def investments(lang: str = _LANG):
             {
                 "category": m["category"],
                 "category_label": _CAT.label(m["category"], lang),
-                "net_invested": 0.0,
-                "contributed": 0.0,
-                "returned": 0.0,
+                "net_invested": Decimal(0),
+                "contributed": Decimal(0),
+                "returned": Decimal(0),
                 "n_movements": 0,
                 "has_instruments": False,
             },
         )
-        # psycopg hands back Decimal for NUMERIC. Pydantic coerces on the way
-        # out, but this roll-up happens first, and Decimal + float raises.
-        k["net_invested"] += float(m["net_invested"] or 0)
-        k["contributed"] += float(m["contributed"] or 0)
-        k["returned"] += float(m["returned"] or 0)
+        # psycopg hands back Decimal for NUMERIC and we keep it that way: the
+        # earlier fix cast to float to stop `Decimal + float` raising, which
+        # silenced the error by breaking the invariant instead. Seeding the
+        # accumulators with Decimal(0) fixes it without leaving exact arithmetic.
+        k["net_invested"] += m["net_invested"] or 0
+        k["contributed"] += m["contributed"] or 0
+        k["returned"] += m["returned"] or 0
         k["n_movements"] += m["n_movements"]
         k["has_instruments"] = k["has_instruments"] or bool(m["into_known"])
 
-    known = sum(float(m["into_known"] or 0) for m in months)
-    unknown = sum(float(m["into_unknown"] or 0) for m in months)
+    known = sum((m["into_known"] or 0 for m in months), Decimal(0))
+    unknown = sum((m["into_unknown"] or 0 for m in months), Decimal(0))
     return {
         "holdings": holdings,
         "months": months,
         "kinds": sorted(kinds.values(), key=lambda k: -k["net_invested"]),
         "total_contributed": known + unknown,
-        "total_returned": sum(float(m["returned"] or 0) for m in months),
-        "total_invested": sum(float(m["net_invested"] or 0) for m in months),
+        "total_returned": sum((m["returned"] or 0 for m in months), Decimal(0)),
+        "total_invested": sum((m["net_invested"] or 0 for m in months), Decimal(0)),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,
     }
@@ -596,7 +607,7 @@ def transfers():
     )
     return {
         "n_pairs": len(rows),
-        "total_volume": float(sum(r["amount"] for r in rows)),
+        "total_volume": sum((r["amount"] for r in rows), Decimal(0)),
         "transfers": rows,
     }
 

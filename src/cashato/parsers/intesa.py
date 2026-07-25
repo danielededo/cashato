@@ -63,8 +63,14 @@ DETECTION: list[list[str]] = [
 
 _DATE_RE = re.compile(r"^\d{2}\.\d{2}\.\d{4}$")
 # Rows that are NOT movements (headers, balances, footers). Italian doc words.
+# ANCHORED on purpose. Unanchored, these words matched anywhere in a row, so a
+# real movement containing ordinary banking vocabulary was silently discarded:
+# "PAGAMENTO ESTRATTO CONTO CARTA NEXI" (a card settlement) matched "estratto",
+# and a transfer's continuation line carrying "IBAN IT.." was dropped from its
+# description. Structural rows — balances, page footers, section titles — put
+# these words FIRST, which is what distinguishes them from a description.
 _SKIP_RE = re.compile(
-    r"saldo|pagina|estratto|totale|segue|riporto|dettaglio|coordinate|iban",
+    r"^(?:saldo|pagina|estratto|totale|segue|riporto|dettaglio|coordinate|iban)\b",
     re.IGNORECASE,
 )
 

@@ -40,7 +40,14 @@ def main() -> int:
     with engine.begin() as conn:
         before = conn.execute(text(other_pct)).scalar_one()
         rows = conn.execute(
-            text("SELECT id, description, source, mcc FROM silver.transactions")
+            # A user correction is ground truth, and this tool runs AFTER a
+            # retrain — re-resolving every row would silently overwrite the very
+            # labels the retrain learned from. The in-cluster worker already
+            # promises manual rows are untouched; this honours the same contract.
+            text(
+                "SELECT id, description, source, mcc FROM silver.transactions "
+                "WHERE category_source IS DISTINCT FROM 'manual'"
+            )
         ).all()
         # Categorize in BATCH (a single encode for all rows)
         results = cat.resolve_many([(r.description, r.source, r.mcc) for r in rows])

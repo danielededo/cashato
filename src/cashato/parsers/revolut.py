@@ -451,9 +451,22 @@ def _parse_interest_csv(path: str | Path) -> list[Transaction]:
     return txs
 
 
+# The two legs are separated by ", " and the second one starts with a sign;
+# amounts themselves use "," as the THOUSANDS separator, so a plain split(",")
+# cuts inside the number — "+ €1,150.00, - €1,000.00" yielded Decimal("1").
+_CRYPTO_LEGS_RE = re.compile(r",\s+(?=[+-])")
+
+
 def _crypto_sale_value(cell: str) -> Decimal | None:
-    # "Value (of Sale, of Purchase)" looks like "+ €1.99, - €2.02"; take the sale (+)
-    for part in cell.split(","):
+    """Sale leg of a "Value (of Sale, of Purchase)" cell, e.g. "+ €1,150.00, - €1,000.00".
+
+    Splitting on the bare comma silently corrupted every amount >= 1,000: the
+    first fragment became "+ €1" and the sale was stored as one euro — with a
+    matching (wrong) natural_key, so a later corrected import would not even
+    dedup against it. Split on the boundary BETWEEN the legs instead: a comma
+    followed by whitespace and a sign, which a thousands separator never is.
+    """
+    for part in _CRYPTO_LEGS_RE.split(cell):
         if "+" in part:
             return _money_or_none(part)
     return None
