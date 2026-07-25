@@ -205,12 +205,18 @@ def transactions(
     account: str | None = Query(default=None, description="Filter by account id"),
     source: str | None = Query(default=None, description="Filter by source"),
     category: str | None = Query(default=None, description="Filter by category code"),
+    category_source: str | None = Query(
+        default=None,
+        description="Filter by how the category was assigned (mcc|model|rule|manual|default)",
+    ),
     sign: str | None = Query(default=None, description="'income' (amount>0) or 'expense' (amount<0)"),
     date_from: date | None = Query(default=None, description="Value date >= (inclusive)"),
     date_to: date | None = Query(default=None, description="Value date <= (inclusive)"),
     q: str | None = Query(default=None, description="Case-insensitive text search in the description"),
     min_amount: float | None = Query(default=None, description="Amount >= (signed)"),
     max_amount: float | None = Query(default=None, description="Amount <= (signed)"),
+    min_confidence: float | None = Query(default=None, description="Category confidence >= (0..1)"),
+    max_confidence: float | None = Query(default=None, description="Category confidence <= (0..1)"),
     include_transfers: bool = Query(default=True, description="Include internal-transfer legs"),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -229,6 +235,9 @@ def transactions(
     if category:
         conds.append("category = :category")
         params["category"] = category
+    if category_source:
+        conds.append("category_source = :category_source")
+        params["category_source"] = category_source
     if sign == "income":
         conds.append("amount > 0")
     elif sign == "expense":
@@ -248,6 +257,12 @@ def transactions(
     if max_amount is not None:
         conds.append("amount <= :max_amount")
         params["max_amount"] = max_amount
+    if min_confidence is not None:
+        conds.append("category_confidence >= :min_confidence")
+        params["min_confidence"] = min_confidence
+    if max_confidence is not None:
+        conds.append("category_confidence <= :max_confidence")
+        params["max_confidence"] = max_confidence
     if not include_transfers:
         conds.append("transfer_group IS NULL")
     where = f"WHERE {' AND '.join(conds)}" if conds else ""

@@ -48,3 +48,17 @@ def fput(key: str, path: str, bucket: str = BUCKET) -> None:
 def fget(key: str, dest: str, bucket: str = BUCKET) -> None:
     """Download ``bucket/key`` to a local file ``dest``."""
     client().fget_object(bucket, key, dest)
+
+
+def list_keys(bucket: str = BUCKET) -> list[str]:
+    """All object keys in the bucket (used to reprocess retained files)."""
+    return [o.object_name for o in client().list_objects(bucket, recursive=True) if o.object_name]
+
+
+def clear(bucket: str = BUCKET) -> int:
+    """Remove every object in the bucket; returns how many were deleted (reset)."""
+    keys = list_keys(bucket)
+    c = client()
+    for k in keys:
+        c.remove_object(bucket, k)
+    return len(keys)

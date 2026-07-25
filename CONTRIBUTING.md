@@ -51,6 +51,17 @@ The design is built so adding a bank touches **one adapter module**, nothing els
    - `DETECTION: list[list[str]]` — content marker groups used to auto-detect the
      file (a file matches if, for ANY group, ALL its markers are in the head text);
    - `CURRENCY` — e.g. `"EUR"`.
+
+   and, optionally, the account holder (shown as the greeting on the home page):
+   - `extract_holder(path) -> str | None` — usually a one-liner over
+     `base.addressee_from_words(pdf.pages[0].extract_words())`, which anchors on
+     the CAP line of the addressee block. Return `None` for formats that carry no
+     addressee (CSV/XLSX exports): unknown is a normal outcome, not an error;
+   - `NAME_ORDER` — `base.GIVEN_FIRST` or `base.FAMILY_FIRST`, i.e. whether that
+     source's documents write "DANIELE ROSSI" or "ROSSI MARIO".
+     Declaring the *document's* convention is what lets the API pick out the first
+     name without guessing which token is the surname.
+
    The module name **is** the source id; the registry auto-discovers it by scanning
    the package (no config entry, no edit to the loader). **Inspect a real file first**;
    don't guess the layout.

@@ -37,9 +37,9 @@ D (CDC) optional. See the plan for the full breakdown.
 Schemas within a single database (not separate DBs):
 
 - **bronze** — `raw_files` (uploaded file registry: sha256 UNIQUE, status
-  `pending|parsed|failed`, `rows_total`, `rows_new`, `error`). Raw row landing
-  (`raw_rows`) was intentionally dropped (YAGNI): reprocessing uses the retained
-  file + sha256.
+  `pending|parsed|failed`, `rows_total`, `rows_new`, `error`, `account_holder`).
+  Raw row landing (`raw_rows`) was intentionally dropped (YAGNI): reprocessing
+  uses the retained file + sha256.
 - **silver** — `transactions`, the common normalized schema (below). Idempotent
   upsert `ON CONFLICT (natural_key) DO NOTHING`.
 - **gold** — read-only views for the query API: `v_category_totals`,
@@ -47,7 +47,7 @@ Schemas within a single database (not separate DBs):
   `v_transactions` (projection of silver so the read API stays gold-only). Plus
   ML tables `training_labels`, `category_feedback` (active learning).
 
-Migrations: Alembic (`src/cashato/db/migrations`), currently through **0009**.
+Migrations: Alembic (`src/cashato/db/migrations`), currently through **0010**.
 
 ### Common schema (`silver.transactions`) — English
 
@@ -147,7 +147,11 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 - **ingest-api** — `POST /uploads` (stores file, validates extension → 415 and
   per-file size cap → 413, enqueues a NATS job); `GET /files` (status +
   `rows_new`/`rows_duplicate`/`error`); `POST /feedback` (category correction →
-  NATS event; a **write**, so it lives here, not in the read-only query-api).
+  NATS event; a **write**, so it lives here, not in the read-only query-api);
+  `GET /profile` (account holder → home greeting); `POST /admin/reprocess`
+  (re-enqueue every stored file, idempotent via `natural_key`) and
+  `POST /admin/reset` (`scope=data|all`, destructive). Bronze reads and writes
+  both live here because query-api is gold-only by design (and by DB role).
 - **etl-worker** — consumes `ingest.jobs` (detect → parse → normalize → dedup →
   persist + fast-path category) and `category.feedback` (apply correction to
   silver + record in `gold.category_feedback`). Stays light (no torch/model).
@@ -161,10 +165,12 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 
 - **Add a source** (fork/monorepo model, no plugin machinery): drop in a
   `src/cashato/parsers/<name>.py` exposing `parse(path) -> list[Transaction]` +
-  `DETECTION: list[list[str]]` (content-detection marker groups) + `CURRENCY`.
-  The registry (`registry.py`) auto-discovers it by scanning the package (module
-  name == source id). No config entry needed — detection is parser-coupled, so it
-  lives with the parser. See CONTRIBUTING.
+  `DETECTION: list[list[str]]` (content-detection marker groups) + `CURRENCY`,
+  and optionally `extract_holder(path)` + `NAME_ORDER` (account holder off the
+  document header; `base.addressee_from_words` does the work). The registry
+  (`registry.py`) auto-discovers it by scanning the package (module name ==
+  source id). No config entry needed — detection is parser-coupled, so it lives
+  with the parser. See CONTRIBUTING.
 - **Parametrized** (runtime `config/*.yaml`, mounted as the `cashato-config`
   ConfigMap — NOT baked into images, loaded via `CASHATO_CONFIG_DIR`):
   `config/settings.yaml` (thresholds, embed model, transfer window, upload caps),

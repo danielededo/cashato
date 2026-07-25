@@ -16,6 +16,8 @@ spec:
         - path: { type: PathPrefix, value: /api/v1/uploads }
         - path: { type: PathPrefix, value: /api/v1/files }
         - path: { type: PathPrefix, value: /api/v1/feedback }
+        - path: { type: PathPrefix, value: /api/v1/profile }
+        - path: { type: PathPrefix, value: /api/v1/admin }
       backendRefs:
         - name: ingest-api
           port: 8000

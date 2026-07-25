@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { TransactionFilters, TransactionRow } from "../api/types";
+import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
 import { SOURCES } from "../api/types";
 import { colorFor } from "../lib/colors";
 import { dateLabel, money } from "../lib/format";
+import { catLabel, sourceLabel, useT } from "../lib/i18n";
+import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
 
 const CATEGORY_CODES = [
@@ -11,25 +14,106 @@ const CATEGORY_CODES = [
   "health", "shopping", "transfers", "investments", "crypto", "cash", "fees", "other",
 ];
 const PAGE = 50;
+const SIGNS: { key: Sign | ""; tkey: string }[] = [
+  { key: "", tkey: "common.all" },
+  { key: "income", tkey: "common.income" },
+  { key: "expense", tkey: "common.expense" },
+];
+const DATE_PRESETS = [
+  { key: "30d", label: "30d" },
+  { key: "90d", label: "90d" },
+  { key: "6m", label: "6m" },
+  { key: "12m", label: "12m" },
+  { key: "ytd", label: "YTD" },
+  { key: "all", label: "All" },
+  { key: "custom", label: "Custom" },
+] as const;
+type DatePreset = (typeof DATE_PRESETS)[number]["key"];
+const PRESET_DAYS: Record<string, number> = { "30d": 30, "90d": 90, "6m": 182, "12m": 365 };
+
+type SortKey = "date" | "description" | "category" | "amount" | "account";
 
 export function Transactions() {
-  // draft filters (form) vs applied filters (drives the query)
-  const [draft, setDraft] = useState<TransactionFilters>({ include_transfers: true });
-  const [applied, setApplied] = useState<TransactionFilters>({ include_transfers: true });
+  const [params] = useSearchParams();
+  const { lang } = useLang();
+  const { t } = useT();
+
+  // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never
+  // blocks on a fetch (react-best-practices: useDeferredValue).
+  const [search, setSearch] = useState(params.get("q") ?? "");
+  const deferredSearch = useDeferredValue(search);
+  const [sign, setSign] = useState<Sign | "">((params.get("sign") as Sign) ?? "");
+  const [source, setSource] = useState(params.get("source") ?? "");
+  const [category, setCategory] = useState(params.get("category") ?? "");
+  const [includeTransfers, setIncludeTransfers] = useState(true);
+  const [dateFrom, setDateFrom] = useState(params.get("date_from") ?? "");
+  const [dateTo, setDateTo] = useState(params.get("date_to") ?? "");
+  const [showAdvanced, setShowAdvanced] = useState(Boolean(params.get("category") || params.get("date_from")));
+  const [datePreset, setDatePreset] = useState<DatePreset>(params.get("date_from") ? "custom" : "all");
   const [offset, setOffset] = useState(0);
-  // local overrides for rows the user just recategorized (feedback is eventual)
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
 
-  const q = useMemo(() => ({ ...applied, lang: "it" as const, limit: PAGE, offset }), [applied, offset]);
-  const state = useAsync(() => api.transactions(q), [q]);
-
-  function apply() {
+  useEffect(() => {
     setOffset(0);
-    setApplied(draft);
+  }, [deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo]);
+
+  const query = useMemo<TransactionFilters>(
+    () => ({
+      lang,
+      q: deferredSearch || undefined,
+      sign: sign || undefined,
+      source: source || undefined,
+      category: category || undefined,
+      include_transfers: includeTransfers,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      limit: PAGE,
+      offset,
+    }),
+    [lang, deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, offset],
+  );
+
+  const state = useAsync(() => api.transactions(query), [query]);
+
+  // sort the loaded page (toSorted keeps the source array immutable)
+  const rows = useMemo(() => {
+    const list = state.data?.transactions;
+    if (!list) return [];
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      switch (sort.key) {
+        case "amount": return (a.amount - b.amount) * dir;
+        case "description": return a.description.localeCompare(b.description) * dir;
+        case "category": return (a.category ?? "").localeCompare(b.category ?? "") * dir;
+        case "account": return a.account.localeCompare(b.account) * dir;
+        default: return a.value_date.localeCompare(b.value_date) * dir;
+      }
+    });
+  }, [state.data, sort]);
+
+  function applyDatePreset(key: DatePreset) {
+    setDatePreset(key);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const now = new Date();
+    if (key === "all") {
+      setDateFrom("");
+      setDateTo("");
+    } else if (key === "ytd") {
+      setDateFrom(iso(new Date(now.getFullYear(), 0, 1)));
+      setDateTo(iso(now));
+    } else if (key !== "custom") {
+      const f = new Date(now);
+      f.setDate(f.getDate() - PRESET_DAYS[key]);
+      setDateFrom(iso(f));
+      setDateTo(iso(now));
+    }
   }
-  function set<K extends keyof TransactionFilters>(k: K, v: TransactionFilters[K]) {
-    setDraft((d) => ({ ...d, [k]: v === "" ? undefined : v }));
+
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   }
+  const caret = (key: SortKey) => (sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
 
   async function recategorize(row: TransactionRow, code: string) {
     setOverrides((o) => ({ ...o, [row.natural_key]: code }));
@@ -41,92 +125,136 @@ export function Transactions() {
     }
   }
 
-  return (
-    <>
-      <h1>Transactions</h1>
+  const total = state.data?.total ?? 0;
+  const of = lang === "it" ? "di" : "of";
+  const activeFilters = [
+    sign && (sign === "income" ? t("common.income") : t("common.expense")),
+    source && source.replace("_", " "),
+    category && catLabel(category, lang),
+    (dateFrom || dateTo) && `${dateFrom || "…"} → ${dateTo || "…"}`,
+    !includeTransfers && `${t("tx.exclude")} ${t("tx.transfers").toLowerCase()}`,
+    deferredSearch && `“${deferredSearch}”`,
+  ].filter(Boolean) as string[];
 
-      <div className="card">
-        <div className="filters">
-          <label className="field">from
-            <input type="date" onChange={(e) => set("date_from", e.target.value)} />
+  return (
+    <div className="fade-in">
+      <div className="panel">
+        <div className="toolbar">
+          <label className="search">
+            <span className="ico">⌕</span>
+            <input type="text" value={search} placeholder={t("tx.search")} onChange={(e) => setSearch(e.target.value)} />
           </label>
-          <label className="field">to
-            <input type="date" onChange={(e) => set("date_to", e.target.value)} />
-          </label>
-          <label className="field">category
-            <select onChange={(e) => set("category", e.target.value)}>
-              <option value="">all</option>
-              {CATEGORY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-          <label className="field">sign
-            <select onChange={(e) => set("sign", (e.target.value || undefined) as TransactionFilters["sign"])}>
-              <option value="">all</option>
-              <option value="income">income</option>
-              <option value="expense">expense</option>
-            </select>
-          </label>
-          <label className="field">source
-            <select onChange={(e) => set("source", e.target.value)}>
-              <option value="">all</option>
-              {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <label className="field">search
-            <input type="text" placeholder="description…" onChange={(e) => set("q", e.target.value)} />
-          </label>
-          <label className="field">transfers
-            <select onChange={(e) => set("include_transfers", e.target.value !== "exclude")}>
-              <option value="include">include</option>
-              <option value="exclude">exclude</option>
-            </select>
-          </label>
-          <button className="primary" onClick={apply}>Apply</button>
+          {SIGNS.map((s) => (
+            <button key={s.tkey} className="chip" aria-pressed={sign === s.key} onClick={() => setSign(s.key)}>
+              {t(s.tkey)}
+            </button>
+          ))}
+          <button className="chip" aria-pressed={source === ""} onClick={() => setSource("")}>
+            {t("tx.allSources")}
+          </button>
+          {SOURCES.map((s) => (
+            <button key={s} className="chip" aria-pressed={source === s} onClick={() => setSource(source === s ? "" : s)}>
+              {sourceLabel(s)}
+            </button>
+          ))}
+          <button className="disclosure" onClick={() => setShowAdvanced((v) => !v)}>
+            {showAdvanced ? "▾ " : "▸ "}{t("tx.filters")}
+          </button>
         </div>
+
+        {showAdvanced ? (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--rule)", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="toolbar">
+              <span className="field" style={{ alignSelf: "center" }}>{t("tx.range")}</span>
+              {DATE_PRESETS.map((p) => (
+                <button key={p.key} className="chip" aria-pressed={datePreset === p.key} onClick={() => applyDatePreset(p.key)}>
+                  {p.key === "custom" ? t("tx.custom") : p.key === "all" ? t("common.all") : p.label}
+                </button>
+              ))}
+            </div>
+            {datePreset === "custom" ? (
+              <div className="toolbar">
+                <label className="field">{t("tx.from")}<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+                <label className="field">{t("tx.to")}<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+              </div>
+            ) : null}
+            <div className="toolbar">
+              <label className="field">
+                {t("common.category")}
+                <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">{t("common.all")}</option>
+                  {CATEGORY_CODES.map((c) => <option key={c} value={c}>{catLabel(c, lang)}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                {t("tx.transfers")}
+                <select className="input" value={includeTransfers ? "include" : "exclude"} onChange={(e) => setIncludeTransfers(e.target.value === "include")}>
+                  <option value="include">{t("tx.include")}</option>
+                  <option value="exclude">{t("tx.exclude")}</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="card">
-        {state.loading && <div className="state">Loading…</div>}
-        {state.error && <div className="state error">{state.error}</div>}
-        {state.data && (
+      <div className="panel">
+        <div className="filter-summary">
+          <span><span className="n">{total.toLocaleString(lang === "it" ? "it-IT" : "en-US")}</span> {t("tx.matchN")}</span>
+          {activeFilters.length ? <span className="dim">· {activeFilters.join(" · ")}</span> : <span className="dim">· {t("tx.noFilters")}</span>}
+        </div>
+
+        {state.error ? <div className="state error">{state.error}</div> : null}
+        {state.loading && !state.data ? <div className="state">{t("common.loading")}</div> : null}
+        {state.data && total === 0 ? (
+          <div className="empty">
+            <div className="big">{t("tx.emptyBig")}</div>
+            <div className="sub">{t("tx.emptySub")}</div>
+          </div>
+        ) : null}
+        {state.data && total > 0 ? (
           <>
             <table>
               <thead>
                 <tr>
-                  <th>Date</th><th>Description</th><th>Category</th>
-                  <th className="num">Amount</th><th>Account</th><th>Source</th>
+                  <th className="sortable" onClick={() => toggleSort("date")}>{t("common.date")}{caret("date")}</th>
+                  <th className="sortable" onClick={() => toggleSort("description")}>{t("common.description")}{caret("description")}</th>
+                  <th className="sortable" onClick={() => toggleSort("category")}>{t("common.category")}{caret("category")}</th>
+                  <th className="num sortable" onClick={() => toggleSort("amount")}>{t("common.amount")}{caret("amount")}</th>
+                  <th className="sortable" onClick={() => toggleSort("account")}>{t("common.account")}{caret("account")}</th>
                 </tr>
               </thead>
               <tbody>
-                {state.data.transactions.map((t) => {
-                  const cat = overrides[t.natural_key] ?? t.category ?? "";
+                {rows.map((tx) => {
+                  const cat = overrides[tx.natural_key] ?? tx.category ?? "";
                   return (
-                    <tr key={t.natural_key}>
-                      <td>{dateLabel(t.value_date)}</td>
-                      <td className="desc" title={t.description}>{t.description}</td>
+                    <tr key={tx.natural_key}>
+                      <td className="mono dim">{dateLabel(tx.value_date)}</td>
+                      <td className="desc" title={tx.description}>{tx.description}</td>
                       <td>
-                        <span className="swatch" style={{ background: colorFor(cat) }} />
-                        <select value={cat} onChange={(e) => recategorize(t, e.target.value)}>
-                          {!CATEGORY_CODES.includes(cat) && cat && <option value={cat}>{cat}</option>}
-                          {CATEGORY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <span className="cat-cell">
+                          <span className="swatch" style={{ background: colorFor(cat) }} />
+                          <select className="cat" value={cat} onChange={(e) => recategorize(tx, e.target.value)}>
+                            {!CATEGORY_CODES.includes(cat) && cat ? <option value={cat}>{catLabel(cat, lang)}</option> : null}
+                            {CATEGORY_CODES.map((c) => <option key={c} value={c}>{catLabel(c, lang)}</option>)}
+                          </select>
+                        </span>
                       </td>
-                      <td className="num"><span className={`amt ${t.amount < 0 ? "neg" : "pos"}`}>{money(t.amount)}</span></td>
-                      <td>{t.account}</td>
-                      <td>{t.source}</td>
+                      <td className="num"><span className={`amt ${tx.amount < 0 ? "neg" : "pos"}`}>{money(tx.amount)}</span></td>
+                      <td className="dim">{tx.account}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
             <div className="pager">
-              <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>← Prev</button>
-              <span>{offset + 1}–{Math.min(offset + PAGE, state.data.total)} of {state.data.total}</span>
-              <button disabled={offset + PAGE >= state.data.total} onClick={() => setOffset(offset + PAGE)}>Next →</button>
+              <button className="btn" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>{t("common.prev")}</button>
+              <span className="count">{offset + 1}–{Math.min(offset + PAGE, total)} {of} {total}</span>
+              <button className="btn" disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}>{t("common.next")}</button>
             </div>
           </>
-        )}
+        ) : null}
       </div>
-    </>
+    </div>
   );
 }

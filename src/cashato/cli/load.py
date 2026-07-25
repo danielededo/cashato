@@ -20,13 +20,29 @@ from sqlalchemy import text
 
 from cashato.db.db import get_engine
 from cashato.parsers.categorize import Categorizer
-from cashato.parsers.registry import ADAPTERS  # (name -> parse, from config)
+from cashato.parsers.registry import ADAPTERS, HOLDER_EXTRACTORS  # (auto-discovered)
 
 # The loader only applies the deterministic fast-path (MCC + rules): lightweight,
 # no torch/model dependency. ML categorization is a separate concern
 # (ml/recategorize.py locally; a categorizer calling the KServe-served model in
 # phase C). This keeps the etl-worker light and fast.
 _CATEGORIZER = Categorizer.load()
+
+
+def _account_holder(path: Path, source: str) -> str | None:
+    """The holder named on the document, or ``None``.
+
+    Never fatal: only PDFs carry an addressee block, and a layout the extractor
+    does not recognize is not a reason to fail an otherwise good ingestion — the
+    column simply stays empty.
+    """
+    extract = HOLDER_EXTRACTORS.get(source)
+    if extract is None:
+        return None
+    try:
+        return extract(path)
+    except Exception:  # noqa: BLE001 - cosmetic metadata, never blocks ingestion
+        return None
 
 
 def sha256_of(path: Path) -> str:
@@ -127,9 +143,15 @@ def load(path: Path, source: str, force: bool = False) -> int:
         conn.execute(
             text(
                 "UPDATE bronze.raw_files SET status = 'parsed', rows_total = :n, "
-                "rows_new = :new WHERE id = :id"
+                "rows_new = :new, account_holder = :holder WHERE id = :id"
             ),
-            {"n": len(txs), "new": inserted, "id": file_id},
+            {
+                "n": len(txs),
+                "new": inserted,
+                # Recorded once the file is known-good, next to its final status.
+                "holder": _account_holder(path, source),
+                "id": file_id,
+            },
         )
 
     print(f"Source: {source} | file_id={file_id}")

@@ -94,6 +94,111 @@ def normalize_desc(description: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
+# --- Account holder (intestatario) -------------------------------------------
+#
+# Every statement PDF carries an addressee block laid out the same way:
+#
+#     DANIELE ROSSI        <- the account holder
+#     Via Roma 1  <- street
+#     00100 Roma                <- CAP (5-digit Italian postal code) + city
+#
+# so one position-aware helper serves all three sources: anchor on the CAP line
+# and walk two lines up, staying inside the same column. Column-scoping matters —
+# a flat text extraction interleaves the facing column (Trade Republic puts the
+# statement period on the holder's line, Intesa the whole left column).
+
+#: Name-order convention of a source's documents. Each adapter declares its own
+#: via ``NAME_ORDER``. This is a documented property of the statement *layout*,
+#: not a guess about the name: which token is the surname is not derivable from
+#: the string alone ("ROSSI MARIO" has a two-token surname).
+GIVEN_FIRST = "given_first"  # "DANIELE ROSSI"  — Revolut, Trade Republic
+FAMILY_FIRST = "family_first"  # "ROSSI MARIO"  — Italian bank statements
+
+_CAP_RE = re.compile(r"^\d{5}$")
+# A name token: letters (incl. accents) plus the punctuation real names carry.
+# Deliberately rejects digits, which is what tells a name line from a street one.
+_NAME_TOKEN_RE = re.compile(r"^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.-]*$")
+
+
+def _lines_in_column(words: list[dict], x_lo: float, x_hi: float) -> list[list[dict]]:
+    """Group the words within the ``[x_lo, x_hi]`` column into lines, top-down.
+
+    Filtering by column *before* grouping (not after) is what keeps a facing
+    column's text out of the line.
+    """
+    kept = sorted((w for w in words if x_lo <= w["x0"] <= x_hi), key=lambda w: (w["top"], w["x0"]))
+    lines: list[list[dict]] = []
+    for w in kept:
+        # Same line if the baselines are within a few points (PDF tops of words
+        # on one visual line are not bit-identical).
+        if lines and abs(w["top"] - lines[-1][0]["top"]) <= 3:
+            lines[-1].append(w)
+        else:
+            lines.append([w])
+    return lines
+
+
+def addressee_from_words(
+    words: list[dict],
+    *,
+    column_width: float = 250.0,
+    column_tol: float = 15.0,
+    max_top: float = 400.0,
+) -> str | None:
+    """Extract the account holder from a statement page's ``extract_words()``.
+
+    Finds a line that *starts* with a CAP, then returns the line two above it in
+    the same column, provided that line looks like a person's name (>= 2 tokens,
+    no digits). Returns ``None`` when the page has no such block — CSV/XLSX
+    exports carry no addressee at all, and that is not an error.
+    """
+    # Reading order: the addressee block is near the top, so the first CAP that
+    # validates wins. Candidates that are not really a CAP (e.g. the bank's own
+    # address in a header line) fail the checks below and are skipped.
+    candidates = sorted(
+        (w for w in words if w["top"] <= max_top and _CAP_RE.match(w["text"])),
+        key=lambda w: (w["top"], w["x0"]),
+    )
+    for cap in candidates:
+        x_lo = cap["x0"] - column_tol
+        lines = _lines_in_column(words, x_lo, cap["x0"] + column_width)
+        idx = next(
+            (i for i, ln in enumerate(lines) if ln[0] is cap),
+            None,  # the CAP is not the leftmost word of its line -> not an address
+        )
+        if idx is None or idx < 2:
+            continue
+        name_line = lines[idx - 2]
+        tokens = [w["text"] for w in name_line]
+        if len(tokens) >= 2 and all(_NAME_TOKEN_RE.match(t) for t in tokens):
+            return " ".join(tokens)
+    return None
+
+
+def format_holder(raw: str) -> str:
+    """Presentation form of a holder name.
+
+    Statement headers are ALL CAPS; title-case those for display. A name that is
+    already mixed-case is left alone — the source knows its own casing better
+    than ``str.title()`` does.
+    """
+    name = " ".join(raw.split())
+    return name.title() if name.isupper() else name
+
+
+def given_name(holder: str, name_order: str) -> str:
+    """Best-effort first name, for greeting the user.
+
+    Uses the source's declared ``NAME_ORDER`` rather than guessing: the given
+    name is the first token where documents put it first, the last token where
+    they put the surname first.
+    """
+    tokens = format_holder(holder).split()
+    if not tokens:
+        return ""
+    return tokens[-1] if name_order == FAMILY_FIRST else tokens[0]
+
+
 @dataclass
 class Transaction:
     """A normalized transaction row (the common schema)."""

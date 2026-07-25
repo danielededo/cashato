@@ -31,7 +31,14 @@ from pathlib import Path
 import pdfplumber
 from dateutil import parser as dateparser
 
-from .base import Transaction, assign_occurrence_keys, normalize_desc, parse_money
+from .base import (
+    GIVEN_FIRST,
+    Transaction,
+    addressee_from_words,
+    assign_occurrence_keys,
+    normalize_desc,
+    parse_money,
+)
 
 SOURCE = "revolut"
 CURRENCY = "EUR"
@@ -260,6 +267,19 @@ def iter_rows_pdf(path: str | Path) -> Iterator[RevolutRow]:
                     buf["desc"].extend(w["text"] for w in ws if 120 <= w["x0"] < 257)
     flush()
     yield from rows
+
+
+# Revolut addresses the statement "DANIELE ROSSI" (given name first).
+NAME_ORDER = GIVEN_FIRST
+
+
+def extract_holder(path: str | Path) -> str | None:
+    """Account holder, from the PDF addressee block. ``None`` for the CSV, whose
+    header carries account/institution details but no addressee."""
+    if not str(path).lower().endswith(".pdf"):
+        return None
+    with pdfplumber.open(path) as pdf:
+        return addressee_from_words(pdf.pages[0].extract_words())
 
 
 def parse(path: str | Path) -> list[Transaction]:

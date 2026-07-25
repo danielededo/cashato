@@ -26,7 +26,13 @@ from pathlib import Path
 
 import pdfplumber
 
-from .base import Transaction, assign_occurrence_keys, parse_money
+from .base import (
+    FAMILY_FIRST,
+    Transaction,
+    addressee_from_words,
+    assign_occurrence_keys,
+    parse_money,
+)
 
 ACCOUNT = "intesa"
 SOURCE = "intesa"
@@ -126,6 +132,20 @@ class _Tx:
     amount: Decimal
     kind: str
     desc: list[str] = field(default_factory=list)
+
+
+# Italian statements address the holder surname-first: "ROSSI MARIO".
+NAME_ORDER = FAMILY_FIRST
+
+
+def extract_holder(path: str | Path) -> str | None:
+    """Account holder, from the quarterly statement's addressee block (right-hand
+    column of page 1). ``None`` for the 13-month export (PDF or XLSX): it is a
+    movement listing with a filter recap, and carries no addressee."""
+    if not str(path).lower().endswith(".pdf"):
+        return None
+    with pdfplumber.open(path) as pdf:
+        return addressee_from_words(pdf.pages[0].extract_words())
 
 
 def parse(path: str | Path) -> list[Transaction]:

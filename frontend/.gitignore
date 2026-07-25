@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dist-ssr/
+
+# vite / typescript caches
+.vite/
+*.tsbuildinfo
+
+# test / lint caches
+coverage/
+.eslintcache
+
+# local env & editor
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store

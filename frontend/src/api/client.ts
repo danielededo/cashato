@@ -7,6 +7,7 @@ import type {
   FilesResponse,
   Lang,
   MonthlyResponse,
+  Profile,
   SummaryResponse,
   TransactionFilters,
   TransactionsResponse,
@@ -45,6 +46,22 @@ async function safeText(res: Response): Promise<string> {
   }
 }
 
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError(res.status, await safeText(res));
+  return res.json() as Promise<T>;
+}
+
+export interface AdminResult {
+  status: string;
+  detail?: string;
+  [k: string]: unknown;
+}
+
 export const api = {
   summary: (lang: Lang) => get<SummaryResponse>("/summary", { lang }),
   monthly: () => get<MonthlyResponse>("/monthly"),
@@ -52,6 +69,11 @@ export const api = {
   transactions: (f: TransactionFilters) => get<TransactionsResponse>("/transactions", { ...f }),
   transfers: () => get<TransfersResponse>("/transfers"),
   files: () => get<FilesResponse>("/files"),
+  profile: () => get<Profile>("/profile"),
+
+  // admin (destructive / operational) — backend endpoints land with a deploy
+  reprocessAll: () => postJson<AdminResult>("/admin/reprocess", {}),
+  resetData: (scope: "data" | "all") => postJson<AdminResult>("/admin/reset", { scope }),
 
   async upload(file: File, source?: string): Promise<UploadAccepted> {
     const form = new FormData();

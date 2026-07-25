@@ -1,185 +1,260 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { colorFor, EXPENSE_COLOR, INCOME_COLOR, topNWithOther } from "../lib/colors";
-import { money, monthLabel } from "../lib/format";
+import type { Row, SeriesDef } from "../components/charts";
+import { Delta, Heatmap, RankBars, Sparkline, type HeatRow, type RankItem } from "../components/primitives";
+import { HeaderPortal } from "../lib/headerSlot";
+import { money } from "../lib/format";
+import { monthShort } from "../lib/format";
+import { useT } from "../lib/i18n";
+import { useLang } from "../lib/lang";
+import { monthsFor, PERIODS, splitWindows, type PeriodKey } from "../lib/period";
 import { useAsync } from "../lib/useAsync";
 
-const axisTick = { fill: "var(--muted)", fontSize: 12 };
-const tooltipStyle = {
-  background: "var(--surface-1)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  color: "var(--text-primary)",
-};
+const StackedArea = lazy(() => import("../components/charts").then((m) => ({ default: m.StackedArea })));
+const MonthlyBars = lazy(() => import("../components/charts").then((m) => ({ default: m.MonthlyBars })));
+const chartFallback = <div className="chart-fallback">Loading chart…</div>;
 
-export function Dashboard() {
-  const summary = useAsync(() => api.summary("it"), []);
-  const monthly = useAsync(() => api.monthly(), []);
-  const catMonthly = useAsync(() => api.categoriesMonthly("it"), []);
+const TOP_RANK = 8;
+const TOP_STACK = 6;
 
-  return (
-    <>
-      <h1>Dashboard</h1>
-
-      {/* KPI tiles from the category totals */}
-      {summary.data && (
-        <div className="grid cols-3" style={{ marginBottom: 16 }}>
-          {(() => {
-            const income = summary.data.categories.reduce((s, c) => s + (c.income ?? 0), 0);
-            const expense = summary.data.categories.reduce((s, c) => s + (c.expense ?? 0), 0);
-            const net = income + expense;
-            return (
-              <>
-                <Tile label="Income" value={money(income)} cls="pos" />
-                <Tile label="Expense" value={money(expense)} cls="neg" />
-                <Tile label="Net" value={money(net)} cls={net >= 0 ? "pos" : "neg"} />
-              </>
-            );
-          })()}
-        </div>
-      )}
-
-      <div className="grid cols-2">
-        <div className="card">
-          <h2>Spending by category</h2>
-          <Chart state={summary}>
-            {summary.data && <CategoryDonut data={summary.data.categories} />}
-          </Chart>
-        </div>
-
-        <div className="card">
-          <h2>Monthly income vs expense</h2>
-          <Chart state={monthly}>
-            {monthly.data && <MonthlyBars data={monthly.data.months} />}
-          </Chart>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>Category trends (monthly)</h2>
-        <Chart state={catMonthly}>
-          {catMonthly.data && <CategoryTrends rows={catMonthly.data.rows} />}
-        </Chart>
-      </div>
-    </>
-  );
+function endOfMonth(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
 }
 
-function Tile({ label, value, cls }: { label: string; value: string; cls?: string }) {
+export function Dashboard() {
+  const [period, setPeriod] = useState<PeriodKey>("12m");
+  const [compare, setCompare] = useState(true);
+  const { lang } = useLang();
+  const { t } = useT();
+  const monthly = useAsync(() => api.monthly(), []);
+  const catMonthly = useAsync(() => api.categoriesMonthly(lang), [lang]);
+  // Decorative: a missing/empty profile just falls back to the impersonal
+  // heading, so swallow the failure rather than surfacing a page-level error.
+  const profile = useAsync(() => api.profile().catch(() => null), []);
+  const navigate = useNavigate();
+
+  const months = monthly.data?.months;
+  const catRows = catMonthly.data?.rows;
+
+  const d = useMemo(() => {
+    if (!months || !catRows) return null;
+    const allMonths = months.map((m) => m.month);
+    const { current, previous } = splitWindows(allMonths, monthsFor(period));
+    const cur = new Set(current);
+    const prev = new Set(previous);
+    const byMonth = new Map(months.map((m) => [m.month, m]));
+
+    const stats = (win: string[]) => {
+      let income = 0, expense = 0, net = 0;
+      const sInc: number[] = [], sExp: number[] = [], sNet: number[] = [];
+      for (const m of win) {
+        const r = byMonth.get(m);
+        const i = r?.income ?? 0, e = r?.expense ?? 0, n = r?.net ?? i + e;
+        income += i; expense += e; net += n;
+        sInc.push(i); sExp.push(Math.abs(e)); sNet.push(n);
+      }
+      return { income, expense, net, sInc, sExp, sNet, n: win.length };
+    };
+    const c = stats(current);
+    const p = stats(previous);
+
+    // category spend (magnitude of negative totals) per window + per current month
+    const curCat = new Map<string, { label: string; spend: number }>();
+    const prevCat = new Map<string, { spend: number }>();
+    const monthCat = new Map<string, Map<string, number>>();
+    const movByMonth = new Map<string, number>();
+    let movCur = 0, movPrev = 0;
+    for (const r of catRows) {
+      const inCur = cur.has(r.month), inPrev = prev.has(r.month);
+      if (inCur) { movCur += r.n_movements; movByMonth.set(r.month, (movByMonth.get(r.month) ?? 0) + r.n_movements); }
+      if (inPrev) movPrev += r.n_movements;
+      const t = r.total ?? 0;
+      if (t >= 0) continue;
+      const mag = -t;
+      if (inCur) {
+        const e = curCat.get(r.category) ?? { label: r.category_label, spend: 0 };
+        e.spend += mag; curCat.set(r.category, e);
+        let mm = monthCat.get(r.month);
+        if (!mm) { mm = new Map(); monthCat.set(r.month, mm); }
+        mm.set(r.category, (mm.get(r.category) ?? 0) + mag);
+      }
+      if (inPrev) { const e = prevCat.get(r.category) ?? { spend: 0 }; e.spend += mag; prevCat.set(r.category, e); }
+    }
+
+    const ranked = [...curCat.entries()].sort((a, b) => b[1].spend - a[1].spend);
+    const rankItems: RankItem[] = ranked.slice(0, TOP_RANK).map(([category, v]) => ({
+      category, label: v.label, value: v.spend, prev: prevCat.get(category)?.spend ?? null,
+    }));
+    const stackSeries: SeriesDef[] = ranked.slice(0, TOP_STACK).map(([category, v]) => ({ key: category, label: v.label, category }));
+    const stackData: Row[] = current.map((m) => {
+      const row: Row = { month: monthShort(m) };
+      for (const s of stackSeries) row[s.key] = monthCat.get(m)?.get(s.category) ?? 0;
+      return row;
+    });
+    const heatRows: HeatRow[] = ranked.slice(0, TOP_RANK).map(([category, v]) => ({ category, label: v.label }));
+    const barsData = current.map((m) => {
+      const r = byMonth.get(m);
+      return { month: monthShort(m), Income: Math.round(r?.income ?? 0), Expense: Math.round(Math.abs(r?.expense ?? 0)) };
+    });
+
+    const expAbs = Math.abs(c.expense);
+    const savings = c.income > 0 ? (c.net / c.income) * 100 : 0;
+    const savingsPrev = p.income > 0 ? (p.net / p.income) * 100 : 0;
+    const avg = c.n ? expAbs / c.n : 0;
+    const avgPrev = p.n ? Math.abs(p.expense) / p.n : 0;
+
+    return {
+      current, previous, cur, hasPrev: previous.length > 0,
+      c, p, expAbs, savings, savingsPrev, avg, avgPrev, movCur, movPrev,
+      movSpark: current.map((m) => movByMonth.get(m) ?? 0),
+      rankItems, stackSeries, stackData, heatRows, barsData, monthCat,
+    };
+  }, [months, catRows, period]);
+
+  const loading = monthly.loading || catMonthly.loading;
+  const error = monthly.error ?? catMonthly.error;
+  const pv = (x: number) => (compare && d?.hasPrev ? x : null);
+
+  const drillCategory = (category: string) => navigate(`/transactions?category=${category}&sign=expense`);
+  const drillCell = (category: string, month: string) =>
+    navigate(`/transactions?category=${category}&sign=expense&date_from=${month}&date_to=${endOfMonth(month)}`);
+
+  const rangeNote =
+    compare && d && d.hasPrev
+      ? `${monthShort(d.current[0])}–${monthShort(d.current[d.current.length - 1])} vs ` +
+        `${monthShort(d.previous[0])}–${monthShort(d.previous[d.previous.length - 1])}`
+      : "";
+
   return (
-    <div className="tile">
-      <div className="label">{label}</div>
-      <div className={`value ${cls ?? ""}`}>{value}</div>
+    <div className="fade-in">
+      <HeaderPortal>
+        <div className="segmented" role="group" aria-label="Period">
+          {PERIODS.map((pp) => (
+            <button key={pp.key} aria-pressed={period === pp.key} onClick={() => setPeriod(pp.key)}>
+              {pp.key === "all" ? "All" : pp.label}
+            </button>
+          ))}
+        </div>
+        <button
+          className="toggle"
+          aria-pressed={compare}
+          onClick={() => setCompare((v) => !v)}
+          title={t("dash.compareTitle")}
+        >
+          <span className="sw" /> {t("dash.compare")}
+        </button>
+        {rangeNote ? <span className="range-note">{rangeNote}</span> : null}
+      </HeaderPortal>
+
+      <header className="greeting">
+        <h1>
+          {profile.data?.given_name
+            ? t("home.hello", { name: profile.data.given_name })
+            : t("home.helloAnon")}
+        </h1>
+        <p>{t("home.subtitle")}</p>
+      </header>
+
+      {error ? <div className="panel state error">{error}</div> : null}
+      {loading && !d ? <div className="panel state">{t("dash.reconciling")}</div> : null}
+
+      {d ? (
+        <>
+          <div className="kpis">
+            <Kpi label={t("kpi.net")} value={money(d.c.net)} cls={d.c.net >= 0 ? "pos" : "neg"} spark={d.c.sNet} color="var(--series-1)">
+              <Delta current={d.c.net} previous={pv(d.p.net)} goodWhenUp />
+            </Kpi>
+            <Kpi label={t("kpi.income")} value={money(d.c.income)} spark={d.c.sInc} color="var(--income)">
+              <Delta current={d.c.income} previous={pv(d.p.income)} goodWhenUp />
+            </Kpi>
+            <Kpi label={t("kpi.expense")} value={money(d.expAbs)} spark={d.c.sExp} color="var(--expense)">
+              <Delta current={d.expAbs} previous={pv(Math.abs(d.p.expense))} goodWhenUp={false} />
+            </Kpi>
+            <Kpi label={t("kpi.savings")} value={`${Math.round(d.savings)}%`} spark={d.c.sNet} color="var(--series-3)">
+              <Delta current={d.savings} previous={pv(d.savingsPrev)} goodWhenUp unit="pp" />
+            </Kpi>
+            <Kpi label={t("kpi.avg")} value={money(d.avg)} spark={d.c.sExp} color="var(--series-4)">
+              <Delta current={d.avg} previous={pv(d.avgPrev)} goodWhenUp={false} />
+            </Kpi>
+            <Kpi label={t("kpi.movements")} value={String(d.movCur)} spark={d.movSpark} color="var(--series-6)">
+              <Delta current={d.movCur} previous={pv(d.movPrev)} goodWhenUp />
+            </Kpi>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
+              <h2>{t("panel.spendingOverTime")}</h2>
+              <span className="hint">{t("panel.spendingOverTime.hint", { n: TOP_STACK })}</span>
+            </div>
+            <Suspense fallback={chartFallback}>
+              <StackedArea data={d.stackData} series={d.stackSeries} />
+            </Suspense>
+          </div>
+
+          <div className="grid wide-narrow">
+            <div className="panel">
+              <div className="panel-head">
+                <h2>{t("panel.categories")}</h2>
+                <span className="hint">{t("panel.categories.hint")}</span>
+              </div>
+              <RankBars items={d.rankItems} onSelect={drillCategory} />
+            </div>
+            <div className="panel">
+              <div className="panel-head">
+                <h2>{t("panel.incomeExpense")}</h2>
+              </div>
+              <Suspense fallback={chartFallback}>
+                <MonthlyBars data={d.barsData} />
+              </Suspense>
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
+              <h2>{t("panel.intensity")}</h2>
+              <span className="hint">{t("panel.intensity.hint")}</span>
+            </div>
+            <Heatmap
+              rows={d.heatRows}
+              months={d.current}
+              monthLabels={d.current.map(monthShort)}
+              valueOf={(cat, m) => d.monthCat.get(m)?.get(cat) ?? 0}
+              onPick={drillCell}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
 
-// Generic loading/error wrapper for a chart card.
-function Chart<T>({ state, children }: { state: { loading: boolean; error: string | null; data: T | null }; children: React.ReactNode }) {
-  if (state.loading) return <div className="state">Loading…</div>;
-  if (state.error) return <div className="state error">{state.error}</div>;
-  return <>{children}</>;
-}
-
-function CategoryDonut({ data }: { data: { category: string; category_label: string; expense: number | null }[] }) {
-  const slices = topNWithOther(
-    data.filter((c) => (c.expense ?? 0) < 0),
-    (c) => c.expense ?? 0,
-    7,
-  );
-  if (!slices.length) return <div className="state">No spending yet.</div>;
+function Kpi({
+  label,
+  value,
+  cls,
+  spark,
+  color,
+  children,
+}: {
+  label: string;
+  value: string;
+  cls?: string;
+  spark: number[];
+  color: string;
+  children: React.ReactNode;
+}) {
   return (
-    <>
-      <ResponsiveContainer width="100%" height={260}>
-        <PieChart>
-          <Pie data={slices} dataKey="value" nameKey="label" innerRadius={60} outerRadius={95} paddingAngle={2} stroke="var(--surface-1)" strokeWidth={2}>
-            {slices.map((s) => (
-              <Cell key={s.category} fill={colorFor(s.category)} />
-            ))}
-          </Pie>
-          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => money(v)} />
-        </PieChart>
-      </ResponsiveContainer>
-      {/* legend = relief for the light-mode low-contrast slots */}
-      <div className="legend">
-        {slices.map((s) => (
-          <span key={s.category}>
-            <span className="swatch" style={{ background: colorFor(s.category) }} />
-            {s.label} · {money(s.value)}
-          </span>
-        ))}
+    <div className="kpi">
+      <div className="k">{label}</div>
+      <div className={`v ${cls ?? ""}`}>{value}</div>
+      <div className="foot">
+        {children}
+        <span className="spark" style={{ color }}>
+          <Sparkline values={spark} />
+        </span>
       </div>
-    </>
-  );
-}
-
-function MonthlyBars({ data }: { data: { month: string; income: number | null; expense: number | null }[] }) {
-  const rows = data.map((m) => ({
-    month: monthLabel(m.month),
-    Income: m.income ?? 0,
-    Expense: Math.abs(m.expense ?? 0),
-  }));
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={rows} barGap={2}>
-        <CartesianGrid stroke="var(--grid)" vertical={false} />
-        <XAxis dataKey="month" tick={axisTick} stroke="var(--baseline)" />
-        <YAxis tick={axisTick} stroke="var(--baseline)" width={72} tickFormatter={(v) => money(v)} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => money(v)} />
-        <Legend />
-        <Bar dataKey="Income" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Expense" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function CategoryTrends({ rows }: { rows: { month: string; category: string; category_label: string; total: number | null }[] }) {
-  // top 5 categories by total |spend|
-  const byCat = new Map<string, { label: string; total: number }>();
-  for (const r of rows) {
-    const e = byCat.get(r.category) ?? { label: r.category_label, total: 0 };
-    e.total += Math.abs(r.total ?? 0);
-    byCat.set(r.category, e);
-  }
-  const top = [...byCat.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([c]) => c);
-
-  // pivot to { month, [label]: value } (values as absolute magnitude)
-  const months = [...new Set(rows.map((r) => r.month))].sort();
-  const labelOf = new Map(top.map((c) => [c, byCat.get(c)!.label]));
-  const pivot = months.map((m) => {
-    const o: Record<string, number | string> = { month: monthLabel(m) };
-    for (const c of top) o[labelOf.get(c)!] = 0;
-    for (const r of rows) if (r.month === m && top.includes(r.category)) o[labelOf.get(r.category)!] = Math.abs(r.total ?? 0);
-    return o;
-  });
-
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <LineChart data={pivot}>
-        <CartesianGrid stroke="var(--grid)" vertical={false} />
-        <XAxis dataKey="month" tick={axisTick} stroke="var(--baseline)" />
-        <YAxis tick={axisTick} stroke="var(--baseline)" width={72} tickFormatter={(v) => money(v)} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => money(v)} />
-        <Legend />
-        {top.map((c) => (
-          <Line key={c} type="monotone" dataKey={labelOf.get(c)!} stroke={colorFor(c)} strokeWidth={2} dot={{ r: 3 }} />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
+    </div>
   );
 }

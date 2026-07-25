@@ -28,7 +28,13 @@ from pathlib import Path
 
 import pdfplumber
 
-from .base import Transaction, assign_occurrence_keys, parse_money
+from .base import (
+    GIVEN_FIRST,
+    Transaction,
+    addressee_from_words,
+    assign_occurrence_keys,
+    parse_money,
+)
 
 ACCOUNT = "trade_republic"
 SOURCE = "trade_republic"
@@ -244,6 +250,19 @@ def _parse_blocks(lines: list[tuple[float, list[dict]]], cols: _Cols) -> list[_B
                 b.month = _MONTHS[low]
         blocks.append(b)
     return blocks
+
+
+# Trade Republic addresses the statement "DANIELE ROSSI" (given name first).
+NAME_ORDER = GIVEN_FIRST
+
+
+def extract_holder(path: str | Path) -> str | None:
+    """Account holder, from the PDF addressee block. ``None`` for the transaction
+    export CSV, which is columnar data with no header block."""
+    if not str(path).lower().endswith(".pdf"):
+        return None
+    with pdfplumber.open(path) as pdf:
+        return addressee_from_words(pdf.pages[0].extract_words())
 
 
 def parse(path: str | Path) -> list[Transaction]:

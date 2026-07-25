@@ -6,12 +6,28 @@ from decimal import Decimal
 import pytest
 
 from cashato.parsers.base import (
+    FAMILY_FIRST,
+    GIVEN_FIRST,
     MoneyParseError,
     Transaction,
+    addressee_from_words,
     assign_occurrence_keys,
+    format_holder,
+    given_name,
     normalize_desc,
     parse_money,
 )
+
+
+def _words(*lines):
+    """Costruisce l'output di ``extract_words()`` da (top, x0, "testo ...")."""
+    out = []
+    for top, x0, text in lines:
+        x = x0
+        for tok in text.split():
+            out.append({"text": tok, "top": top, "x0": x, "x1": x + 6 * len(tok)})
+            x += 6 * len(tok) + 4
+    return out
 
 
 def _tx(amount, descr="x", account="revolut_eur", d=date(2025, 1, 1)):
@@ -107,3 +123,65 @@ class TestDedup:
         assign_occurrence_keys(s1)
         assign_occurrence_keys(s2)
         assert {t.natural_key for t in s1} == {t.natural_key for t in s2}
+
+
+class TestAccountHolder:
+    """I tre layout reali dell'intestatario (coordinate come nei PDF veri)."""
+
+    def test_revolut_layout(self):
+        # blocco a sinistra, CAP su riga propria, colonna destra con altri dati
+        words = _words(
+            (104.4, 446.2, "Generated on the Jul 18, 2026"),
+            (144.0, 39.7, "DANIELE ROSSI"),
+            (170.0, 39.7, "Via Roma 1"),
+            (170.0, 383.0, "Tax residency: Italy"),
+            (182.4, 39.7, "20127"),
+            (194.8, 39.7, "Milano"),
+        )
+        assert addressee_from_words(words) == "DANIELE ROSSI"
+
+    def test_trade_republic_ignores_facing_column_on_the_name_line(self):
+        # la riga del nome contiene ANCHE il periodo dell'estratto, a destra:
+        # senza il ritaglio per colonna finirebbe dentro al nome
+        words = _words(
+            (104.7, 73.7, "TRADE REPUBLIC BANK GMBH, BRANCH ITALY 20154 MILANO (MI)"),
+            (139.9, 75.2, "DANIELE ROSSI"),
+            (139.9, 388.7, "DATA 01 gen 2025 - 17 lug 2026"),
+            (148.2, 75.2, "Via Roma 1"),
+            (157.2, 75.2, "00100 Roma"),
+        )
+        assert addressee_from_words(words) == "DANIELE ROSSI"
+
+    def test_intesa_right_column_ignores_left_column(self):
+        # "Tipologia conto:" è a sinistra e quasi alla stessa altezza del nome
+        words = _words(
+            (151.1, 8.0, "Coordinate bancarie: 0140371"),
+            (183.1, 283.0, "ROSSI MARIO"),
+            (185.0, 8.0, "Tipologia conto:"),
+            (193.2, 283.0, "VIA ACQUACORRENTE 3"),
+            (197.8, 8.0, "XME Conto"),
+            (203.3, 283.0, "00100 ROMA PE"),
+        )
+        assert addressee_from_words(words) == "ROSSI MARIO"
+
+    def test_none_when_no_address_block(self):
+        # export CSV/XLSX: nessun destinatario -> vuoto, non è un errore
+        assert addressee_from_words(_words((10.0, 10.0, "DATA OPERAZIONE IMPORTO"))) is None
+
+    def test_street_line_is_not_mistaken_for_a_name(self):
+        # niente due righe sopra il CAP che sembrino un nome -> None
+        words = _words(
+            (100.0, 40.0, "Via Roma 1"),
+            (110.0, 40.0, "Scala B interno 4"),
+            (120.0, 40.0, "00100 Roma"),
+        )
+        assert addressee_from_words(words) is None
+
+    def test_given_name_follows_the_source_convention(self):
+        assert given_name("DANIELE ROSSI", GIVEN_FIRST) == "Daniele"
+        assert given_name("ROSSI MARIO", FAMILY_FIRST) == "Daniele"
+
+    def test_format_holder_titlecases_only_all_caps(self):
+        assert format_holder("ROSSI MARIO") == "Rossi Mario"
+        # già in maiuscolo/minuscolo: la fonte sa meglio di str.title()
+        assert format_holder("Mario de Rossi") == "Mario de Rossi"

@@ -1,0 +1,96 @@
+import { useState } from "react";
+import { api, ApiError } from "../api/client";
+import { useT } from "../lib/i18n";
+
+type Busy = null | "reprocess" | "reset";
+
+export function Manage() {
+  const { t } = useT();
+  const [busy, setBusy] = useState<Busy>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [scope, setScope] = useState<"data" | "all">("data");
+  const [confirm, setConfirm] = useState("");
+
+  async function run(kind: Exclude<Busy, null>, fn: () => Promise<{ status: string; detail?: string }>) {
+    setBusy(kind);
+    setMsg(null);
+    try {
+      const r = await fn();
+      setMsg({ ok: true, text: r.detail ?? r.status });
+    } catch (e) {
+      const notDeployed = e instanceof ApiError && (e.status === 404 || e.status === 405);
+      setMsg({ ok: false, text: notDeployed ? t("mng.notDeployed") : e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="fade-in">
+      {/* reprocess */}
+      <div className="panel">
+        <div className="panel-head"><h2>{t("mng.reprocess")}</h2><span className="hint">{t("mng.reprocess.hint")}</span></div>
+        <div className="toolbar">
+          <button className="btn" disabled={busy !== null} onClick={() => run("reprocess", api.reprocessAll)}>
+            {busy === "reprocess" ? "…" : t("mng.reprocessBtn")}
+          </button>
+        </div>
+      </div>
+
+      {/* retrain (guided, offline) */}
+      <div className="panel">
+        <div className="panel-head"><h2>{t("mng.retrain")}</h2><span className="hint">{t("mng.retrain.hint")}</span></div>
+        <ol className="steps">
+          <li>Label the long tail with the host LLM → <code>gold.training_labels</code>:
+            <pre><code>ollama serve  # host GPU
+python -m cashato.ml.label --limit 2000</code></pre>
+          </li>
+          <li>Train the embedding kNN and register it in MLflow:
+            <pre><code>python -m cashato.ml.train</code></pre>
+          </li>
+          <li>Recategorize existing transactions with the new model:
+            <pre><code>python -m cashato.ml.recategorize</code></pre>
+          </li>
+          <li>The categorizer service picks up the new MLflow model version automatically.</li>
+        </ol>
+        <p className="dim" style={{ fontSize: 12 }}>
+          Runs locally on the host GPU — not in-cluster. Exact commands may differ; see the ML docs.
+        </p>
+      </div>
+
+      {/* reset (destructive) */}
+      <div className="panel">
+        <div className="panel-head"><h2>{t("mng.reset")}</h2><span className="hint">{t("mng.reset.hint")}</span></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+            <input type="radio" name="scope" checked={scope === "data"} onChange={() => setScope("data")} />
+            {t("mng.reset.keep")}
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+            <input type="radio" name="scope" checked={scope === "all"} onChange={() => setScope("all")} />
+            {t("mng.reset.all")}
+          </label>
+          <div className="toolbar">
+            <input
+              className="input"
+              placeholder="RESET"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              style={{ width: 120 }}
+            />
+            <button
+              className="btn"
+              style={{ borderColor: "var(--expense)", color: "var(--expense)" }}
+              disabled={busy !== null || confirm !== "RESET"}
+              onClick={() => run("reset", () => api.resetData(scope))}
+            >
+              {busy === "reset" ? "…" : t("mng.resetBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {msg ? <div className={`panel state ${msg.ok ? "" : "error"}`}>{msg.text}</div> : null}
+    </div>
+  );
+}

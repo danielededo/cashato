@@ -89,9 +89,19 @@ export interface RawFile {
   rows_duplicate: number;
   error: string | null;
   uploaded_at: string;
+  /** Only statement PDFs name the holder; exports legitimately leave this null. */
+  account_holder: string | null;
 }
 export interface FilesResponse {
   files: RawFile[];
+}
+/** Who the ingested statements belong to. Every field is nullable: "no PDF
+ *  ingested yet" is a normal state, not an error. */
+export interface Profile {
+  display_name: string | null;
+  given_name: string | null;
+  source: string | null;
+  variants: string[];
 }
 export interface FeedbackAccepted {
   status: string;
@@ -108,12 +118,15 @@ export interface TransactionFilters {
   account?: string;
   source?: string;
   category?: string;
+  category_source?: string;
   sign?: Sign;
   date_from?: string;
   date_to?: string;
   q?: string;
   min_amount?: number;
   max_amount?: number;
+  min_confidence?: number;
+  max_confidence?: number;
   include_transfers?: boolean;
   limit?: number;
   offset?: number;

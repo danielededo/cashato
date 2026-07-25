@@ -19,6 +19,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -37,8 +38,9 @@ from cashato.obs import (
     start_metrics_server,
     tracing_enabled,
 )
+from cashato.parsers.base import GIVEN_FIRST, format_holder, given_name
 from cashato.parsers.categorize import Categorizer
-from cashato.parsers.registry import SOURCE_NAMES
+from cashato.parsers.registry import NAME_ORDERS, SOURCE_NAMES
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("ingest-api")
@@ -53,7 +55,16 @@ _TAGS = [
     {"name": "health", "description": "Liveness/readiness probes for Kubernetes."},
     {"name": "ingestion", "description": "Upload statements and inspect ingested files."},
     {"name": "feedback", "description": "User category corrections (active learning)."},
+    {"name": "profile", "description": "Who the ingested statements belong to."},
+    {"name": "admin", "description": "Operational: reprocess stored files, reset data."},
 ]
+
+# Tables cleared by a reset. "data" keeps the learned labels (active-learning
+# memory); "all" also wipes them for a true from-scratch restart.
+_RESET_TABLES = {
+    "data": ["silver.transactions", "bronze.raw_files"],
+    "all": ["silver.transactions", "bronze.raw_files", "gold.training_labels", "gold.category_feedback"],
+}
 
 
 @asynccontextmanager
@@ -92,6 +103,8 @@ class RawFile(BaseModel):
     rows_duplicate: int
     error: str | None = None
     uploaded_at: datetime
+    # Only statement PDFs name the holder; exports legitimately leave this empty.
+    account_holder: str | None = None
 
 
 class FilesResponse(BaseModel):
@@ -115,6 +128,32 @@ class FeedbackAccepted(BaseModel):
     status: str = Field(examples=["queued"])
     natural_key: str
     category: str
+
+
+class Profile(BaseModel):
+    """The account holder, as read off the ingested statements. All optional:
+    CSV/XLSX exports carry no addressee, so "unknown" is a normal state."""
+
+    display_name: str | None = Field(default=None, examples=["Mario Rossi"])
+    given_name: str | None = Field(default=None, examples=["Daniele"])
+    source: str | None = Field(default=None, description="Source the name was read from.")
+    variants: list[str] = Field(
+        default_factory=list, description="Distinct holder spellings seen across sources."
+    )
+
+
+class ResetRequest(BaseModel):
+    scope: Literal["data", "all"] = Field(
+        default="data",
+        description="'data' wipes transactions+files but KEEPS learned labels; "
+        "'all' also wipes gold.training_labels + gold.category_feedback.",
+    )
+
+
+class AdminResult(BaseModel):
+    status: str = Field(examples=["ok", "queued"])
+    detail: str
+    count: int | None = None
 
 
 # Prometheus metrics on a dedicated port (:9100), uniform across all services.
@@ -232,7 +271,8 @@ async def list_files():
             conn.execute(
                 text(
                     "SELECT source, filename, status, rows_total, rows_new, "
-                    "rows_total - rows_new AS rows_duplicate, error, uploaded_at "
+                    "rows_total - rows_new AS rows_duplicate, error, uploaded_at, "
+                    "account_holder "
                     "FROM bronze.raw_files ORDER BY uploaded_at DESC LIMIT 50"
                 )
             )
@@ -240,6 +280,100 @@ async def list_files():
             .all()
         )
     return {"files": [dict(r) for r in rows]}
+
+
+@api.get("/profile", response_model=Profile, tags=["profile"], summary="Account holder")
+async def profile():
+    """Who the ingested statements belong to, for a personalized home page.
+
+    The holder is read off the statement headers at ingestion time; CSV/XLSX
+    exports carry none. Sources disagree on name order (Revolut writes "DANIELE
+    ROSSI", Italian statements "ROSSI MARIO"), so the greeting
+    name is derived from the *declared* convention of the source that supplied
+    the name rather than guessed from the string. Everything is nullable: an
+    empty profile is a normal state (no PDF ingested yet).
+    """
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(
+                text(
+                    "SELECT account_holder, source, COUNT(*) AS n "
+                    "FROM bronze.raw_files "
+                    "WHERE account_holder IS NOT NULL AND account_holder <> '' "
+                    "GROUP BY account_holder, source "
+                    "ORDER BY n DESC, MAX(uploaded_at) DESC"
+                )
+            )
+            .mappings()
+            .all()
+        )
+    if not rows:
+        return Profile()
+    top = rows[0]
+    order = NAME_ORDERS.get(top["source"], GIVEN_FIRST)
+    return Profile(
+        display_name=format_holder(top["account_holder"]),
+        given_name=given_name(top["account_holder"], order) or None,
+        source=top["source"],
+        # Distinct spellings seen across sources — transparency, and a hint that
+        # statements from more than one holder were mixed in.
+        variants=sorted({format_holder(r["account_holder"]) for r in rows}),
+    )
+
+
+@api.post(
+    "/admin/reprocess",
+    response_model=AdminResult,
+    status_code=202,
+    tags=["admin"],
+    summary="Re-enqueue the ETL over all stored files",
+)
+async def reprocess():
+    """Re-run ingestion over every retained object (by key), no re-upload needed.
+
+    Idempotent: dedup by ``natural_key`` means already-reconciled rows are skipped,
+    so this safely re-parses (e.g. after a parser fix or a model retrain).
+    """
+    keys = objstore.list_keys()
+    for key in keys:
+        # key is "<uuid8>_<original filename>"; recover the filename for logging/detect.
+        filename = key.split("_", 1)[1] if "_" in key else key
+        job = {"key": key, "filename": filename, "source": None}
+        await app.state.js.publish(
+            SUBJECT_INGEST, json.dumps(job).encode(), headers=inject_trace_headers()
+        )
+    _log.info("reprocess enqueued", extra={"fields": {"count": len(keys)}})
+    return AdminResult(status="queued", detail=f"re-enqueued {len(keys)} file(s)", count=len(keys))
+
+
+@api.post(
+    "/admin/reset",
+    response_model=AdminResult,
+    tags=["admin"],
+    summary="Delete ingested data (destructive)",
+)
+async def reset(req: ResetRequest):
+    """Truncate the ingested data and drop the stored files. Destructive.
+
+    ``scope=data`` keeps the active-learning memory (``gold.training_labels`` +
+    ``gold.category_feedback``); ``scope=all`` wipes those too. Also clears the
+    object bucket so a later reprocess does not repopulate.
+    """
+    tables = _RESET_TABLES[req.scope]
+    engine = get_engine()
+    with engine.begin() as conn:
+        for tbl in tables:
+            conn.execute(text(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE"))
+    removed = objstore.clear()
+    _log.warning(
+        "data reset", extra={"fields": {"scope": req.scope, "tables": tables, "files_removed": removed}}
+    )
+    return AdminResult(
+        status="ok",
+        detail=f"reset (scope={req.scope}): cleared {len(tables)} table(s) and {removed} stored file(s)",
+        count=removed,
+    )
 
 
 app.include_router(api)
