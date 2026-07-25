@@ -34,19 +34,30 @@ from cashato.parsers.registry import (  # (auto-discovered)
 _CATEGORIZER = Categorizer.load()
 
 
-def record_unsupported(path: Path, filename: str, bank: str | None) -> None:
+def record_unsupported(
+    path: Path, filename: str, bank: str | None, ambiguous: list[str] | None = None
+) -> None:
     """Register a file no adapter can read, so it does not vanish silently.
 
     Without this the object is stored and the job is consumed, but nothing ever
     appears in ``/files`` — from the UI the upload simply did nothing. Recording
     it as ``failed`` with a useful reason is the difference between "cashato is
     broken" and "cashato does not support this bank yet".
+
+    ``ambiguous`` distinguishes the two ways detection declines: nothing matched,
+    versus several sources matched equally well and guessing would be a coin
+    flip. They need different actions from the user, so they say different things.
     """
-    reason = (
-        f"Statement appears to be from {bank}, which has no adapter yet."
-        if bank
-        else "Unrecognized statement format: no adapter matched this file's content."
-    )
+    if ambiguous:
+        reason = (
+            f"Ambiguous statement: its content matches {' and '.join(sorted(ambiguous))} "
+            f"equally well, so the source was not guessed. Re-upload choosing the "
+            f"source explicitly."
+        )
+    elif bank:
+        reason = f"Statement appears to be from {bank}, which has no adapter yet."
+    else:
+        reason = "Unrecognized statement format: no adapter matched this file's content."
     with get_engine().begin() as conn:
         conn.execute(
             text(

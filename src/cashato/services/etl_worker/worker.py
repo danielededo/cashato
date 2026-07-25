@@ -39,7 +39,7 @@ from cashato.obs import (
     start_metrics_server,
     tracing_enabled,
 )
-from cashato.parsers.detect import detect_source, identify_bank
+from cashato.parsers.detect import detect_candidates, detect_source, identify_bank
 
 log = setup_logging("etl-worker")
 setup_tracing("etl-worker")
@@ -67,12 +67,20 @@ def _process(key: str, filename: str | None, source_override: str | None, force:
         objstore.fget(key, dest)
         source = source_override if source_override in load.ADAPTERS else detect_source(dest)
         if not source:
-            # No adapter — but the IBAN usually still says which bank it is, and
-            # recording that beats dropping the file with no trace in /files.
+            # Two different declines: nothing matched, or several sources matched
+            # equally and guessing would be a coin flip. Record which, because the
+            # user's next step differs — and either way the IBAN usually still
+            # names the bank, which beats dropping the file with no trace.
+            tied = [s for s, _ in detect_candidates(dest)]
             bank = identify_bank(dest)
-            load.record_unsupported(Path(dest), filename or key, bank)
+            load.record_unsupported(
+                Path(dest), filename or key, bank, ambiguous=tied if len(tied) > 1 else None
+            )
             JOBS.labels(status="skipped").inc()
-            log.warning("unrecognized source", extra={"fields": {"key": key, "bank": bank}})
+            log.warning(
+                "source not resolved",
+                extra={"fields": {"key": key, "bank": bank, "candidates": tied}},
+            )
             return 0
         with PROC.time():
             # force: an ordinary upload stops at the sha256 check (cheap dedup of

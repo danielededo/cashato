@@ -83,7 +83,17 @@ export function useAccounts(): AccountNaming {
       banksBySource.set(a.source, s);
     }
 
-    const raw = (id: string | null | undefined) => (id ? id.replace(/_/g, " ") : "—");
+    // Fallback when nothing described the account. Title-cased so it sits
+    // beside real bank names without looking like a different kind of thing:
+    // the UI used to show "Trade Republic Bank" in one place and
+    // "trade republic" in another, purely by whether a PDF had been ingested.
+    // Still visibly derived from the id — never an invented bank name.
+    const raw = (id: string | null | undefined) =>
+      id
+        ? id
+            .replace(/_/g, " ")
+            .replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+        : "—";
 
     return {
       accounts,

@@ -4,7 +4,17 @@ The user uploads any file and the ``etl-worker`` picks the right adapter based o
 content signatures (no filename guessing). If detection is uncertain the caller
 can pass an explicit source override (see the ingest API).
 
-Returns ``"revolut" | "trade_republic" | "intesa"`` or ``None`` if unknown.
+**Registry order is not a tie-breaker.** Detection used to walk the sources in
+alphabetical module-discovery order and take the first match, which made the
+outcome depend on a filename: `intesa.py` sorted first, so its markers won every
+tie, and adding a `bper.py` or `hype.py` would silently change who wins. Worse,
+the loser was invisible — the wrong adapter simply finds no table and returns
+zero rows. See `demo/DETECTION_COLLISIONS.md`.
+
+Now every source is scored and the most specific match wins, where specific
+means "matched more markers". If two sources tie at the top the file is reported
+as AMBIGUOUS (``None``) rather than resolved by accident: an honest "I cannot
+tell, choose the bank yourself" beats a coin flip the user never sees.
 """
 
 from __future__ import annotations
@@ -57,14 +67,38 @@ def head_text(path: Path) -> str | None:
     return None
 
 
-def detect_source(path: str | Path) -> str | None:
+def detect_candidates(path: str | Path) -> list[tuple[str, int]]:
+    """Every source whose markers match, with the size of its best match.
+
+    The score is the number of markers in the matched group: a group naming the
+    bank plus a layout string is a stronger claim than one generic word. Length
+    is deliberately NOT used — "estratto conto" is longer than "revolut" and far
+    less specific, so it would rank the wrong way round.
+    """
     text = head_text(Path(path))
     if not text:
-        return None
+        return []
+    scored: list[tuple[str, int]] = []
     for source, groups in detection_signatures():
-        if any(all(marker in text for marker in group) for group in groups):
-            return source
-    return None
+        sizes = [len(g) for g in groups if all(marker in text for marker in g)]
+        if sizes:
+            scored.append((source, max(sizes)))
+    return sorted(scored, key=lambda p: (-p[1], p[0]))
+
+
+def detect_source(path: str | Path) -> str | None:
+    """The one source this file belongs to, or ``None`` if unknown OR ambiguous.
+
+    Returning ``None`` for an ambiguous file is the point: the caller records it
+    with a reason and the user picks the bank, instead of the file being handed
+    to whichever adapter happened to sort first.
+    """
+    candidates = detect_candidates(path)
+    if not candidates:
+        return None
+    if len(candidates) > 1 and candidates[0][1] == candidates[1][1]:
+        return None  # tie -> genuinely ambiguous, do not guess
+    return candidates[0][0]
 
 
 def identify_bank(path: str | Path) -> str | None:
