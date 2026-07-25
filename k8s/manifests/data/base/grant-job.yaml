@@ -22,7 +22,7 @@ metadata:
   annotations:
     # Wave 2: after db-migrate (wave 1), so the tables the GRANTs name exist.
     argocd.argoproj.io/sync-wave: "2"
-    argocd.argoproj.io/sync-options: Replace=true
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
 spec:
   backoffLimit: 10
   template:
