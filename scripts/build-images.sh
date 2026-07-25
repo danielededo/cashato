@@ -23,7 +23,7 @@ CLUSTER="${KIND_CLUSTER:-cashato}"
 
 build_load() { # <image:tag> <dockerfile-name>
   echo "==> build $1"
-  docker build -t "$1" -f "$ROOT/build/$2" "$ROOT"
+  docker build -t "$1" -f "$ROOT/docker/$2" "$ROOT"
   echo "==> kind load $1 (cluster: $CLUSTER)"
   kind load docker-image "$1" --name "$CLUSTER"
 }

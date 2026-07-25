@@ -32,7 +32,7 @@ the deploy.
 An **EventListener** (`el-cashato-ci.cashato-ci.svc:8080`) receives the webhook.
 Interceptors: `github` (HMAC-SHA256 via `X-Hub-Signature-256` — Gitea sends
 GitHub-compatible headers — + push filter) then `cel` (branch == `main` **and** a
-changed file under `src/**`, `build/**`, or `pyproject.toml`). So docs/k8s/infra/
+changed file under `src/**`, `docker/**`, or `pyproject.toml`). So docs/k8s/infra/
 config-only pushes don't rebuild. Both sender (Gitea) and sink live in the cluster →
 no public exposure. The webhook is created by an Argo Sync-hook Job (`webhook-job.yaml`).
 
@@ -60,8 +60,8 @@ The CI builds **2 images** backing **6 workloads** across 2 namespaces:
 
 | Built image | Dockerfile | Consumed by | Namespace |
 |-------------|-----------|-------------|-----------|
-| **`cashato/svc`** | `build/Dockerfile.svc` | `ingest-api`, `etl-worker`, `query-api`, `categorizer` (Deployments) | `cashato` |
-| **`cashato/migrate`** | `build/Dockerfile.migrate` | `migration-job`, `grant-job` (Jobs) | `cashato-data` |
+| **`cashato/svc`** | `docker/Dockerfile.svc` | `ingest-api`, `etl-worker`, `query-api`, `categorizer` (Deployments) | `cashato` |
+| **`cashato/migrate`** | `docker/Dockerfile.migrate` | `migration-job`, `grant-job` (Jobs) | `cashato-data` |
 
 > Out of CI scope (built manually via `scripts/build-images.sh`): the heavy
 > `cashato/train`, `cashato/predict`, `cashato/mlflow` images (torch/ST — too slow for

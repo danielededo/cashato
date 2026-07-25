@@ -1,12 +1,12 @@
 # Keep the Docker build context small and free of secrets/bank data.
-# Images need only: pyproject.toml, README.md, src/, alembic.ini, build/,
+# Images need only: pyproject.toml, README.md, src/, alembic.ini, docker/,
 # models/latest.joblib (train). Everything below is excluded.
 .venv/
 .git/
 data/
 output/
 mlruns/
-# frontend source IS needed by build/Dockerfile.frontend — exclude only its build artifacts
+# frontend source IS needed by docker/Dockerfile.frontend — exclude only its build artifacts
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/

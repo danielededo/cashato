@@ -31,7 +31,7 @@ spec:
               value: ["push"]
         # Only push to main, AND only when a source-relevant path changed — so a
         # docs/k8s/infra/config-only push does NOT rebuild the images (config is a
-        # runtime ConfigMap now; only src/**, build/**, or pyproject.toml matter).
+        # runtime ConfigMap now; only src/**, docker/**, or pyproject.toml matter).
         - name: only-main-and-source-changes
           ref:
             name: cel
@@ -41,7 +41,7 @@ spec:
               value: >-
                 body.ref == 'refs/heads/main' &&
                 body.commits.exists(c, (c.added + c.modified + c.removed).exists(f,
-                  f.startsWith('src/') || f.startsWith('frontend/') || f.startsWith('build/') || f == 'pyproject.toml'))
+                  f.startsWith('src/') || f.startsWith('frontend/') || f.startsWith('docker/') || f == 'pyproject.toml'))
       bindings:
         - ref: cashato-ci-push
       template:

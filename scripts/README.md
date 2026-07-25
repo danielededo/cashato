@@ -29,7 +29,7 @@ the controller decrypts them in-cluster.
 
 | Script | What it does | When to run |
 |--------|--------------|-------------|
-| `build-images.sh` | Build all five `cashato/*:dev` images from `build/` and `kind load` them. | Bootstrap / fast local iteration. In steady state the **CI (Tekton) builds+deploys `svc`+`migrate` by SHA** on every push (C7c); this script is still the path for the heavy `train`/`predict`/`mlflow` images (out of CI scope) and for a from-scratch `:dev` load. |
+| `build-images.sh` | Build all five `cashato/*:dev` images from `docker/` and `kind load` them. | Bootstrap / fast local iteration. In steady state the **CI (Tekton) builds+deploys `svc`+`migrate` by SHA** on every push (C7c); this script is still the path for the heavy `train`/`predict`/`mlflow` images (out of CI scope) and for a from-scratch `:dev` load. |
 
 ## MLOps — retraining (C6)
 

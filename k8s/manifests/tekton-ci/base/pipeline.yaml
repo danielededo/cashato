@@ -75,7 +75,7 @@ spec:
         - { name: source, workspace: shared }
 
     # cashato/svc — the shared service image. CONSUMED BY 4 Deployments (ns cashato):
-    # ingest-api, etl-worker, query-api, categorizer. (build/Dockerfile.svc)
+    # ingest-api, etl-worker, query-api, categorizer. (docker/Dockerfile.svc)
     - name: build-push-svc
       runAfter: [lint-test]
       taskRef:
@@ -88,7 +88,7 @@ spec:
           - { name: version, value: "0.9" }
       params:
         - { name: IMAGE, value: "$(params.registry)/cashato/svc:$(tasks.fetch-source.results.commit)" }
-        - { name: DOCKERFILE, value: ./build/Dockerfile.svc }
+        - { name: DOCKERFILE, value: ./docker/Dockerfile.svc }
         - { name: CONTEXT, value: . }
         - { name: TLSVERIFY, value: "false" }
         - { name: STORAGE_DRIVER, value: vfs }
@@ -98,7 +98,7 @@ spec:
 
     # cashato/migrate — the Alembic migrator image. CONSUMED BY 2 Jobs (ns cashato-data):
     # migration-job (alembic upgrade head) + grant-job (DB privilege GRANTs).
-    # (build/Dockerfile.migrate)
+    # (docker/Dockerfile.migrate)
     - name: build-push-migrate
       runAfter: [lint-test]
       taskRef:
@@ -111,7 +111,7 @@ spec:
           - { name: version, value: "0.9" }
       params:
         - { name: IMAGE, value: "$(params.registry)/cashato/migrate:$(tasks.fetch-source.results.commit)" }
-        - { name: DOCKERFILE, value: ./build/Dockerfile.migrate }
+        - { name: DOCKERFILE, value: ./docker/Dockerfile.migrate }
         - { name: CONTEXT, value: . }
         - { name: TLSVERIFY, value: "false" }
         - { name: STORAGE_DRIVER, value: vfs }
@@ -120,7 +120,7 @@ spec:
         - { name: dockerconfig, workspace: dockerconfig }
 
     # cashato/frontend — the SPA (phase E). CONSUMED BY the frontend Deployment
-    # (ns cashato). Multi-stage node→nginx build. (build/Dockerfile.frontend)
+    # (ns cashato). Multi-stage node→nginx build. (docker/Dockerfile.frontend)
     - name: build-push-frontend
       runAfter: [lint-test]
       taskRef:
@@ -133,7 +133,7 @@ spec:
           - { name: version, value: "0.9" }
       params:
         - { name: IMAGE, value: "$(params.registry)/cashato/frontend:$(tasks.fetch-source.results.commit)" }
-        - { name: DOCKERFILE, value: ./build/Dockerfile.frontend }
+        - { name: DOCKERFILE, value: ./docker/Dockerfile.frontend }
         - { name: CONTEXT, value: . }
         - { name: TLSVERIFY, value: "false" }
         - { name: STORAGE_DRIVER, value: vfs }

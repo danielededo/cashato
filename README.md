@@ -162,7 +162,7 @@ src/cashato/      the installable package (pip install -e .)
   cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
 config/           settings.yaml · categorie.yaml · mcc.yaml   (runtime `cashato-config` ConfigMap; not baked)
 pyproject.toml    package metadata + deps (base + svc/migrate/train/predict/dev extras)
-build/            Dockerfile.{svc,migrate,train,predict,mlflow}   (bootstrap images)
+docker/           Dockerfile.{svc,migrate,frontend,train,predict,mlflow}
 infra/            OpenTofu (kind + operators)   k8s/   GitOps manifests (Argo CD)
 scripts/          secret-zero.sh · seal-secrets.sh · build-images.sh    tests/  unit + verification
 data/  output/  models/   (git-ignored)

@@ -181,7 +181,7 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
   pytest, MIT license. Dev: a local Postgres for the data core; the full platform
   runs on kind (`infra/` OpenTofu + `k8s/` GitOps via Argo CD). Bootstrap images
-  in `build/`. Everything in English (Italian only in string literals that must
+  in `docker/`. Everything in English (Italian only in string literals that must
   match real document text).
 
 ## Key decisions
@@ -194,7 +194,7 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   was cut) tagged by commit SHA → a `bump-deploy` step pins those tags in a
   **separate `cashato-deploy` config repo** (Argo watches it), so the build deploys
   automatically. The **source repo stays human-only** (no CI commits); a CEL
-  path-filter only builds on `src/**`/`build/**`/`pyproject.toml` changes. Model
+  path-filter only builds on `src/**`/`docker/**`/`pyproject.toml` changes. Model
   registry = **MLflow**. Secrets: **Sealed Secrets**. Code → GitHub later (mirror).
 - Platform (phase C, DONE): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
   (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/
