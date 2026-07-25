@@ -3,12 +3,20 @@
 # secret), avoids concurrent-runner races across service replicas, and gives a
 # clean pass/fail before services start. sync-wave 1 = after the Cluster; the
 # initContainer additionally waits until Postgres actually accepts connections.
+# Run as an Argo **Sync hook**, for the same reason as db-grants: a Job's pod
+# template is immutable, so as a plain tracked resource the Job created at the
+# first deploy would sit there forever — Argo reports OutOfSync but cannot
+# replace it, and every migration added afterwards silently never runs. As a
+# hook it is deleted+recreated on each sync (BeforeHookCreation).
+# `alembic upgrade head` is a no-op when already at head, so re-running is safe.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-migrate
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 6
   template:

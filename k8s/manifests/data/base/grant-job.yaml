@@ -17,6 +17,10 @@ kind: Job
 metadata:
   name: db-grants
   annotations:
+    # Wave 2: after db-migrate (wave 1), so the tables the GRANTs name exist.
+    # Hooks are ordered by sync-wave among themselves; without this the job
+    # defaults to wave 0 and would race ahead of the migration.
+    argocd.argoproj.io/sync-wave: "2"
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
