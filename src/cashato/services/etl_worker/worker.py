@@ -13,8 +13,6 @@ is deployed in phase C.
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -31,9 +29,10 @@ from cashato.messaging import (
     SUBJECT_INGEST,
     SUBJECT_RECATEGORIZE,
     connect_jetstream,
+    consume_one,
+    consumer_config,
 )
 from cashato.obs import (
-    extract_trace_context,
     inject_trace_headers,
     setup_logging,
     setup_tracing,
@@ -115,27 +114,15 @@ def _apply_feedback(natural_key: str, category: str, corrected_by: str | None) -
     return res.rowcount
 
 
-async def _consume(sub, handler, span_name: str) -> None:
-    """Pull one message from ``sub`` (if any) and run ``handler(data)``.
-
-    The span is rooted at the producer's trace context (carried in the NATS
-    message headers), so the ingest request and this job appear in one trace.
-    """
-    try:
-        msgs = await sub.fetch(1, timeout=1)
-    except Exception:
-        return  # no message within the timeout
-    for m in msgs:
-        ctx = extract_trace_context(m.headers)
-        with tracer.start_as_current_span(span_name, context=ctx):
-            try:
-                await handler(json.loads(m.data))
-            finally:
-                await m.ack()
-
-
 async def _handle_ingest(data: dict) -> int:
-    """Process one ingest job. Returns the number of rows inserted (0 on error)."""
+    """Process one ingest job. Returns the number of rows inserted.
+
+    Deliberately RE-RAISES. It used to swallow every exception and return 0,
+    while the consumer acked in a `finally` — and on a WorkQueue stream an ack
+    deletes the message, so a one-second Postgres or MinIO blip destroyed the
+    ingest with no way back except a manual /admin/reprocess. Letting it out
+    lets the consumer nak and have JetStream redeliver.
+    """
     try:
         return await asyncio.to_thread(
             _process,
@@ -144,10 +131,10 @@ async def _handle_ingest(data: dict) -> int:
             data.get("source"),
             bool(data.get("force")),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         JOBS.labels(status="error").inc()
         log.error("ingest failed", extra={"fields": {"key": data.get("key"), "error": str(exc)}})
-        return 0
+        raise
 
 
 async def _handle_feedback(data: dict) -> None:
@@ -160,16 +147,21 @@ async def _handle_feedback(data: dict) -> None:
             "feedback applied",
             extra={"fields": {"natural_key": data["natural_key"], "category": data["category"], "updated": updated}},
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         FEEDBACK.labels(status="error").inc()
         log.error("feedback failed", extra={"fields": {"error": str(exc), "data": data}})
+        raise  # let the consumer retry rather than drop the correction
 
 
 async def main() -> None:
     port = start_metrics_server()
     nc, js = await connect_jetstream()
-    ingest_sub = await js.pull_subscribe(SUBJECT_INGEST, durable="etl-worker")
-    feedback_sub = await js.pull_subscribe(SUBJECT_FEEDBACK, durable="etl-feedback")
+    ingest_sub = await js.pull_subscribe(
+        SUBJECT_INGEST, durable="etl-worker", config=consumer_config("etl-worker")
+    )
+    feedback_sub = await js.pull_subscribe(
+        SUBJECT_FEEDBACK, durable="etl-feedback", config=consumer_config("etl-feedback")
+    )
     log.info(
         "etl-worker listening",
         extra={"fields": {"subjects": [SUBJECT_INGEST, SUBJECT_FEEDBACK], "metrics_port": port}},
@@ -179,17 +171,26 @@ async def main() -> None:
         inserted = await _handle_ingest(data)
         # New rows landed -> ask the categorizer to run the model over them.
         if inserted:
-            with contextlib.suppress(Exception):
+            try:
                 # Propagate the current trace context so the categorizer's run
                 # links back to this ingest (one end-to-end trace).
                 await js.publish(
                     SUBJECT_RECATEGORIZE, b"{}", headers=inject_trace_headers()
                 )
+            except Exception as exc:  # noqa: BLE001
+                # Best-effort: the rows ARE loaded, so do not fail the job over a
+                # missed nudge — but say so, instead of vanishing.
+                log.warning("recategorize request failed", extra={"fields": {"error": str(exc)}})
+            else:
                 log.info("recategorize requested", extra={"fields": {"inserted": inserted}})
 
     while True:
-        await _consume(ingest_sub, handle_ingest_and_notify, "etl.ingest")
-        await _consume(feedback_sub, _handle_feedback, "etl.feedback")
+        await consume_one(
+            ingest_sub, handle_ingest_and_notify, log=log, tracer=tracer, span_name="etl.ingest"
+        )
+        await consume_one(
+            feedback_sub, _handle_feedback, log=log, tracer=tracer, span_name="etl.feedback"
+        )
 
 
 if __name__ == "__main__":

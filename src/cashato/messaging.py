@@ -11,11 +11,15 @@ dedicated ``categorizer`` service (same event, same handler).
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import json
 import os
 
 import nats
-from nats.js.api import RetentionPolicy, StreamConfig
+from nats.js.api import ConsumerConfig, RetentionPolicy, StreamConfig
+
+from cashato.obs import extract_trace_context
 
 NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
@@ -39,6 +43,91 @@ SUBJECT = SUBJECT_INGEST
 STREAM_MAX_AGE_SECONDS = float(
     os.environ.get("NATS_STREAM_MAX_AGE_SECONDS", 7 * 24 * 3600)
 )
+
+
+# Delivery policy for the pull consumers. WorkQueue retention DELETES a message
+# on ack, so an ack is irreversible: acking a job that failed loses the ingest
+# outright, and only a manual /admin/reprocess would recover it. Hence explicit
+# redelivery instead — nak on failure, bounded by max_deliver, then term.
+ACK_WAIT_SECONDS = float(os.environ.get("NATS_ACK_WAIT_SECONDS", 300))
+MAX_DELIVER = int(os.environ.get("NATS_MAX_DELIVER", 5))
+NAK_DELAY_SECONDS = float(os.environ.get("NATS_NAK_DELAY_SECONDS", 30))
+
+
+def consumer_config(durable: str) -> ConsumerConfig:
+    """Pull-consumer config with a redelivery budget.
+
+    ``ack_wait`` must exceed the slowest realistic job (parsing a large PDF), or
+    JetStream redelivers while the first attempt is still running. ``max_deliver``
+    bounds a poison message: without it a job that always fails is redelivered
+    until ``max_age`` reaps it, crash-looping the worker in between.
+    """
+    return ConsumerConfig(
+        durable_name=durable,
+        ack_wait=ACK_WAIT_SECONDS,
+        max_deliver=MAX_DELIVER,
+    )
+
+
+async def consume_one(sub, handler, *, log, tracer, span_name: str) -> bool:
+    """Pull at most one message and settle it explicitly. Returns True if one ran.
+
+    Settlement rules, all deliberate:
+    - **malformed payload → term.** It will never parse; redelivering it is a
+      guaranteed loop.
+    - **handler raised → nak** (delayed), so a transient blip — MinIO or Postgres
+      unavailable for a second — is retried instead of silently dropped. Once the
+      delivery budget is spent the message is termed and logged as given up, so
+      it neither loops forever nor disappears without a trace.
+    - **success → ack**, which on WorkQueue removes it.
+
+    A fetch timeout means "no message" and is the normal idle path. Anything else
+    — a deleted stream, a durable-config conflict after a stream recreate, a
+    permissions error — is a real outage and is logged and counted rather than
+    mistaken for idleness, which would leave the worker looking healthy while
+    every upload silently queued.
+    """
+    try:
+        msgs = await sub.fetch(1, timeout=1)
+    except TimeoutError:
+        return False
+    except Exception as exc:  # noqa: BLE001 - broken consumer, not an idle one
+        log.error("nats fetch failed", extra={"fields": {"error": str(exc)}})
+        # Back off so a persistently broken consumer does not spin a hot loop.
+        await asyncio.sleep(NAK_DELAY_SECONDS)
+        return False
+
+    for m in msgs:
+        ctx = extract_trace_context(m.headers)
+        with tracer.start_as_current_span(span_name, context=ctx):
+            try:
+                data = json.loads(m.data)
+            except Exception as exc:  # noqa: BLE001
+                log.error(
+                    "malformed message, dropping",
+                    extra={"fields": {"error": str(exc), "subject": m.subject}},
+                )
+                await m.term()
+                continue
+            try:
+                await handler(data)
+            except Exception as exc:  # noqa: BLE001
+                delivered = getattr(m.metadata, "num_delivered", 1)
+                if delivered >= MAX_DELIVER:
+                    log.error(
+                        "job failed permanently, giving up",
+                        extra={"fields": {"error": str(exc), "delivered": delivered}},
+                    )
+                    await m.term()
+                else:
+                    log.warning(
+                        "job failed, will retry",
+                        extra={"fields": {"error": str(exc), "delivered": delivered}},
+                    )
+                    await m.nak(delay=NAK_DELAY_SECONDS)
+                continue
+            await m.ack()
+    return bool(msgs)
 
 
 async def connect_jetstream():

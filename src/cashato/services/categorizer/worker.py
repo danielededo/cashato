@@ -13,17 +13,20 @@ predictor pod. Writes silver as the etl_writer role. Metrics on :9100.
 from __future__ import annotations
 
 import asyncio
-import json
 
 from opentelemetry import trace
 from prometheus_client import Counter, Histogram
 from sqlalchemy import text
 
 from cashato.db.db import get_engine
-from cashato.messaging import SUBJECT_RECATEGORIZE, connect_jetstream
+from cashato.messaging import (
+    SUBJECT_RECATEGORIZE,
+    connect_jetstream,
+    consume_one,
+    consumer_config,
+)
 from cashato.model_client import KServeModel
 from cashato.obs import (
-    extract_trace_context,
     setup_logging,
     setup_tracing,
     start_metrics_server,
@@ -86,35 +89,36 @@ async def _handle(_data: dict) -> None:
     log.info("recategorized", extra={"fields": {"rows": n}})
 
 
-async def _consume(sub) -> None:
+async def _handle_counted(data: dict) -> None:
+    """Wrap the handler so a failure is counted and then RE-RAISED.
+
+    Swallowing it and acking anyway dropped the recategorize request outright —
+    on a WorkQueue stream the ack deletes the message. Raising lets the shared
+    consumer nak, so a KServe hiccup is retried rather than leaving the rows
+    uncategorized until the next ingest happens to nudge it.
+    """
     try:
-        msgs = await sub.fetch(1, timeout=1)
-    except Exception:
-        return  # no message within the timeout
-    for m in msgs:
-        # Root the span at the etl-worker's trace context (from the message
-        # headers) so the recategorize + KServe call join the ingest trace.
-        ctx = extract_trace_context(m.headers)
-        with tracer.start_as_current_span("categorizer.recategorize", context=ctx):
-            try:
-                await _handle(json.loads(m.data or b"{}"))
-            except Exception as exc:  # noqa: BLE001
-                RUNS.labels(status="error").inc()
-                log.error("recategorize failed", extra={"fields": {"error": str(exc)}})
-            finally:
-                await m.ack()
+        await _handle(data)
+    except Exception as exc:
+        RUNS.labels(status="error").inc()
+        log.error("recategorize failed", extra={"fields": {"error": str(exc)}})
+        raise
 
 
 async def main() -> None:
     port = start_metrics_server()
     nc, js = await connect_jetstream()
-    sub = await js.pull_subscribe(SUBJECT_RECATEGORIZE, durable="categorizer")
+    sub = await js.pull_subscribe(
+        SUBJECT_RECATEGORIZE, durable="categorizer", config=consumer_config("categorizer")
+    )
     log.info(
         "categorizer listening",
         extra={"fields": {"subject": SUBJECT_RECATEGORIZE, "metrics_port": port}},
     )
     while True:
-        await _consume(sub)
+        await consume_one(
+            sub, _handle_counted, log=log, tracer=tracer, span_name="categorizer.recategorize"
+        )
 
 
 if __name__ == "__main__":
