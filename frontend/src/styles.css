@@ -265,6 +265,14 @@ select.cat:hover { border-color: var(--border); background: var(--panel-2); }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
 input[type="date"], select.input, input.input { font: inherit; font-size: 12px; padding: 6px 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
 input:focus-visible, select:focus-visible, button:focus-visible, .search:focus-within, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The option list of a <select> is drawn by the OS, not by us: Chrome derives it
+   from the control's own background and does not reliably carry the text colour
+   across, so a themed control can open into an unreadable list — worst with
+   `select.cat`, whose control is transparent. `color-scheme` alone does not
+   cover this once the control has an author-set background. Give options an
+   explicit opaque pair; both values are theme tokens, so light mode follows. */
+option, optgroup { background-color: var(--panel-2); color: var(--text); }
 button.btn { font: inherit; font-weight: 500; padding: 6px 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel-2); color: var(--text); cursor: pointer; }
 button.btn:hover:not(:disabled) { background: var(--hover); }
 button:disabled { opacity: 0.45; cursor: default; }
