@@ -275,6 +275,49 @@ def given_name(holder: str, name_order: str) -> str:
     return tokens[-1] if name_order == FAMILY_FIRST else tokens[0]
 
 
+# --- Instrument leg (what a cash movement actually bought or sold) -----------
+#
+# Two levels of investment tracking coexist, because the sources support
+# different amounts of it:
+#
+#   * CASH FLOW — how much left the account towards investing. Always knowable,
+#     including for a plain bank transfer to an outside broker, where the
+#     contents are simply not in our documents.
+#   * POSITIONS — which instrument, how many units, at what price. Only when the
+#     source discloses it (the Trade Republic export does; a bank transfer does
+#     not).
+#
+# So this hangs off a Transaction as an OPTIONAL leg rather than being folded
+# into the common schema: absent means "we know money was invested, not what
+# in", which is a real and common state, not missing data.
+
+BUY = "buy"
+SELL = "sell"
+
+
+@dataclass
+class TradeLeg:
+    """The instrument side of an investment movement."""
+
+    #: Signed in units: positive when acquiring, negative when disposing, so a
+    #: position is just the running sum.
+    quantity: Decimal
+    side: str = BUY
+    isin: str | None = None
+    instrument: str | None = None
+    asset_class: str | None = None
+    unit_price: Decimal | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("quantity", "unit_price"):
+            v = getattr(self, name)
+            if v is not None and not isinstance(v, Decimal):
+                raise TypeError(f"{name} must be Decimal, got {type(v).__name__}")
+        # Keep the sign a function of the side, so callers cannot disagree with
+        # themselves and quietly corrupt a position total.
+        self.quantity = -abs(self.quantity) if self.side == SELL else abs(self.quantity)
+
+
 @dataclass
 class Transaction:
     """A normalized transaction row (the common schema)."""
@@ -299,6 +342,10 @@ class Transaction:
     # by assign_occurrence_keys (distinguishes genuinely identical operations on
     # the same day without breaking cross-format dedup).
     dedup_extra: str = ""
+    # What this movement bought or sold, when the source says. NOT part of the
+    # natural_key: the same purchase read from the PDF (no instrument detail)
+    # and from the CSV (full detail) must still dedup to one movement.
+    trade: TradeLeg | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.amount, Decimal):
@@ -348,6 +395,18 @@ class Transaction:
         d["value_date"] = self.value_date.isoformat()
         d["booking_date"] = self.booking_date.isoformat()
         d["natural_key"] = self.natural_key
+        if self.trade is not None:
+            # asdict() recurses but leaves Decimals as Decimal, which json
+            # cannot serialize — the NATS job payload goes through json.dumps.
+            d["trade"] = {
+                **d["trade"],
+                "quantity": format(self.trade.quantity, "f"),
+                "unit_price": (
+                    format(self.trade.unit_price, "f")
+                    if self.trade.unit_price is not None
+                    else None
+                ),
+            }
         return d
 
 

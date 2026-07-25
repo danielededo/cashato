@@ -29,8 +29,11 @@ from pathlib import Path
 import pdfplumber
 
 from .base import (
+    BUY,
     GIVEN_FIRST,
+    SELL,
     AccountInfo,
+    TradeLeg,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
@@ -328,6 +331,37 @@ def _parse_pdf(path: str | Path) -> list[Transaction]:
     return assign_occurrence_keys(transactions)
 
 
+def _csv_decimal(row: dict, key: str) -> Decimal | None:
+    """A plain (non-monetary) decimal column — share counts, unit prices."""
+    s = (row.get(key) or "").strip()
+    return Decimal(s) if s else None
+
+
+def _trade_leg(row: dict) -> TradeLeg | None:
+    """The instrument side of a CSV row, when it has one.
+
+    ``asset_class`` is the marker: it is filled on TRADING rows and empty on
+    CASH ones, so a deposit or a card payment yields ``None`` — those move money
+    without buying anything. ``symbol`` carries the ISIN in this export.
+    """
+    if not (row.get("asset_class") or "").strip():
+        return None
+    qty = _csv_decimal(row, "shares")
+    if qty is None:
+        return None
+    # Only BUY appears in the data seen so far, but SELL is the same row shape
+    # with the cash sign flipped, so the side is read rather than assumed.
+    side = SELL if (row.get("type") or "").strip().upper().endswith("SELL") else BUY
+    return TradeLeg(
+        quantity=qty,
+        side=side,
+        isin=(row.get("symbol") or "").strip() or None,
+        instrument=(row.get("name") or "").strip() or None,
+        asset_class=(row.get("asset_class") or "").strip().lower() or None,
+        unit_price=_csv_decimal(row, "price"),
+    )
+
+
 def _csv_money(row: dict, key: str) -> Decimal:
     """Read an amount (US format) from a CSV column, 0 if empty."""
     s = (row.get(key) or "").strip()
@@ -366,6 +400,7 @@ def _parse_csv(path: str | Path) -> list[Transaction]:
 
             transactions.append(
                 Transaction(
+                    trade=_trade_leg(row),
                     value_date=d,
                     booking_date=d,
                     description=descr,

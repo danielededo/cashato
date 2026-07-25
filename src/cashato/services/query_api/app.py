@@ -168,6 +168,48 @@ class AccountsResponse(BaseModel):
     accounts: list[Account]
 
 
+class Holding(BaseModel):
+    """A position, aggregated from the trades a source disclosed."""
+
+    isin: str | None = None
+    instrument: str | None = None
+    asset_class: str | None = None
+    units: float = Field(description="Net units held (buys minus sells).")
+    invested: float = Field(description="Cash cost basis: what actually left the account.")
+    n_trades: int
+    first_trade: date | None = None
+    last_trade: date | None = None
+    last_price: float | None = Field(
+        default=None,
+        description="Last price seen ON A STATEMENT, not a market quote — it ages.",
+    )
+    value_at_last_price: float | None = None
+
+
+class InvestmentMonth(BaseModel):
+    month: date
+    contributed: float | None = Field(default=None, description="Money in (outflows).")
+    returned: float | None = Field(default=None, description="Money back (sales, dividends).")
+    net_invested: float | None = None
+    into_known: float | None = Field(
+        default=None, description="Contributions whose instrument the source disclosed."
+    )
+    into_unknown: float | None = Field(
+        default=None,
+        description="Contributions with no instrument detail — e.g. a transfer to an "
+        "outside broker. Real money invested, contents not in our documents.",
+    )
+    n_movements: int
+
+
+class InvestmentsResponse(BaseModel):
+    holdings: list[Holding]
+    months: list[InvestmentMonth]
+    total_invested: float = Field(description="Net cash into investments, all sources.")
+    total_in_known_instruments: float
+    total_in_unknown: float
+
+
 _LANG = Query(default="it", description="Category label language", examples=["it", "en"])
 
 
@@ -216,6 +258,35 @@ def accounts():
         "accounts": _rows(
             "SELECT * FROM gold.v_accounts ORDER BY transactions DESC, account_id"
         )
+    }
+
+
+@api.get("/investments", response_model=InvestmentsResponse, summary="Investments")
+def investments():
+    """Investments on the two levels the sources actually support.
+
+    **Contributions** are always knowable — money leaving towards investing,
+    including a plain transfer to an outside broker. **Positions** need the
+    source to disclose the instrument, which a bank transfer never does. The
+    split between the two is reported rather than hidden: ``into_unknown`` is
+    money genuinely invested whose contents are not in our documents, and
+    presenting only the instruments we happen to know would understate the
+    total.
+
+    No market prices are involved. ``last_price`` is the last price printed on a
+    statement, so ``value_at_last_price`` is a cost-basis-era figure, not what
+    the position is worth today.
+    """
+    holdings = _rows("SELECT * FROM gold.v_holdings ORDER BY invested DESC NULLS LAST")
+    months = _rows("SELECT * FROM gold.v_investment_month ORDER BY month")
+    known = sum(m["into_known"] or 0 for m in months)
+    unknown = sum(m["into_unknown"] or 0 for m in months)
+    return {
+        "holdings": holdings,
+        "months": months,
+        "total_invested": sum(m["net_invested"] or 0 for m in months),
+        "total_in_known_instruments": known,
+        "total_in_unknown": unknown,
     }
 
 

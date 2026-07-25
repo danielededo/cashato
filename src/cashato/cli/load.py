@@ -226,6 +226,33 @@ def load(path: Path, source: str, force: bool = False) -> int:
                 },
             )
             inserted += res.rowcount
+            if t.trade is not None:
+                # Keyed by natural_key, so this inherits the movement's dedup:
+                # re-reading the same purchase updates one row instead of
+                # doubling a position. The PDF has no instrument detail, so when
+                # the CSV arrives later it fills the gap in place.
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO silver.trades
+                            (natural_key, quantity, side, isin, instrument, asset_class, unit_price)
+                        VALUES (:k, :qty, :side, :isin, :instrument, :asset_class, :price)
+                        ON CONFLICT (natural_key) DO UPDATE SET
+                            quantity = EXCLUDED.quantity, side = EXCLUDED.side,
+                            isin = EXCLUDED.isin, instrument = EXCLUDED.instrument,
+                            asset_class = EXCLUDED.asset_class, unit_price = EXCLUDED.unit_price
+                        """
+                    ),
+                    {
+                        "k": t.natural_key,
+                        "qty": t.trade.quantity,
+                        "side": t.trade.side,
+                        "isin": t.trade.isin,
+                        "instrument": t.trade.instrument,
+                        "asset_class": t.trade.asset_class,
+                        "price": t.trade.unit_price,
+                    },
+                )
 
         conn.execute(
             text(
