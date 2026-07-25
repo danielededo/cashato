@@ -35,8 +35,8 @@ export function Transactions() {
   const [params] = useSearchParams();
   const { lang } = useLang();
   const { t } = useT();
-  const { accounts, sourceLabel, accountLabel, accountShort } = useAccounts();
-  const { categoryCodes, catLabel } = useMeta();
+  const { accounts, accountLabel, accountShort } = useAccounts();
+  const { categoryCodes, catLabel, sourceLabel } = useMeta();
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
   // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never

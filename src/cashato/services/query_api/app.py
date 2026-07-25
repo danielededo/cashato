@@ -179,6 +179,11 @@ class SourceMeta(BaseModel):
     """A source cashato can parse, straight from the adapter registry."""
 
     id: str = Field(examples=["trade_republic"])
+    label: str = Field(
+        description="Human name for the source. The bank read off its statements "
+        "when they agree on one, otherwise the id title-cased — never invented.",
+        examples=["Trade Republic Bank"],
+    )
 
 
 class CategoryMeta(BaseModel):
@@ -363,8 +368,24 @@ def meta():
     discovery, so a client that reads this can never be out of step with what
     the pipeline actually accepts.
     """
+    # Name each source ONCE, here, rather than letting every client invent its
+    # own rendering of the id: the UI was showing "Trade Republic Bank" in one
+    # place and "trade republic" in another purely by which fallback it hit.
+    # A source is named after its accounts' bank only when they all agree;
+    # otherwise the id, title-cased, which is honest about being derived.
+    banks = {
+        r["source"]: r["bank"]
+        for r in _rows(
+            "SELECT source, MIN(bank_name) AS bank FROM gold.v_accounts "
+            "WHERE bank_name IS NOT NULL GROUP BY source "
+            "HAVING COUNT(DISTINCT bank_name) = 1"
+        )
+    }
     return {
-        "sources": [{"id": s} for s in SOURCE_NAMES],
+        "sources": [
+            {"id": s, "label": banks.get(s) or s.replace("_", " ").title()}
+            for s in SOURCE_NAMES
+        ],
         "categories": [
             {"code": code, "labels": labels} for code, labels in sorted(_CAT.categories.items())
         ],

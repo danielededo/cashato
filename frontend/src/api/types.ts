@@ -261,7 +261,7 @@ export interface TransactionDetail {
 /** The vocabulary the UI builds its selectors from — sources from the adapter
  *  registry, categories from categorie.yaml, limits from settings.yaml. */
 export interface MetaResponse {
-  sources: { id: string }[];
+  sources: { id: string; label: string }[];
   categories: { code: string; labels: Record<string, string> }[];
   languages: string[];
   allowed_extensions: string[];

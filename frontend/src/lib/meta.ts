@@ -30,6 +30,8 @@ function load(): Promise<MetaResponse | null> {
 export interface Meta {
   /** Source ids the backend can actually parse. Empty until loaded. */
   sources: string[];
+  /** Backend-supplied human name for a source id. */
+  sourceLabel: (id: string | null | undefined) => string;
   /** Category codes, in the order the backend lists them. */
   categoryCodes: string[];
   /** Localized label for a code; falls back to the code itself, never invents one. */
@@ -54,8 +56,13 @@ export function useMeta(): Meta {
     [labels],
   );
 
+  const sourceLabels = new Map((data?.sources ?? []).map((s) => [s.id, s.label]));
+
   return {
     sources: data?.sources.map((s) => s.id) ?? [],
+    // Naming lives in the backend so every client renders it identically; the
+    // id is the last resort, not a second naming scheme.
+    sourceLabel: (id) => (id ? (sourceLabels.get(id) ?? id.replace(/_/g, " ")) : "—"),
     categoryCodes: data?.categories.map((c) => c.code) ?? [],
     catLabel,
     acceptAttr: (data?.allowed_extensions ?? []).join(","),

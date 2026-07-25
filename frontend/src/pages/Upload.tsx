@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { dateLabel } from "../lib/format";
-import { invalidateAccounts, useAccounts } from "../lib/accounts";
+import { invalidateAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
 import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
-  const { sourceLabel } = useAccounts();
-  const { sources, acceptAttr } = useMeta();
+  const { sources, acceptAttr, sourceLabel } = useMeta();
   const [source, setSource] = useState("");
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);

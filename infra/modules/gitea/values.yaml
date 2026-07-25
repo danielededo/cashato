@@ -45,6 +45,20 @@ gitea:
       # (el-cashato-ci.cashato-ci.svc → a 10.96/12 ClusterIP). `private` re-allows
       # RFC1918 ranges (covers the service CIDR) without opening external hosts.
       ALLOWED_HOST_LIST: private
+    "cron.cleanup_packages":
+      # CI pushes three images per commit into the built-in OCI registry and
+      # nothing ever removed them: after ~50 builds /data/packages was 4 GB, the
+      # largest volume on the cluster by far. Deleting the old TAGS is the manual
+      # part; this is what actually reclaims the disk, by collecting the blobs
+      # those tags referenced.
+      #
+      # OLDER_THAN defaults to 24h, i.e. space freed today is not returned until
+      # tomorrow. On a single-user cluster where the only writer is our own CI
+      # there is no concurrent push to protect, so 1h is plenty of grace — and
+      # hourly beats the daily default when a heavy day pushes 15 builds.
+      ENABLED: true
+      SCHEDULE: "@every 1h"
+      OLDER_THAN: 1h
 
 # Dedicated NodePort Service exposing Gitea's HTTP port (3000) — which also serves
 # the built-in OCI registry (/v2/) — to the kind NODES so containerd can pull
