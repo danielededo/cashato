@@ -2,6 +2,15 @@
 # from this namespace (allowedRoutes.from: All permits it). Both APIs live under
 # /api/v1 with DISJOINT sub-paths, so a path-prefix split needs no URL rewrite.
 # Backends are in this same namespace (cashato) → no ReferenceGrant required.
+#
+# ingest-api enumerates its (few, write-side) paths; query-api takes ALL of
+# /api/v1 as a catch-all. Gateway API resolves ties by longest path prefix, so
+# the specific ingest paths win over the catch-all regardless of rule order.
+#
+# Why not enumerate both: every new read endpoint then needs a manifest change,
+# and forgetting one does not 404 — it falls through to the SPA, which answers
+# 200 with HTML. That silently broke /admin, /profile and /accounts in turn.
+# A catch-all makes the read API's routing follow its code.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -33,11 +42,7 @@ spec:
       namespace: cashato-gateway
   rules:
     - matches:
-        - path: { type: PathPrefix, value: /api/v1/summary }
-        - path: { type: PathPrefix, value: /api/v1/monthly }
-        - path: { type: PathPrefix, value: /api/v1/categories }
-        - path: { type: PathPrefix, value: /api/v1/transactions }
-        - path: { type: PathPrefix, value: /api/v1/transfers }
+        - path: { type: PathPrefix, value: /api/v1 }
       backendRefs:
         - name: query-api
           port: 8001
