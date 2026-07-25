@@ -339,7 +339,10 @@ async def reprocess():
     for key in keys:
         # key is "<uuid8>_<original filename>"; recover the filename for logging/detect.
         filename = key.split("_", 1)[1] if "_" in key else key
-        job = {"key": key, "filename": filename, "source": None}
+        # force: the whole point is to re-parse files already marked 'parsed'
+        # (after a parser fix, a model retrain, or a new column to backfill);
+        # without it the loader stops at the sha256 check and does nothing.
+        job = {"key": key, "filename": filename, "source": None, "force": True}
         await app.state.js.publish(
             SUBJECT_INGEST, json.dumps(job).encode(), headers=inject_trace_headers()
         )

@@ -57,7 +57,7 @@ PROC = Histogram("cashato_etl_process_seconds", "Job processing time (s)")
 FEEDBACK = Counter("cashato_etl_feedback_total", "Category corrections applied", ["status"])
 
 
-def _process(key: str, filename: str | None, source_override: str | None) -> int:
+def _process(key: str, filename: str | None, source_override: str | None, force: bool = False) -> int:
     # Fetch the object from storage to a temp file (services are stateless — no
     # shared volume); parse it, then drop the temp. Keep the original extension so
     # content/format detection behaves as with a real upload.
@@ -72,7 +72,11 @@ def _process(key: str, filename: str | None, source_override: str | None) -> int
             log.warning("unrecognized source", extra={"fields": {"key": key}})
             return 0
         with PROC.time():
-            inserted = load.load(Path(dest), source)
+            # force: an ordinary upload stops at the sha256 check (cheap dedup of
+            # a re-upload), but an admin reprocess exists precisely to re-parse
+            # files already marked 'parsed'. Safe either way — silver dedups on
+            # natural_key, so a re-parse inserts nothing it already has.
+            inserted = load.load(Path(dest), source, force=force)
         ROWS.inc(inserted)
         JOBS.labels(status="ok").inc()
         log.info("ingested", extra={"fields": {"key": key, "source": source, "inserted": inserted}})
@@ -130,7 +134,11 @@ async def _handle_ingest(data: dict) -> int:
     """Process one ingest job. Returns the number of rows inserted (0 on error)."""
     try:
         return await asyncio.to_thread(
-            _process, data["key"], data.get("filename"), data.get("source")
+            _process,
+            data["key"],
+            data.get("filename"),
+            data.get("source"),
+            bool(data.get("force")),
         )
     except Exception as exc:  # noqa: BLE001
         JOBS.labels(status="error").inc()
