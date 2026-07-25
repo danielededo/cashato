@@ -234,6 +234,7 @@ class Holding(BaseModel):
 
 class InvestmentMonth(BaseModel):
     month: date
+    category: str = Field(description="Wealth destination kind: investments, pension_fund, …")
     contributed: float | None = Field(default=None, description="Money in (outflows).")
     returned: float | None = Field(default=None, description="Money back (sales, dividends).")
     net_invested: float | None = None
@@ -248,10 +249,25 @@ class InvestmentMonth(BaseModel):
     n_movements: int
 
 
+class WealthKind(BaseModel):
+    """One destination kind, rolled up. Present only when it has movements."""
+
+    category: str
+    category_label: str
+    net_invested: float
+    contributed: float
+    returned: float
+    n_movements: int
+    #: Instruments are only knowable for kinds whose source discloses them; a
+    #: pension fund reached by bank transfer never will.
+    has_instruments: bool
+
+
 class InvestmentsResponse(BaseModel):
     holdings: list[Holding]
     months: list[InvestmentMonth]
-    total_invested: float = Field(description="Net cash into investments, all sources.")
+    kinds: list[WealthKind]
+    total_invested: float = Field(description="Net cash into all wealth destinations.")
     total_in_known_instruments: float
     total_in_unknown: float
 
@@ -346,7 +362,7 @@ def transaction_detail(natural_key: str, lang: str = _LANG):
 
 
 @api.get("/investments", response_model=InvestmentsResponse, summary="Investments")
-def investments():
+def investments(lang: str = _LANG):
     """Investments on the two levels the sources actually support.
 
     **Contributions** are always knowable — money leaving towards investing,
@@ -362,12 +378,36 @@ def investments():
     the position is worth today.
     """
     holdings = _rows("SELECT * FROM gold.v_holdings ORDER BY invested DESC NULLS LAST")
-    months = _rows("SELECT * FROM gold.v_investment_month ORDER BY month")
+    months = _rows("SELECT * FROM gold.v_investment_month ORDER BY month, category")
+
+    # Roll the months up per destination kind. Kinds with no movements simply do
+    # not appear, so the UI renders a section only when there is something in it.
+    kinds: dict[str, dict] = {}
+    for m in months:
+        k = kinds.setdefault(
+            m["category"],
+            {
+                "category": m["category"],
+                "category_label": _CAT.label(m["category"], lang),
+                "net_invested": 0.0,
+                "contributed": 0.0,
+                "returned": 0.0,
+                "n_movements": 0,
+                "has_instruments": False,
+            },
+        )
+        k["net_invested"] += m["net_invested"] or 0
+        k["contributed"] += m["contributed"] or 0
+        k["returned"] += m["returned"] or 0
+        k["n_movements"] += m["n_movements"]
+        k["has_instruments"] = k["has_instruments"] or bool(m["into_known"])
+
     known = sum(m["into_known"] or 0 for m in months)
     unknown = sum(m["into_unknown"] or 0 for m in months)
     return {
         "holdings": holdings,
         "months": months,
+        "kinds": sorted(kinds.values(), key=lambda k: -k["net_invested"]),
         "total_invested": sum(m["net_invested"] or 0 for m in months),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,

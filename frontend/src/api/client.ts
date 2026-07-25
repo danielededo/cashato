@@ -72,7 +72,7 @@ export const api = {
   transactions: (f: TransactionFilters) => get<TransactionsResponse>("/transactions", { ...f }),
   transfers: () => get<TransfersResponse>("/transfers"),
   accounts: () => get<AccountsResponse>("/accounts"),
-  investments: () => get<InvestmentsResponse>("/investments"),
+  investments: (lang: Lang) => get<InvestmentsResponse>("/investments", { lang }),
   transaction: (key: string, lang: Lang) =>
     get<TransactionDetail>(`/transactions/${encodeURIComponent(key)}`, { lang }),
   files: () => get<FilesResponse>("/files"),

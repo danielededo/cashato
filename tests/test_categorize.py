@@ -39,3 +39,26 @@ class TestI18nLabels:
 class TestBuildText:
     def test_normalizes(self):
         assert build_text("Caffè BAR!") == "caffe bar"
+
+
+class TestWealthDestinations:
+    """Patrimonio: non solo titoli. Le destinazioni non sono consumo, tranne
+    le polizze di protezione, che lo sono."""
+
+    def test_pension_fund_contribution(self):
+        assert _cat().resolve("Bonifico fondo pensione Cometa").code == "pension_fund"
+        assert _cat().resolve("Piano individuale pensionistico").code == "pension_fund"
+
+    def test_pension_received_is_still_income(self):
+        # la regola salary contiene "pension": senza precedenza esplicita
+        # inghiottirebbe "fondo pensione" (vince la prima regola che matcha)
+        assert _cat().resolve("Pensione INPS accredito").code == "salary"
+
+    def test_deposits_both_legs(self):
+        assert _cat().resolve("Versamento conto deposito vincolato").code == "deposits"
+        assert _cat().resolve("Svincolo deposito").code == "deposits"
+
+    def test_insurance_defaults_to_expense_not_wealth(self):
+        # una polizza di puro rischio E' consumo: classificarla come patrimonio
+        # cancellerebbe una spesa reale dal tasso di risparmio
+        assert _cat().resolve("Premio polizza RC auto").code == "insurance"

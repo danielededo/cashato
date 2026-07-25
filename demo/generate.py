@@ -649,10 +649,416 @@ def write_tr_csv(path: Path, movs: list[TMov], rng: random.Random) -> None:
             })
 
 
+# --- other Italian banks (no cashato parser yet) -----------------------------------------
+#
+# Formats replicated VERBATIM from public, anonymized references (never from
+# real data): the BananaAccounting/Italia import-extension testcases (UniCredit,
+# BPER, Banca Popolare di Sondrio) and the sources of ofxstatement plugins
+# (frankIT/ofxstatement-fineco incl. its test workbook, ecorini/ofxstatement-
+# it-banks for Widiba and Webank). They are inputs for FUTURE adapters, so the
+# only executable check is that the current detection does NOT misroute them.
+
+_IT_MONTHS_LONG = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+                   "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+
+# (kind, description, amount range)
+_OB_KINDS = [
+    ("POS", "PAGAMENTO POS ESSELUNGA MILANO", -95, -12),
+    ("POS", "PAGAMENTO POS FARMACIA CENTRALE MILANO", -42, -9),
+    ("POS", "PAGAMENTO POS Q8 MILANO", -70, -35),
+    ("SDD", "ADDEBITO SEPA DD PER FATTURA A VOSTRO CARICO ENEL ENERGIA", -95, -45),
+    ("BON_OUT", "DISPOSIZIONE DI BONIFICO ROSSI IMMOBILIARE CANONE", -850, -850),
+    ("PRELIEVO", "PRELIEVO ATM MILANO VIA MANZONI", -200, -100),
+    ("FEE", "COMMISSIONI E SPESE TENUTA CONTO", -4, -1),
+    ("BON_IN", "BONIFICO A VOSTRO FAVORE ACME SRL EMOLUMENTI", 2450, 2490),
+]
+
+
+def _ob_history(rng: random.Random, n: int = 26) -> list[tuple[date, date, str, str, Decimal]]:
+    """Six months of generic 2026 movements, NEWEST FIRST like the real exports.
+
+    Descriptions deliberately avoid the word "operazione": several of these
+    formats already carry "importo" in their header, and the pair would trip
+    Intesa's content detection (["operazione", "importo"]).
+    """
+    rows = []
+    for _ in range(n):
+        kind, desc, lo, hi = _OB_KINDS[rng.randrange(len(_OB_KINDS))]
+        b = date(2026, rng.randint(1, 6), rng.randint(1, 28))
+        v = b + timedelta(days=rng.choice([0, 0, 1]))
+        amount = eur(lo) if lo == hi else eur(round(rng.uniform(lo, hi), 2))
+        rows.append((b, v, kind, desc, amount))
+    rows.sort(key=lambda r: r[0], reverse=True)
+    return rows
+
+
+def _num_it(v: Decimal) -> str:
+    return ("-" if v < 0 else "") + fmt_it(v)
+
+
+def write_unicredit_format1(path: Path, rng: random.Random) -> None:
+    """Excel-converted CSV: 2-row preamble, header SPLIT across two rows,
+    dd/mm/yyyy + Italian amounts (the UTF-8-BOM testcase variant)."""
+    caus = {"POS": "280", "SDD": "198", "BON_OUT": "208", "PRELIEVO": "043",
+            "FEE": "016", "BON_IN": "048"}
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, delimiter=";")
+        w.writerow(["Rapporto IT60Y0200801000100000012345 - BIANCHI MARIO", "", "", "", ""])
+        w.writerow(["", "", "", "", ""])
+        w.writerow(["Data", "", "Descrizione", "EUR", "Caus."])
+        w.writerow(["Operaz.", "Valuta", "", "", ""])
+        for b, v, kind, desc, amount in _ob_history(rng):
+            w.writerow([f"{b:%d/%m/%Y}", f"{v:%d/%m/%Y}", desc, _num_it(amount), caus[kind]])
+
+
+def write_unicredit_format2(path: Path, rng: random.Random) -> None:
+    """Direct CSV export: single header row with a TRAILING semicolon (empty 5th
+    column), dd.mm.yyyy, Italian amounts, descriptions padded to 50-char runs."""
+    with open(path, "w", newline="", encoding="ascii") as f:
+        w = csv.writer(f, delimiter=";")
+        w.writerow(["Data Registrazione", "Data valuta", "Descrizione", "Importo (EUR)", ""])
+        for b, v, _kind, desc, amount in _ob_history(rng):
+            padded = f"{desc:<50}" + f"{'TRN:11XXXXXXXXX0040873':<50}".rstrip() + " "
+            w.writerow([f"{b:%d.%m.%Y}", f"{v:%d.%m.%Y}", padded, _num_it(amount), ""])
+
+
+def write_bper_xlsx(path: Path, rng: random.Random) -> None:
+    """BPER "Smart Web" grid: 11 preamble rows, header at row 12, Italian
+    long-form dates, Entrate/Uscite numeric columns, Totale + footer."""
+    import openpyxl
+
+    style = {"POS": ("PAGAMENTO POS", "PORTAFOGLIO"), "SDD": ("ADDEBITO", "ADDEBITO SDD/RID"),
+             "BON_OUT": ("BONIFICO", "BONIFICO"), "BON_IN": ("BONIFICO", "BONIFICO"),
+             "PRELIEVO": ("Prelievo atm", "PRELIEVO"), "FEE": ("CANONE", "CANONE")}
+    movs = _ob_history(rng)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Modena, 30 giugno 2026"])
+    ws.append([])
+    ws.append(["CONTO", "1234567", None, "Saldo disponibile", "4.821,90 EUR"])
+    ws.append(["Conto Corrente", "1234567", None, "Saldo contabile", "4.821,90 EUR"])
+    ws.append(["IBAN", "IT84M0538701000100000012345", None, "Saldo iniziale", "3.210,74 EUR"])
+    ws.append(["Intestatari", "BIANCHI MARIO", None, "Saldo finale", "4.821,90 EUR"])
+    ws.append([])
+    ws.append([])
+    ws.append(["Stai visualizzando i seguenti movimenti:"])
+    ws.append([f"Numero Movimenti: {len(movs)}"])
+    ws.append(["Intervallo di tempo: dal 1 gennaio 2026 fino al 30 giugno 2026"])
+    ws.append(["Data operazione", "Data valuta", "Descrizione", "Entrate", "Uscite",
+               "Categoria", "Stato"])
+
+    def d_it(d: date) -> str:
+        return f"{d.day} {_IT_MONTHS_LONG[d.month - 1]} {d.year}"
+
+    tot_in = tot_out = D0
+    for b, v, kind, _desc, amount in movs:
+        descr, cat = style[kind]
+        entrate = float(amount) if amount > 0 else None
+        uscite = float(amount) if amount < 0 else None
+        tot_in, tot_out = tot_in + max(amount, D0), tot_out + min(amount, D0)
+        ws.append([d_it(b), d_it(v), descr, entrate, uscite, cat, "Contabilizzato"])
+    ws.append([None, None, "Totale", fmt_it(tot_in), _num_it(tot_out)])
+    ws.append([])
+    ws.append(["Dati Aggiornati al 30 giugno 2026"])
+    wb.save(str(path))
+
+
+def write_bps_csv(path: Path, rng: random.Random) -> None:
+    """Popolare di Sondrio "Scrigno" export: every field double-quoted, explicit
+    +/- sign, dot decimal, NO thousands separator."""
+    causale = {"POS": "PAGAMENTO POS", "SDD": "ADDEBITO DIRETTO", "BON_OUT": "VOSTRA DISPOSIZIONE",
+               "BON_IN": "RICEZIONE BONIFICO ISTANTANEO", "PRELIEVO": "PRELIEVO", "FEE": "COMMISSIONI"}
+    with open(path, "w", newline="", encoding="ascii") as f:
+        w = csv.writer(f, delimiter=";", quoting=csv.QUOTE_ALL)
+        w.writerow(["Data", "Valuta", "Causale", "Descrizione", "Importo", "Divisa"])
+        for b, v, kind, desc, amount in _ob_history(rng):
+            signed = f"{'+' if amount >= 0 else '-'}{abs(amount):.2f}"
+            w.writerow([f"{b:%d/%m/%Y}", f"{v:%d/%m/%Y}", causale[kind], desc.title(), signed, "EUR"])
+
+
+def write_fineco_xlsx(path: Path, rng: random.Random) -> None:
+    """Fineco movements workbook: sheet "Movimenti", 6 preamble rows (account id
+    in A1 after the exact "Conto Corrente: " prefix), header at row 7,
+    Entrate XOR Uscite numeric, a "Totale" footer row."""
+    import openpyxl
+
+    descr = {"POS": "VISA DEBIT", "SDD": "SEPA Direct Debit", "BON_OUT": "Bonifico SEPA Italia",
+             "BON_IN": "Bonifico SEPA Italia", "PRELIEVO": "Prelievo Bancomat",
+             "FEE": "Canone Mensile Conto"}
+    movs = _ob_history(rng)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Movimenti"
+    ws.append(["Conto Corrente: 1234567"])
+    ws.append(["Intestazione Conto Corrente: MARIO BIANCHI"])
+    ws.append(["Periodo Dal: 01/01/2026 Al: 30/06/2026"])
+    ws.append([])
+    ws.append(["Risultati Ricerca"])
+    ws.append([])
+    ws.append(["Data", "Entrate", "Uscite", "Descrizione", "Descrizione_Completa", "Stato"])
+    tot_in = tot_out = D0
+    for i, (b, _v, kind, desc, amount) in enumerate(movs):
+        stato = "Autorizzato" if i < 2 else "Contabilizzato"
+        entrate = float(amount) if amount > 0 else None
+        uscite = float(amount) if amount < 0 else None
+        tot_in, tot_out = tot_in + max(amount, D0), tot_out + min(amount, D0)
+        ws.append([f"{b:%d/%m/%Y}", entrate, uscite, descr[kind], desc.capitalize(), stato])
+    ws.append(["Totale", float(tot_in), float(tot_out)])
+    wb.save(str(path))
+
+
+def write_widiba_xlsx(path: Path, rng: random.Random) -> None:
+    """Widiba movements list: columns A and F EMPTY (data in B..E and G), account
+    number in cell D10, booking date as a raw Excel SERIAL number, a
+    "Totale (€)" marker row in the amount column position."""
+    import openpyxl
+
+    causale = {"POS": "PAGAMENTO POS", "SDD": "ADDEBITO DIRETTO", "BON_OUT": "BONIFICO SEPA",
+               "BON_IN": "BONIFICO SEPA", "PRELIEVO": "PRELIEVO ATM", "FEE": "CANONE"}
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    # "Lista Movimenti" would trip Intesa's ["lista movimenti"] marker: avoid it.
+    ws.append([None, "Widiba - Movimenti del conto"])
+    for _ in range(7):
+        ws.append([])
+    ws.append([None, "Numero conto:"])  # row 9: label
+    ws.append([None, None, None, "6000123456"])  # row 10: D10 = account number (parser reads [9,3])
+    ws.append([])
+    ws.append([None, "DATA CONT.", "DATA VAL.", "CAUSALE", "DESCRIZIONE", None, "IMPORTO (€)(€)"])
+
+    def serial(d: date) -> int:
+        return (d - date(1899, 12, 30)).days
+
+    for b, v, kind, desc, amount in _ob_history(rng):
+        ws.append([None, serial(b), serial(v), causale[kind], desc.capitalize(), None,
+                   float(amount)])
+    ws.append([None, None, None, None, None, None, "Totale (€)"])
+    wb.save(str(path))
+
+
+def write_webank_xls(path: Path, rng: random.Random) -> None:
+    """Webank "movimentiConto.xls": actually an HTML table (the plugin parses it
+    with pandas.read_html, decimal=',' thousands='.'). Only the three columns
+    the plugin reads by name are confirmed; the real export may carry more."""
+    rows = "\n".join(
+        f"<tr><td>{b:%d/%m/%Y}</td><td>{desc.title()}</td><td>{_num_it(amount)}</td></tr>"
+        for b, _v, _kind, desc, amount in _ob_history(rng)
+    )
+    path.write_text(
+        "<html><body><table>\n"
+        "<tr><th>Data Contabile</th><th>Causale / Descrizione</th><th>Importo</th></tr>\n"
+        f"{rows}\n</table></body></html>\n",
+        encoding="utf-8",
+    )
+
+
+# --- other-bank PDFs (layout contracts from third-party open-source parsers) ---
+
+_DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+def write_poste_ec_pdf(path: Path, rng: random.Random) -> None:
+    """BancoPosta "Estratto Conto" PDF, to the layout contract of
+    genbs/poste-italiane-parser (PyMuPDF, coordinate-based).
+
+    Contract highlights: cells are matched by the span's RIGHT edge falling in
+    per-column x-windows (data [70,75], valuta [120,125], addebiti [210,230],
+    accrediti [300,320], operazione [360,600]); table clip y>=300 on page 1,
+    y>=100 after; required metadata areas on page 1 (holder, currency "Euro",
+    generated_at, account number digits, IBAN); SALDO INIZIALE/FINALE and
+    TOTALE ENTRATE/USCITE meta-rows whose amounts MUST balance; Italian amounts
+    WITHOUT a currency symbol (a euro sign would crash its float())."""
+    movs = _ob_history(rng)
+    opening = eur(1500)
+    tot_in = sum((m[4] for m in movs if m[4] > 0), D0)
+    tot_out = -sum((m[4] for m in movs if m[4] < 0), D0)
+    closing = opening + tot_in - tot_out
+
+    pdf = new_pdf()
+    pdf.add_page()
+    put(pdf, 40, 60, "Poste Italiane S.p.A. - Patrimonio BancoPosta", size=10, style="B")
+    # "ESTRATTO DEL CONTO": the real title phrase "estratto conto" is an Intesa
+    # detection marker in cashato; "del" keeps this file out of the wrong parser.
+    put(pdf, 40, 80, "ESTRATTO DEL CONTO BANCOPOSTA", size=11, style="B")
+    put_right(pdf, 422, 48, "30/06/26", size=7)                  # generated_at [390,40,430,50]
+    put(pdf, 392, 78, "Euro", size=8)                            # currency [390,68,420,82]
+    put(pdf, 362, 92, HOLDER_GIVEN_FIRST, size=8)                # holder [360,82,500,94]
+    put(pdf, 38, 166, "IBAN IT22J0760101600000012345678", size=6)  # iban [36,160,240,168]
+    put(pdf, 292, 195, HOLDER_GIVEN_FIRST, size=8)               # customer [290,180,510,220]
+    put(pdf, 292, 207, "VIA GARIBALDI 42 20121 MILANO", size=8)
+    put(pdf, 152, 214, "1234567890", size=8)                     # account no. [150,200,220,220]
+    # column labels ABOVE the page-1 table clip (y>=300): an in-clip header row
+    # would be fed to the row parser and crash its date parsing
+    put(pdf, 40, 292, "Data / Valuta / Addebiti / Accrediti / Descrizione operazioni", size=7, style="B")
+
+    def row(y: float, d1: str, d2: str, deb: Decimal | None, cred: Decimal | None, op: str) -> None:
+        put_right(pdf, 73, y, d1, size=7)                        # data -> right edge in [70,75]
+        if d2:
+            put_right(pdf, 123, y, d2, size=7)                   # valuta -> [120,125]
+        if deb is not None:
+            put_right(pdf, 225, y, fmt_it(deb), size=7)          # addebiti -> [210,230]
+        if cred is not None:
+            put_right(pdf, 315, y, fmt_it(cred), size=7)         # accrediti -> [300,320]
+        put(pdf, 365, y, op, size=7, max_x=598)                  # operazione -> [360,600]
+
+    y = 315.0  # page-1 table clip starts at y=300
+    row(y, "01/01/26", "", None, opening, "SALDO INIZIALE")
+    y += 18  # generous spacing: adjacent rows must land in SEPARATE PyMuPDF blocks
+    for b, v, _kind, desc, amount in reversed(movs):  # statement runs oldest-first
+        if y > 790:
+            pdf.add_page()
+            y = 110.0  # later-page clip starts at y=100
+        deb = -amount if amount < 0 else None
+        cred = amount if amount > 0 else None
+        row(y, f"{b:%d/%m/%y}", f"{v:%d/%m/%y}", deb, cred, desc[:52])
+        y += 18
+    # NO "TOTALE ENTRATE/USCITE" meta-rows: when present the parser compares
+    # them to its own float sum WITHOUT rounding, so any accumulation error is
+    # fatal; the SALDO FINALE balance check below rounds to 4 decimals instead.
+    if y > 790:
+        pdf.add_page()
+        y = 110.0
+    row(y, "30/06/26", "", None, closing, "SALDO FINALE")
+    pdf.output(str(path))
+
+
+def write_hype_pdf(path: Path, rng: random.Random) -> None:
+    """Hype (Banca Sella group) movements-list PDF, to the layout contract of
+    lorenzogiudici5/ofxstatement-hype: 6 whitespace-separated columns for
+    tabula's stream mode (Data Operazione, Data Contabile, Tipologia, Nome,
+    Descrizione, Importo), dd/mm/yyyy dates, amount with a LEADING sign and a
+    TRAILING euro sign glued on ("-12,34€" — the parser slices both off).
+    Tipologia values from the parser's startswith-map."""
+    tipologia = {"POS": ("PAGAMENTO", "5411"), "SDD": ("ADDEBITO DIRETTO", ""),
+                 "BON_OUT": ("BONIFICO ISTANTANEO", ""), "BON_IN": ("BONIFICO ORDINARIO", ""),
+                 "PRELIEVO": ("PAGAMENTO", ""), "FEE": ("CANONE", "")}
+    nome = {"POS": "Esselunga", "SDD": "Enel Energia", "BON_OUT": "Rossi Immobiliare",
+            "BON_IN": "Acme Srl", "PRELIEVO": "ATM", "FEE": "Hype"}
+    pdf = new_pdf()
+    pdf.add_font("DejaVu", "", _DEJAVU)
+    pdf.add_page()
+    put(pdf, 40, 52, "HYPE - Banca Sella S.p.A.", size=10, style="B")
+    put(pdf, 40, 70, "Movimenti del conto - MARIO BIANCHI", size=9)
+    y = 100.0
+    # plausible header labels (= the parser's own column names); tabula reads
+    # positions, not names, and the plugin discards any non-date first cell
+    for x, label in ((40, "Data Operazione"), (115, "Data Contabile"), (190, "Tipologia"),
+                     (290, "Nome"), (360, "Descrizione"), (505, "Importo")):
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.text(x, y, label)
+    y += 16
+    for b, v, kind, desc, amount in _ob_history(rng, n=20):
+        if y > 790:
+            pdf.add_page()
+            y = 60.0
+        pdf.set_font("Helvetica", "", 7)
+        pdf.text(40, y, f"{b:%d/%m/%Y}")
+        pdf.text(115, y, f"{v:%d/%m/%Y}")
+        pdf.text(190, y, tipologia[kind][0])
+        pdf.text(290, y, nome[kind])
+        pdf.text(360, y, desc.title()[:28])
+        amt = f"{'+' if amount > 0 else '-'}{fmt_it(amount)}€"
+        pdf.set_font("DejaVu", "", 7)
+        pdf.text(555 - pdf.get_string_width(amt), y, amt)
+        y += 15
+    pdf.output(str(path))
+
+
+# The exact operation types g-gg/estratto_ing accepts (closed list), with the
+# description shapes its extract_controparte() expects for each.
+_ING_ROWS = {
+    "BON_IN": ("ACCREDITO BONIFICO",
+               "VOSTRO BONIFICO ANAGRAFICA ORDINANTE ACME SRL NOTE: EMOLUMENTI"),
+    "BON_OUT": ("VS.DISPOSIZIONE",
+                "BONIFICO A FAVORE DI ROSSI IMMOBILIARE BENEF. CANONE LOCAZIONE"),
+    "POS": ("PAGAMENTO CARTA", "PAGAMENTO DEL {d} ORE 12:01 PRESSO ESSELUNGA MILANO"),
+    "PRELIEVO": ("PRELIEVO CARTA", "PRELIEVO DEL {d} ORE 10:00 PRESSO ATM ING MILANO"),
+    "SDD": ("PAGAMENTI DIVERSI",
+            "ADDEBITO SDD ENEL ENERGIA CREDITOR ID.IT96ZZZ0000012345678901 ID MANDATO 987654"),
+    "FEE": ("BOLLI GOVERNATIVI", "IMPOSTA DI BOLLO SU ESTRATTO"),
+}
+
+
+def write_ing_pdf(path: Path, rng: random.Random) -> None:
+    """ING "Conto Arancio" quarterly statement PDF, to the text contract of
+    g-gg/estratto_ing (pypdf, line-based state machine): the exact line
+    "Estratto conto trimestrale al dd/mm/yyyy", a LISTA MOVIMENTI title, a
+    header line containing USCITE repeated on EVERY page, movement lines
+    "<data> [<valuta>] <importo> € <TIPO> - <descrizione>" with TIPO from the
+    parser's closed list, a RECT_ footer closing every page, and SALDO
+    INIZIALE/FINALE that must balance to the cent.
+
+    NOTE: "estratto conto" / "lista movimenti" are Intesa detection markers in
+    cashato — a REAL ING statement would be misrouted the same way; the demo
+    keeps the faithful text and the verify step pins detection to "intesa"."""
+    movs = [m for m in _ob_history(rng, n=45) if date(2026, 4, 1) <= m[0] <= date(2026, 6, 30)]
+    opening = eur(1500)
+    balance = opening
+
+    pdf = new_pdf()
+    pdf.add_font("DejaVu", "", _DEJAVU)
+
+    def line(y: float, text: str, size: float = 8, bold: bool = False) -> None:
+        pdf.set_font("Helvetica" if text.isascii() else "DejaVu", "B" if bold and text.isascii() else "", size)
+        pdf.text(40, y, text)
+
+    pdf.add_page()
+    line(50, "ING BANK N.V. Milan Branch", 10, bold=True)
+    line(72, "Estratto conto trimestrale al 30/06/2026", 9)
+    line(88, "Conto Corrente Arancio n. 123456 - MARIO BIANCHI", 8)
+    line(112, "LISTA MOVIMENTI", 10, bold=True)
+    line(128, "DATA OPERAZIONE DATA VALUTA USCITE ENTRATE DESCRIZIONE", 8, bold=True)
+    y = 146.0
+    rows: list[str] = []
+    for b, v, kind, _desc, amount in reversed(movs):  # oldest first
+        tipo, desc = _ING_ROWS[kind]
+        desc = desc.format(d=f"{b:%d/%m/%y}")
+        balance += amount
+        rows.append(f"{b:%d/%m/%Y} {v:%d/%m/%Y} {fmt_it(amount)} € {tipo} - {desc}")
+    rows.insert(0, f"01/04/2026 {fmt_it(opening)} € SALDO INIZIALE")
+    rows.append(f"30/06/2026 {fmt_it(balance)} € SALDO FINALE")
+    for i, text in enumerate(rows):
+        if y > 770:
+            line(786, "Pag. 1", 7)          # lines containing 'Pag.' are skipped
+            line(800, "RECT_210320", 6)     # footer marker: closes the page state
+            pdf.add_page()
+            line(50, "DATA OPERAZIONE DATA VALUTA USCITE ENTRATE DESCRIZIONE", 8, bold=True)
+            y = 68.0
+        line(y, text, 7)
+        y += 14
+        if i == len(rows) - 1:
+            line(y + 10, "RECT_210320", 6)
+    pdf.output(str(path))
+
+
+def write_other_banks(outdir: Path, rng: random.Random) -> list[tuple[Path, str | None]]:
+    """Generate the other-bank files; each entry carries the detection outcome
+    cashato's CURRENT detect_source must produce for it (None = unclaimed;
+    "intesa" = known, REAL marker collision documented in the README)."""
+    ob = outdir / "other_banks"
+    ob.mkdir(parents=True, exist_ok=True)
+    writers: list[tuple[Path, object, str | None]] = [
+        (ob / "unicredit_movimenti_format1.csv", write_unicredit_format1, None),
+        (ob / "unicredit_movimenti_format2.csv", write_unicredit_format2, None),
+        (ob / "bper_smart_web_movimenti.xlsx", write_bper_xlsx, None),
+        (ob / "popso_scrigno_movimenti.csv", write_bps_csv, None),
+        (ob / "fineco_movimenti.xlsx", write_fineco_xlsx, None),
+        (ob / "widiba_movimenti.xlsx", write_widiba_xlsx, None),
+        (ob / "webank_movimentiConto.xls", write_webank_xls, None),
+        (ob / "bancoposta_estratto_conto.pdf", write_poste_ec_pdf, None),
+        (ob / "hype_lista_movimenti.pdf", write_hype_pdf, "intesa"),
+        (ob / "ing_estratto_trimestrale.pdf", write_ing_pdf, "intesa"),
+    ]
+    for path, writer, _expected in writers:
+        writer(path, rng)
+    return [(p, exp) for p, _w, exp in writers]
+
+
 # --- verification against the REAL parsers ---------------------------------------------
 
 
-def verify(outdir: Path, paths: dict[str, list[Path]]) -> bool:
+def verify(outdir: Path, paths: dict[str, list[Path]],
+           other: list[tuple[Path, str | None]]) -> bool:
     from cashato.parsers import registry
     from cashato.parsers.detect import detect_source
 
@@ -732,6 +1138,13 @@ def verify(outdir: Path, paths: dict[str, list[Path]]) -> bool:
             missing += 1
     check(missing == 0, "xfer   monthly Intesa->Revolut opposite legs present in every month")
 
+    # other-bank files (future adapters): pin what the CURRENT detection does
+    # with them — None (unclaimed) for most; the ING/Hype PDFs carry text that
+    # legitimately collides with Intesa's generic markers (real-world issue)
+    for p, expected in other:
+        det = detect_source(p)
+        check(det == expected, f"detect other_banks/{p.name} -> {det} (expected {expected})")
+
     # ground-truth export: the expected silver rows after full ingestion
     exp = outdir / "expected_transactions.csv"
     with open(exp, "w", newline="", encoding="utf-8") as f:
@@ -782,17 +1195,18 @@ def main() -> int:
     write_tr_pdf(tr_pdf, gt.tr)
     write_tr_csv(tr_csv, gt.tr, rng)
 
+    other = write_other_banks(outdir, rng)
+
     files = {"intesa": [*quarters, xlsx],
              "revolut": [rev_csv, rev_pdf],
              "trade_republic": [tr_pdf, tr_csv]}
-    for ps in files.values():
-        for p in ps:
-            print(f"  wrote {p} ({p.stat().st_size:,} bytes)")
+    for p in [p for ps in files.values() for p in ps] + [p for p, _ in other]:
+        print(f"  wrote {p} ({p.stat().st_size:,} bytes)")
 
     if args.no_verify:
         return 0
     print("\nverifying against the real parsers:")
-    return 0 if verify(outdir, files) else 1
+    return 0 if verify(outdir, files, other) else 1
 
 
 if __name__ == "__main__":

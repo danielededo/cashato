@@ -33,8 +33,9 @@ same files, so these double as **test fixtures**.
    files that share movements dedup automatically no matter the format.
 3. **Verify with the real parsers.** The script ends by running
    `detect_source` + each adapter on the generated files and asserting
-   44 checks (detection, in-file key uniqueness, cross-format dedup,
-   occurrence index, holder/account extraction, transfer legs).
+   51 checks (detection, in-file key uniqueness, cross-format dedup,
+   occurrence index, holder/account extraction, transfer legs, and
+   non-misdetection of the `other_banks/` files).
 
 ## Files
 
@@ -72,6 +73,50 @@ same files, so these double as **test fixtures**.
   `abi_from_iban` work; the Revolut/TR IBANs are foreign and intentionally
   ignored by the Italian-only `find_iban`.
 
+## other_banks/ — future sources
+
+Synthetic export files for banks named in `config/banks.yaml` that cashato has
+**no parser for yet** — ready-made inputs for the "Add a source" workflow.
+Formats replicated **verbatim from public, anonymized references** (never from
+real data): the [BananaAccounting/Italia](https://github.com/BananaAccounting/Italia)
+import-extension testcases and the sources of the ofxstatement plugins
+([fineco](https://github.com/frankIT/ofxstatement-fineco),
+[widiba/webank](https://github.com/ecorini/ofxstatement-it-banks)).
+
+| File | Reference | Format quirks reproduced |
+|---|---|---|
+| `unicredit_movimenti_format1.csv` | Banana testcase (UTF-8 BOM variant) | 2-row preamble (`Rapporto <IBAN> - <holder>`), header **split across two rows** (`Data;;Descrizione;EUR;Caus.` + `Operaz.;Valuta;;;`), dd/mm/yyyy, Italian amounts, 3-digit causale codes |
+| `unicredit_movimenti_format2.csv` | Banana testcase | header with **trailing `;`** (empty 5th column), dd.mm.yyyy, descriptions padded in 50-char runs |
+| `bper_smart_web_movimenti.xlsx` | Banana testcase (tab-converted XLS) | 11 preamble rows (saldi block, "Stai visualizzando…"), header at row 12, **Italian long-form dates** ("30 aprile 2026"), Entrate/negative Uscite, `Totale` + "Dati Aggiornati al" footer |
+| `popso_scrigno_movimenti.csv` | Banana testcase ("Scrigno" format 2) | every field double-quoted, **explicit +/- sign**, dot decimal, no thousands separator |
+| `fineco_movimenti.xlsx` | ofxstatement-fineco test workbook (cell-level dump) | sheet `Movimenti`, account id in A1 after `Conto Corrente: `, 6 preamble rows, header at row 7, Entrate XOR Uscite, `Totale` footer, `Autorizzato`/`Contabilizzato` |
+| `widiba_movimenti.xlsx` | ofxstatement-it-banks source | columns **A and F empty**, account number in **cell D10**, booking date as raw **Excel serial number**, `Totale (€)` marker row |
+| `webank_movimentiConto.xls` | ofxstatement-it-banks source | an **HTML table** despite the .xls extension (parsed with `pandas.read_html`, decimal=`,`); only the 3 plugin-confirmed columns |
+| `bancoposta_estratto_conto.pdf` | [poste-italiane-parser](https://github.com/genbs/poste-italiane-parser) (PyMuPDF, coordinate-based) | cells matched by span **right edge** in per-column x-windows, page-1 metadata areas (holder, "Euro", IBAN, account digits), SALDO INIZIALE/FINALE **balance check**, Italian amounts without `€` — **verified by running the real parser** (`verify_thirdparty.py`) |
+| `hype_lista_movimenti.pdf` | [ofxstatement-hype](https://github.com/lorenzogiudici5/ofxstatement-hype) (tabula stream mode) | 6 whitespace-separated columns, amount `-12,34€` with leading sign AND trailing `€` (the parser slices both), Tipologia from its startswith-map — **not runtime-verified** (tabula needs a Java runtime, absent here) |
+| `ing_estratto_trimestrale.pdf` | [estratto_ing](https://github.com/g-gg/estratto_ing) (pypdf, line state machine) | exact `Estratto conto trimestrale al dd/mm/yyyy` line, `USCITE` header + `RECT_` footer per page, `<data> <importo> € <TIPO> - <desc>` rows with TIPO from a closed list and per-type description shapes, balance to the cent — **verified by running the real parser** |
+
+Notes:
+- All these exports list movements **newest first** (like the real ones).
+- Descriptions deliberately avoid the word "operazione": several headers already
+  contain "importo", and the pair would trip Intesa's content detection. The
+  generator pins what `detect_source(...)` returns for each file — when you add
+  one of these parsers, its `DETECTION` groups must stay distinguishable from
+  Intesa's generic markers (and note that Webank's real header "Data Contabile"
+  IS an Intesa marker: it only escapes because openpyxl cannot open HTML).
+- Widiba's real export title "Lista Movimenti" also collides with an Intesa
+  marker; the synthetic file uses "Movimenti del conto" instead.
+- **Known REAL detection collisions** (kept faithful, pinned as `intesa` in the
+  verify step): the ING statement necessarily contains "Estratto conto
+  trimestrale" and "LISTA MOVIMENTI", and the Hype table header contains "Data
+  Contabile" — all Intesa markers. A genuine ING/Hype PDF uploaded today would
+  be misrouted to the Intesa parser (which then finds no table and yields 0
+  rows). Worth revisiting Intesa's generic markers before adding these sources.
+- The Poste and ING PDFs are additionally verified by **running the actual
+  third-party parsers** on them — see `verify_thirdparty.py` for how (separate
+  venv; not part of `generate.py`'s standard checks).
+
 To load the dataset into the platform, upload the 11 statement files via the
 frontend Upload page (or `POST /uploads`); `expected_transactions.csv` is the
-assertion baseline, not an input.
+assertion baseline, not an input. The `other_banks/` files are NOT ingestable
+yet (uploading one exercises the unknown-source failure path).

@@ -38,7 +38,7 @@ const UI: Dict = {
   "nav.dashboard": { it: "Cruscotto", en: "Dashboard" },
   "nav.transactions": { it: "Movimenti", en: "Transactions" },
   "nav.review": { it: "Revisione", en: "Review" },
-  "nav.investments": { it: "Investimenti", en: "Investments" },
+  "nav.investments": { it: "Patrimonio", en: "Wealth" },
   "nav.manage": { it: "Gestione", en: "Manage" },
   "nav.upload": { it: "Carica", en: "Upload" },
 
@@ -52,6 +52,7 @@ const UI: Dict = {
   "common.description": { it: "Descrizione", en: "Description" },
   "common.amount": { it: "Importo", en: "Amount" },
   "common.account": { it: "Conto", en: "Account" },
+  "common.movements": { it: "Movimenti", en: "Movements" },
   "common.source": { it: "Fonte", en: "Source" },
   "common.prev": { it: "← Prec", en: "← Prev" },
   "common.next": { it: "Succ →", en: "Next →" },
@@ -125,7 +126,13 @@ const UI: Dict = {
 
   // investments — two levels: contributions (always knowable) and positions
   // (only where the source discloses the instrument)
-  "inv.title": { it: "Investimenti", en: "Investments" },
+  "inv.title": { it: "Patrimonio", en: "Wealth" },
+  "inv.kinds": { it: "Dove va il patrimonio", en: "Where wealth goes" },
+  "inv.kinds.hint": { it: "una riga per destinazione con movimenti", en: "one row per destination with movements" },
+  "inv.kind": { it: "Destinazione", en: "Destination" },
+  "inv.detailLevel": { it: "Dettaglio", en: "Detail" },
+  "inv.withInstruments": { it: "strumenti noti", en: "instruments known" },
+  "inv.amountOnly": { it: "solo importo", en: "amount only" },
   "inv.invested": { it: "Capitale versato", en: "Capital contributed" },
   "inv.invested.foot": { it: "netto, al netto dei rientri", en: "net of money taken back" },
   "inv.known": { it: "In strumenti noti", en: "In known instruments" },
@@ -155,8 +162,8 @@ const UI: Dict = {
     it: "L'ultimo prezzo è quello riportato sull'ultimo estratto, non una quotazione di mercato: invecchia. cashato non interroga fonti esterne.",
     en: "The last price is the one printed on the latest statement, not a market quote: it ages. cashato queries no external source.",
   },
-  "inv.empty": { it: "Nessun investimento", en: "No investments" },
-  "inv.emptySub": { it: "I movimenti verso investimenti compariranno qui una volta caricati gli estratti.", en: "Movements towards investments will appear here once statements are loaded." },
+  "inv.empty": { it: "Nessun movimento di patrimonio", en: "No wealth movements" },
+  "inv.emptySub": { it: "Investimenti, fondo pensione, conti deposito e polizze di accumulo compariranno qui una volta caricati gli estratti.", en: "Investments, pension funds, deposits and savings policies will appear here once statements are loaded." },
 
   // transaction detail
   "det.title": { it: "Dettaglio movimento", en: "Movement detail" },

@@ -175,6 +175,8 @@ export interface Holding {
 
 export interface InvestmentMonth {
   month: string;
+  /** Wealth destination kind: investments, crypto, pension_fund, deposits, … */
+  category: string;
   contributed: number | null;
   returned: number | null;
   net_invested: number | null;
@@ -185,9 +187,22 @@ export interface InvestmentMonth {
   n_movements: number;
 }
 
+/** One destination kind, rolled up. Present only when it has movements. */
+export interface WealthKind {
+  category: string;
+  category_label: string;
+  net_invested: number;
+  contributed: number;
+  returned: number;
+  n_movements: number;
+  /** Instruments are only knowable where the source discloses them. */
+  has_instruments: boolean;
+}
+
 export interface InvestmentsResponse {
   holdings: Holding[];
   months: InvestmentMonth[];
+  kinds: WealthKind[];
   total_invested: number;
   total_in_known_instruments: number;
   total_in_unknown: number;

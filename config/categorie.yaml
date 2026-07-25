@@ -28,6 +28,16 @@ categories:
   transfers:     {it: "Trasferimenti",  en: "Transfers"}
   investments:   {it: "Investimenti",   en: "Investments"}
   crypto:        {it: "Crypto",         en: "Crypto"}
+  # Wealth destinations other than securities. Money sent here is not spending:
+  # it changes form. See silver.asset_categories, which is what actually decides.
+  pension_fund:  {it: "Fondo pensione",  en: "Pension fund"}
+  deposits:      {it: "Conti deposito",  en: "Savings deposits"}
+  # Protection is genuine CONSUMPTION (motor, home, term life) and stays a
+  # spending category. Only accumulation policies are wealth, and telling the
+  # two apart from a transfer description is guesswork — so that split is a
+  # manual reclassification, never inferred.
+  insurance:     {it: "Assicurazioni",   en: "Insurance"}
+  insurance_savings: {it: "Polizze di accumulo", en: "Savings policies"}
   cash:          {it: "Contanti",       en: "Cash"}
   fees:          {it: "Commissioni",    en: "Fees"}
   other:         {it: "Altro",          en: "Other"}
@@ -83,6 +93,13 @@ rules:
   - {pattern: "\\b(?:dividend|cedol|coupon|etf|ishares|vanguard|msci|savings plan|piano di accumulo|buy trade|sell trade|tax optimisation|investiment)", category: investments}
   - {pattern: "\\b(?:crypto|bitcoin|ethereum|coinbase|binance)|\\b(?:btc|eth)\\b", category: crypto}
   - {pattern: "\\b(?:interess|interest)", category: investments}
+  # Must precede `salary`: its "pension" keyword matches "fondo pensione" too,
+  # and the first matching rule wins. Contributing to a pension fund and
+  # receiving a pension are opposite directions of money.
+  - {pattern: "\\b(?:fondo pension|fondi pension|previdenza complementar|pension fund|fondo negoziale|piano individuale pensionistic)", category: pension_fund}
+  - {pattern: "\\b(?:conto deposito|deposito vincolat|deposito svincolat|svincolo|time deposit|term deposit)", category: deposits}
+  # Protection by default; an accumulation policy is reclassified by hand.
+  - {pattern: "\\b(?:polizza|polizze|assicuraz|insurance|premio assicurativ)|\\brc auto\\b", category: insurance}
   - {pattern: "\\b(?:stipend|salary|payroll|emolument|pension)", category: salary}
   - {pattern: "\\b(?:affitt|locazion)|\\brent\\b", category: rent}
   - {pattern: "\\b(?:enel|hera|acea|iren|plenitude|luce|acqua|tari|vodafone|windtre|fastweb|iliad|utilit|bollett)|\\b(?:eni|a2a|gas|tim)\\b", category: bills}

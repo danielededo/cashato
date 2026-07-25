@@ -1,3 +1,15 @@
+// Wealth: everything money turns into that is not consumption.
+//
+// Securities, but also pension funds, term deposits and accumulation policies —
+// they are all wealth changing form rather than being spent, so they sit on the
+// same side of the line. A section per destination kind is rendered only when
+// that kind has movements, so the page grows with the data instead of showing
+// empty panels.
+//
+// Insurance is deliberately NOT here by default: a protection policy is real
+// consumption, and only an accumulation policy is wealth. That split is a manual
+// reclassification, never inferred from a transfer description.
+//
 // Investments on the two levels the statements actually support.
 //
 // CONTRIBUTIONS are always knowable: money leaving towards investing, including
@@ -14,9 +26,10 @@ import { lazy, Suspense, useMemo } from "react";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { RankBars, Sparkline, type RankItem } from "../components/primitives";
-import { seriesColor } from "../lib/colors";
+import { colorFor, seriesColor } from "../lib/colors";
 import { dateLabel, money, monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
+import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
 
 const StackedArea = lazy(() => import("../components/charts").then((m) => ({ default: m.StackedArea })));
@@ -27,7 +40,8 @@ const UNKNOWN = "unknown";
 
 export function Investments() {
   const { t } = useT();
-  const inv = useAsync(() => api.investments(), []);
+  const { lang } = useLang();
+  const inv = useAsync(() => api.investments(lang), [lang]);
 
   const d = useMemo(() => {
     const data = inv.data;
@@ -39,12 +53,18 @@ export function Investments() {
       { key: KNOWN, label: t("inv.known"), category: "investments" },
       { key: UNKNOWN, label: t("inv.unknown"), category: "other" },
     ];
-    const stackData: Row[] = data.months.map((m) => ({
-      month: monthShort(m.month),
-      [KNOWN]: m.into_known ?? 0,
-      [UNKNOWN]: m.into_unknown ?? 0,
-    }));
-    const spark = data.months.map((m) => m.contributed ?? 0);
+    // The months arrive per kind, so fold them into one row per month.
+    const byMonth = new Map<string, Row>();
+    for (const m of data.months) {
+      const row = byMonth.get(m.month) ?? { month: monthShort(m.month) };
+      row[KNOWN] = ((row[KNOWN] as number) ?? 0) + (m.into_known ?? 0);
+      row[UNKNOWN] = ((row[UNKNOWN] as number) ?? 0) + (m.into_unknown ?? 0);
+      byMonth.set(m.month, row);
+    }
+    const stackData: Row[] = [...byMonth.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, row]) => row);
+    const spark = stackData.map((r) => ((r[KNOWN] as number) ?? 0) + ((r[UNKNOWN] as number) ?? 0));
 
     // Keyed by ISIN so each row is distinct; colours come from the ramp because
     // an ISIN is not a category code.
@@ -111,6 +131,46 @@ export function Investments() {
               </div>
             </div>
           </div>
+
+          {/* One row per destination kind that actually has movements. With a
+              single kind this says nothing new, so it is not rendered. */}
+          {d.kinds.length > 1 ? (
+            <div className="panel">
+              <div className="panel-head">
+                <h2>{t("inv.kinds")}</h2>
+                <span className="hint">{t("inv.kinds.hint")}</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("inv.kind")}</th>
+                    <th className="num">{t("inv.investedCol")}</th>
+                    <th className="num">{t("inv.returns")}</th>
+                    <th className="num">{t("common.movements")}</th>
+                    <th>{t("inv.detailLevel")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.kinds.map((k) => (
+                    <tr key={k.category}>
+                      <td>
+                        <span className="cat-cell">
+                          <span className="swatch" style={{ background: colorFor(k.category) }} />
+                          {k.category_label}
+                        </span>
+                      </td>
+                      <td className="num mono">{money(k.net_invested)}</td>
+                      <td className="num mono dim">{money(k.returned)}</td>
+                      <td className="num mono dim">{k.n_movements}</td>
+                      <td className="dim">
+                        {k.has_instruments ? t("inv.withInstruments") : t("inv.amountOnly")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           {/* Honesty note, not decoration: without it the instrument table reads
               as the whole portfolio when it may be only part of it. */}
