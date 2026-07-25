@@ -156,3 +156,76 @@ export interface TransactionFilters {
   limit?: number;
   offset?: number;
 }
+
+/** A position, aggregated from the trades a source disclosed. */
+export interface Holding {
+  isin: string | null;
+  instrument: string | null;
+  asset_class: string | null;
+  units: number;
+  /** Cash cost basis: what actually left the account (fees included). */
+  invested: number;
+  n_trades: number;
+  first_trade: string | null;
+  last_trade: string | null;
+  /** Last price seen ON A STATEMENT, not a market quote — it ages. */
+  last_price: number | null;
+  value_at_last_price: number | null;
+}
+
+export interface InvestmentMonth {
+  month: string;
+  contributed: number | null;
+  returned: number | null;
+  net_invested: number | null;
+  /** Contributions whose instrument the source disclosed. */
+  into_known: number | null;
+  /** Contributions with no instrument detail (e.g. transfer to an outside broker). */
+  into_unknown: number | null;
+  n_movements: number;
+}
+
+export interface InvestmentsResponse {
+  holdings: Holding[];
+  months: InvestmentMonth[];
+  total_invested: number;
+  total_in_known_instruments: number;
+  total_in_unknown: number;
+}
+
+export interface TransferLeg {
+  natural_key: string;
+  value_date: string;
+  account: string;
+  amount: number;
+  description: string;
+}
+
+/** Everything known about one movement. */
+export interface TransactionDetail {
+  natural_key: string;
+  value_date: string;
+  booking_date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  account: string;
+  source: string;
+  category: string | null;
+  category_label: string | null;
+  category_source: string | null;
+  category_confidence: number | null;
+  mcc: string | null;
+  native_category: string | null;
+  transfer_group: string | null;
+  transfer_counterpart: TransferLeg | null;
+  file_name: string | null;
+  file_uploaded_at: string | null;
+  file_sha256: string | null;
+  isin: string | null;
+  instrument: string | null;
+  asset_class: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  side: string | null;
+}

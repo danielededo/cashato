@@ -126,7 +126,7 @@ class FeedbackRequest(BaseModel):
         description="New (corrected) category code.", examples=["groceries"]
     )
     corrected_by: str | None = Field(
-        default=None, description="Who made the correction (user id).", examples=["daniele"]
+        default=None, description="Who made the correction (user id).", examples=["mario"]
     )
 
 

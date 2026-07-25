@@ -7,7 +7,7 @@ data is involved (the real data lives in `data/`, which is gitignored).
 Regenerate any time with:
 
 ```bash
-.venv/bin/python scripts/generate_demo_data.py        # writes demo/ + verifies
+.venv/bin/python demo/generate.py        # writes demo/ + verifies
 ```
 
 The generator is deterministic (seeded RNG): the same seed always produces the

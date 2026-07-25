@@ -66,10 +66,14 @@ export const Delta = memo(function Delta({
 });
 
 export interface RankItem {
+  /** Identity: React key, selection value, and default colour lookup. */
   category: string;
   label: string;
   value: number;
   prev?: number | null;
+  /** Explicit colour, for rankings not keyed by category code (e.g. holdings
+   *  keyed by ISIN, which colorFor knows nothing about and would render grey). */
+  color?: string;
 }
 
 export const RankBars = memo(function RankBars({
@@ -97,11 +101,11 @@ export const RankBars = memo(function RankBars({
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.(it.category)}
         >
           <span className="name">
-            <span className="swatch" style={{ background: colorFor(it.category) }} />
+            <span className="swatch" style={{ background: it.color ?? colorFor(it.category) }} />
             {it.label}
           </span>
           <span className="track">
-            <span className="fill" style={{ width: `${max ? (it.value / max) * 100 : 0}%`, background: colorFor(it.category) }} />
+            <span className="fill" style={{ width: `${max ? (it.value / max) * 100 : 0}%`, background: it.color ?? colorFor(it.category) }} />
           </span>
           <span className="amt">{money(it.value)}</span>
           <span style={{ textAlign: "right" }}>

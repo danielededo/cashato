@@ -11,7 +11,7 @@ Swagger UI at ``/docs``, ReDoc at ``/redoc``.
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -168,6 +168,52 @@ class AccountsResponse(BaseModel):
     accounts: list[Account]
 
 
+class TransferLeg(BaseModel):
+    """The other side of an internal transfer."""
+
+    natural_key: str
+    value_date: date
+    account: str
+    amount: float
+    description: str
+
+
+class TransactionDetail(BaseModel):
+    """Everything known about one movement, for investigating it."""
+
+    natural_key: str
+    value_date: date
+    booking_date: date
+    description: str
+    amount: float
+    currency: str
+    account: str
+    source: str
+    category: str | None = None
+    category_label: str | None = None
+    category_source: str | None = Field(
+        default=None, description="How the category was assigned: mcc | model | rule | manual."
+    )
+    category_confidence: float | None = None
+    mcc: str | None = Field(default=None, description="ISO 18245 merchant category code.")
+    native_category: str | None = Field(
+        default=None,
+        description="The provider's own category. Kept for transparency; never used at runtime.",
+    )
+    transfer_group: str | None = None
+    transfer_counterpart: TransferLeg | None = None
+    file_name: str | None = None
+    file_uploaded_at: datetime | None = None
+    file_sha256: str | None = None
+    # Instrument leg, when the movement was a trade and the source said what.
+    isin: str | None = None
+    instrument: str | None = None
+    asset_class: str | None = None
+    quantity: float | None = None
+    unit_price: float | None = None
+    side: str | None = None
+
+
 class Holding(BaseModel):
     """A position, aggregated from the trades a source disclosed."""
 
@@ -258,6 +304,44 @@ def accounts():
         "accounts": _rows(
             "SELECT * FROM gold.v_accounts ORDER BY transactions DESC, account_id"
         )
+    }
+
+
+@api.get(
+    "/transactions/{natural_key}",
+    response_model=TransactionDetail,
+    summary="One movement, in full",
+)
+def transaction_detail(natural_key: str, lang: str = _LANG):
+    """Everything known about a single movement.
+
+    Beyond the list columns: how the category was assigned and how confident
+    that was, the raw provider signals, which uploaded file it came from, the
+    instrument if it was a trade, and the paired leg if it is one half of an
+    internal transfer.
+    """
+    rows = _rows(
+        "SELECT * FROM gold.v_transaction_detail WHERE natural_key = :k", {"k": natural_key}
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"unknown transaction {natural_key!r}")
+    row = rows[0]
+
+    # The other leg of an internal transfer: same group, different movement.
+    counterpart = None
+    if row.get("transfer_group"):
+        others = _rows(
+            "SELECT natural_key, value_date, account, amount, description "
+            "FROM gold.v_transactions WHERE transfer_group = :g AND natural_key <> :k",
+            {"g": row["transfer_group"], "k": natural_key},
+        )
+        if others:
+            counterpart = others[0]
+
+    return {
+        **row,
+        "category_label": _CAT.label(row["category"], lang),
+        "transfer_counterpart": counterpart,
     }
 
 

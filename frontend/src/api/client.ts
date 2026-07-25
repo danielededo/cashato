@@ -6,10 +6,12 @@ import type {
   CategoriesMonthlyResponse,
   FeedbackAccepted,
   FilesResponse,
+  InvestmentsResponse,
   Lang,
   MonthlyResponse,
   Profile,
   SummaryResponse,
+  TransactionDetail,
   TransactionFilters,
   TransactionsResponse,
   TransfersResponse,
@@ -70,6 +72,9 @@ export const api = {
   transactions: (f: TransactionFilters) => get<TransactionsResponse>("/transactions", { ...f }),
   transfers: () => get<TransfersResponse>("/transfers"),
   accounts: () => get<AccountsResponse>("/accounts"),
+  investments: () => get<InvestmentsResponse>("/investments"),
+  transaction: (key: string, lang: Lang) =>
+    get<TransactionDetail>(`/transactions/${encodeURIComponent(key)}`, { lang }),
   files: () => get<FilesResponse>("/files"),
   profile: () => get<Profile>("/profile"),
 

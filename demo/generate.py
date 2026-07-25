@@ -25,7 +25,7 @@ The PDF layouts are generated to the SAME geometry the parsers are calibrated
 on (word X coordinates), because parsing is position-aware. The persona is
 fictional: MARIO BIANCHI, Via Garibaldi 42, 20121 Milano.
 
-Usage:  .venv/bin/python scripts/generate_demo_data.py [--out demo]
+Usage:  .venv/bin/python demo/generate.py [--out demo]
 Requires: fpdf2 (dev-only), openpyxl (already a project dependency).
 """
 
@@ -753,7 +753,7 @@ def verify(outdir: Path, paths: dict[str, list[Path]]) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="demo", type=Path)
+    ap.add_argument("--out", default=Path(__file__).parent, type=Path)
     ap.add_argument("--seed", default=SEED, type=int)
     ap.add_argument("--no-verify", action="store_true")
     args = ap.parse_args()

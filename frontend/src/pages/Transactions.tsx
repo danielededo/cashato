@@ -5,6 +5,7 @@ import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
 import { SOURCES } from "../api/types";
 import { colorFor } from "../lib/colors";
 import { dateLabel, money } from "../lib/format";
+import { TransactionDetail } from "../components/TransactionDetail";
 import { useAccounts } from "../lib/accounts";
 import { catLabel, useT } from "../lib/i18n";
 import { useLang } from "../lib/lang";
@@ -39,6 +40,7 @@ export function Transactions() {
   const { lang } = useLang();
   const { t } = useT();
   const { sourceLabel, accountLabel, accountShort } = useAccounts();
+  const [detailKey, setDetailKey] = useState<string | null>(null);
 
   // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never
   // blocks on a fetch (react-best-practices: useDeferredValue).
@@ -232,7 +234,17 @@ export function Transactions() {
                   return (
                     <tr key={tx.natural_key}>
                       <td className="mono dim">{dateLabel(tx.value_date)}</td>
-                      <td className="desc" title={tx.description}>{tx.description}</td>
+                      {/* The row also holds a category <select>, so the whole
+                          row cannot be the click target — the description is. */}
+                      <td className="desc">
+                        <button
+                          className="link-cell"
+                          title={t("tx.investigate")}
+                          onClick={() => setDetailKey(tx.natural_key)}
+                        >
+                          {tx.description}
+                        </button>
+                      </td>
                       <td>
                         <span className="cat-cell">
                           <span className="swatch" style={{ background: colorFor(cat) }} />
@@ -257,6 +269,10 @@ export function Transactions() {
           </>
         ) : null}
       </div>
+
+      {detailKey ? (
+        <TransactionDetail naturalKey={detailKey} onClose={() => setDetailKey(null)} />
+      ) : null}
     </div>
   );
 }
