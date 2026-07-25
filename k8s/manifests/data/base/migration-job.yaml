@@ -3,20 +3,25 @@
 # secret), avoids concurrent-runner races across service replicas, and gives a
 # clean pass/fail before services start. sync-wave 1 = after the Cluster; the
 # initContainer additionally waits until Postgres actually accepts connections.
-# Run as an Argo **Sync hook**, for the same reason as db-grants: a Job's pod
-# template is immutable, so as a plain tracked resource the Job created at the
-# first deploy would sit there forever — Argo reports OutOfSync but cannot
-# replace it, and every migration added afterwards silently never runs. As a
-# hook it is deleted+recreated on each sync (BeforeHookCreation).
-# `alembic upgrade head` is a no-op when already at head, so re-running is safe.
+# A Job's pod template is immutable, so a plain `apply` can never update this
+# Job once created: the one from the first deploy would sit there forever while
+# Argo reports OutOfSync, and every migration added later would silently never
+# run. `Replace=true` is the fix — Argo deletes and recreates the Job instead of
+# applying it.
+#
+# NOT a Sync hook, deliberately. Argo excludes hooks from diffing, and the
+# migrate image tag appears nowhere else in this app, so as a hook a new image
+# produced NO detectable drift: the app stayed "Synced" and the migration never
+# ran. As a tracked resource the tag change IS the drift that triggers the sync.
+# It also means this only re-runs when the manifest really changed, rather than
+# on every unrelated sync.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-migrate
   annotations:
     argocd.argoproj.io/sync-wave: "1"
-    argocd.argoproj.io/hook: Sync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-options: Replace=true
 spec:
   backoffLimit: 6
   template:
