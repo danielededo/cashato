@@ -28,6 +28,22 @@ def _load(name: str) -> dict:
         return yaml.safe_load(f) or {}
 
 
+@cache
+def bank_names() -> dict[str, str]:
+    """ABI code -> bank name, from ``banks.yaml``.
+
+    Lets an adapter name the bank behind an IBAN when the statement itself does
+    not (Intesa's quarterly statement never spells its own name out). Missing
+    file or key is not an error — the caller falls back to no bank name.
+    """
+    try:
+        raw = _load("banks.yaml").get("abi") or {}
+    except FileNotFoundError:
+        return {}
+    # YAML may parse an unquoted ABI as an int, losing the leading zero.
+    return {str(k).zfill(5): str(v) for k, v in raw.items()}
+
+
 def setting(path: str, default: Any = None) -> Any:
     """Read a dotted setting from settings.yaml, e.g. ``setting('categorization.model_threshold')``."""
     node: Any = _load("settings.yaml")

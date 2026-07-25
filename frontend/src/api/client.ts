@@ -2,6 +2,7 @@
 // (in-cluster) or the Vite dev proxy (local). Never hardcode a host.
 
 import type {
+  AccountsResponse,
   CategoriesMonthlyResponse,
   FeedbackAccepted,
   FilesResponse,
@@ -68,6 +69,7 @@ export const api = {
   categoriesMonthly: (lang: Lang) => get<CategoriesMonthlyResponse>("/categories/monthly", { lang }),
   transactions: (f: TransactionFilters) => get<TransactionsResponse>("/transactions", { ...f }),
   transfers: () => get<TransfersResponse>("/transfers"),
+  accounts: () => get<AccountsResponse>("/accounts"),
   files: () => get<FilesResponse>("/files"),
   profile: () => get<Profile>("/profile"),
 

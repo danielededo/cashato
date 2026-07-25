@@ -33,9 +33,13 @@ from dateutil import parser as dateparser
 
 from .base import (
     GIVEN_FIRST,
+    INDIVIDUAL,
+    JOINT,
+    AccountInfo,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
+    find_iban,
     normalize_desc,
     parse_money,
 )
@@ -271,6 +275,66 @@ def iter_rows_pdf(path: str | Path) -> Iterator[RevolutRow]:
 
 # Revolut addresses the statement "DANIELE ROSSI" (given name first).
 NAME_ORDER = GIVEN_FIRST
+
+# The consolidated statement opens each account with a titled block followed by
+# a "Current account details" key/value table. Both the CSV and the PDF carry it,
+# but the CSV has it as real cells — far more robust than reading it off a PDF.
+_ACCT_TITLE_RE = re.compile(r"^((?:[A-Z][a-z]+ )*Account) \(([A-Z]{3})\)$")
+_ACCT_FIELDS = {
+    "holding modalities": "holding_modality",
+    "financial institution name": "bank_name",
+}
+_IBAN_LABEL = "account number"
+
+
+def extract_accounts(path: str | Path) -> list[AccountInfo]:
+    """Per-account metadata from the consolidated statement CSV.
+
+    Revolut labels everything we need: the block title gives the product and
+    currency ("Joint Account (EUR)"), and the details table states the holding
+    modality and the institution outright — no inference. The PDF renders the
+    same table but as positioned text, so we only read the CSV and let the PDF
+    contribute nothing rather than guess.
+    """
+    if not str(path).lower().endswith(".csv"):
+        return []
+    found: dict[str, AccountInfo] = {}
+    current: AccountInfo | None = None
+    with open(path, newline="", encoding="utf-8") as f:
+        for row in csv.reader(f):
+            cells = [c.strip() for c in row]
+            first = cells[0] if cells else ""
+            m = _ACCT_TITLE_RE.match(first)
+            if m:
+                product, currency = m.group(1), m.group(2)
+                acc_id = _account_id(product, currency)
+                # Same account can open several blocks (cash, savings, crypto);
+                # keep the first, which is the one carrying the details table.
+                current = found.setdefault(
+                    acc_id,
+                    AccountInfo(account_id=acc_id, product=product, currency=currency),
+                )
+                continue
+            if current is None or len(cells) < 2:
+                continue
+            label, value = first.lower(), cells[1]
+            if not value:
+                continue
+            # First value wins throughout. An account's title is followed by its
+            # own details table and THEN by sub-blocks (savings, crypto pockets)
+            # that restate the fields for the underlying personal account — the
+            # joint account's own block says "Joint", a later sub-block says
+            # "Individual", and last-wins would silently mislabel it.
+            field = _ACCT_FIELDS.get(label)
+            if field == "holding_modality":
+                if current.holding_modality is None:
+                    current.holding_modality = JOINT if value.lower() == "joint" else INDIVIDUAL
+            elif field:
+                if getattr(current, field) is None:
+                    setattr(current, field, value)
+            elif label.startswith(_IBAN_LABEL) and current.iban is None:
+                current.iban = find_iban(value)
+    return list(found.values())
 
 
 def extract_holder(path: str | Path) -> str | None:

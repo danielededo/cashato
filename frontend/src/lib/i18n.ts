@@ -31,20 +31,6 @@ export function catLabel(code: string | null | undefined, lang: Lang): string {
   return CATEGORY_LABELS[code]?.[lang] ?? code;
 }
 
-/** Display names of the ingest sources. Proper nouns, so identical in every
- *  language. The source *id* (`intesa`) is untouched: it is part of the natural
- *  key and the API contract — only the label the user reads changes. */
-const SOURCE_LABELS: Record<string, string> = {
-  intesa: "Intesa Sanpaolo",
-  revolut: "Revolut",
-  trade_republic: "Trade Republic",
-};
-
-export function sourceLabel(id: string | null | undefined): string {
-  if (!id) return "—";
-  return SOURCE_LABELS[id] ?? id.replace(/_/g, " ");
-}
-
 type Dict = Record<string, { it: string; en: string }>;
 
 const UI: Dict = {

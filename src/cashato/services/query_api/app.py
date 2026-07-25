@@ -143,6 +143,31 @@ class TransfersResponse(BaseModel):
     transfers: list[TransferPair]
 
 
+class Account(BaseModel):
+    """An account as the statements describe it. The id is opaque and stable (it
+    is hashed into ``natural_key``); everything else is display metadata read off
+    the documents, so most of it is nullable."""
+
+    account_id: str = Field(examples=["revolut_joint_eur"])
+    source: str
+    bank_name: str | None = Field(default=None, examples=["Intesa Sanpaolo"])
+    product: str | None = Field(default=None, examples=["XME Conto", "Joint Account"])
+    is_joint: bool | None = Field(
+        default=None,
+        description="null = the document did not say, which is NOT the same as individual.",
+    )
+    currency: str | None = None
+    iban: str | None = None
+    display_name: str = Field(examples=["Revolut Bank UAB · Joint Account (Joint)"])
+    transactions: int
+    first_movement: date | None = None
+    last_movement: date | None = None
+
+
+class AccountsResponse(BaseModel):
+    accounts: list[Account]
+
+
 _LANG = Query(default="it", description="Category label language", examples=["it", "en"])
 
 
@@ -176,6 +201,21 @@ def summary(lang: str = _LANG):
     return {
         "lang": lang,
         "categories": [{**r, "category_label": _CAT.label(r["category"], lang)} for r in rows],
+    }
+
+
+@api.get("/accounts", response_model=AccountsResponse, summary="Accounts and how they are held")
+def accounts():
+    """The accounts behind the ingested statements: bank, product, joint or not.
+
+    The display name is composed in the view from the stored parts, so no bank
+    name is ever spelled out in the client. Accounts with no movements are still
+    listed — a statement can describe an account whose currency we skip.
+    """
+    return {
+        "accounts": _rows(
+            "SELECT * FROM gold.v_accounts ORDER BY transactions DESC, account_id"
+        )
     }
 
 

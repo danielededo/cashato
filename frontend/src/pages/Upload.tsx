@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { SOURCES } from "../api/types";
 import { dateLabel } from "../lib/format";
-import { sourceLabel, useT } from "../lib/i18n";
+import { useAccounts } from "../lib/accounts";
+import { useT } from "../lib/i18n";
 import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
+  const { sourceLabel } = useAccounts();
   const [source, setSource] = useState("");
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);

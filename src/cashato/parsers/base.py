@@ -94,6 +94,72 @@ def normalize_desc(description: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
+# --- Account descriptor (which bank, which product, held with whom) ----------
+#
+# The account *id* stays exactly as it is: it is hashed into ``natural_key``, so
+# renaming one would invalidate every key ever computed. What a statement tells
+# us about an account — the bank, the product name, whether it is held jointly —
+# is therefore DISPLAY metadata carried alongside, never part of the id.
+
+INDIVIDUAL = "individual"
+JOINT = "joint"
+
+# Italian IBAN: IT + 2 check digits + 1 CIN + 5 ABI + 5 CAB + 12 account number
+# = 27 characters. Statements print it grouped ("IT47 K030 6915 ..."), so the
+# search pattern tolerates spaces between characters and the result is compacted
+# before validation. Matching on the ORIGINAL text matters: compacting the whole
+# page first would glue the "IBAN" label onto the number and destroy the word
+# boundary the search relies on.
+_IBAN_FIND_RE = re.compile(r"\bIT\d{2}(?:\s*[A-Z0-9]){23}", re.IGNORECASE)
+_IBAN_IT_RE = re.compile(r"IT\d{2}[A-Z]\d{10}[A-Z0-9]{12}", re.IGNORECASE)
+
+
+@dataclass
+class AccountInfo:
+    """What a statement says about one account. Everything but the id is optional
+    — sources disclose wildly different amounts of metadata, and absent is normal."""
+
+    account_id: str
+    bank_name: str | None = None
+    product: str | None = None
+    #: ``INDIVIDUAL`` / ``JOINT`` when the document states it, else ``None``.
+    #: ``None`` means "not disclosed", which is NOT the same as individual.
+    holding_modality: str | None = None
+    currency: str | None = None
+    iban: str | None = None
+
+
+def find_iban(text: str) -> str | None:
+    """First Italian IBAN in ``text`` (statements print it spaced or unspaced)."""
+    for m in _IBAN_FIND_RE.finditer(text or ""):
+        candidate = re.sub(r"\s+", "", m.group(0)).upper()
+        if _IBAN_IT_RE.fullmatch(candidate):
+            return candidate
+    return None
+
+
+def abi_from_iban(iban: str | None) -> str | None:
+    """The 5-digit ABI (bank) code embedded in an Italian IBAN."""
+    if not iban:
+        return None
+    compact = re.sub(r"\s+", "", iban).upper()
+    return compact[5:10] if _IBAN_IT_RE.fullmatch(compact) else None
+
+
+def bank_from_iban(iban: str | None) -> str | None:
+    """Bank name for an IBAN, via the ABI lookup in ``config/banks.yaml``.
+
+    Deferred import: this module is the adapters' stdlib toolkit, and the config
+    loader is only needed on this path.
+    """
+    abi = abi_from_iban(iban)
+    if not abi:
+        return None
+    from cashato.config import bank_names
+
+    return bank_names().get(abi)
+
+
 # --- Account holder (intestatario) -------------------------------------------
 #
 # Every statement PDF carries an addressee block laid out the same way:

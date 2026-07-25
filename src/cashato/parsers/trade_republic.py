@@ -30,9 +30,11 @@ import pdfplumber
 
 from .base import (
     GIVEN_FIRST,
+    AccountInfo,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
+    find_iban,
     parse_money,
 )
 
@@ -254,6 +256,22 @@ def _parse_blocks(lines: list[tuple[float, list[dict]]], cols: _Cols) -> list[_B
 
 # Trade Republic addresses the statement "DANIELE ROSSI" (given name first).
 NAME_ORDER = GIVEN_FIRST
+
+
+def extract_accounts(path: str | Path) -> list[AccountInfo]:
+    """The single cash account behind the statement.
+
+    Trade Republic prints its name as a letterhead, not a labelled field, and
+    folds the branch and street address into the same line — so rather than
+    slice that up we hand back the IBAN and let the shared ABI lookup name the
+    bank, the same way Intesa is resolved. One account per statement; the
+    holding modality is never stated, and ``None`` means exactly that.
+    """
+    if not str(path).lower().endswith(".pdf"):
+        return []
+    with pdfplumber.open(path) as pdf:
+        head = pdf.pages[0].extract_text() or ""
+    return [AccountInfo(account_id=ACCOUNT, currency=CURRENCY, iban=find_iban(head))]
 
 
 def extract_holder(path: str | Path) -> str | None:

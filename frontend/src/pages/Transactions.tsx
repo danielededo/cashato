@@ -5,7 +5,8 @@ import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
 import { SOURCES } from "../api/types";
 import { colorFor } from "../lib/colors";
 import { dateLabel, money } from "../lib/format";
-import { catLabel, sourceLabel, useT } from "../lib/i18n";
+import { useAccounts } from "../lib/accounts";
+import { catLabel, useT } from "../lib/i18n";
 import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
 
@@ -37,6 +38,7 @@ export function Transactions() {
   const [params] = useSearchParams();
   const { lang } = useLang();
   const { t } = useT();
+  const { sourceLabel, accountLabel, accountShort } = useAccounts();
 
   // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never
   // blocks on a fetch (react-best-practices: useDeferredValue).
@@ -241,7 +243,7 @@ export function Transactions() {
                         </span>
                       </td>
                       <td className="num"><span className={`amt ${tx.amount < 0 ? "neg" : "pos"}`}>{money(tx.amount)}</span></td>
-                      <td className="dim">{tx.account}</td>
+                      <td className="dim" title={accountLabel(tx.account)}>{accountShort(tx.account)}</td>
                     </tr>
                   );
                 })}

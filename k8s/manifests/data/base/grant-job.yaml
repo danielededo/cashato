@@ -49,9 +49,14 @@ spec:
               GRANT USAGE ON SCHEMA gold TO etl_writer;
               GRANT SELECT, INSERT ON gold.category_feedback TO etl_writer;
 
+              -- Account dimension (bank, product, joint/individual): written by
+              -- the loader on every ingest, read by the gold v_accounts view.
+              GRANT SELECT, INSERT, UPDATE ON silver.accounts TO etl_writer;
+
               -- ingest-api /admin/reset needs to TRUNCATE ingested data. Bounded
               -- to the specific reset-target tables (not a blanket DELETE grant).
               GRANT TRUNCATE ON bronze.raw_files, silver.transactions TO etl_writer;
+              GRANT TRUNCATE ON silver.accounts TO etl_writer;
               GRANT TRUNCATE ON gold.category_feedback TO etl_writer;
               GRANT SELECT, TRUNCATE ON gold.training_labels TO etl_writer;
 

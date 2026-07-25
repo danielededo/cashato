@@ -95,6 +95,26 @@ export interface RawFile {
 export interface FilesResponse {
   files: RawFile[];
 }
+/** An account as the statements describe it. The id is opaque and stable (it is
+ *  hashed into the dedup key); the rest is display metadata read off documents. */
+export interface Account {
+  account_id: string;
+  source: string;
+  bank_name: string | null;
+  product: string | null;
+  /** null = the document did not say, which is NOT the same as individual. */
+  is_joint: boolean | null;
+  currency: string | null;
+  iban: string | null;
+  display_name: string;
+  transactions: number;
+  first_movement: string | null;
+  last_movement: string | null;
+}
+export interface AccountsResponse {
+  accounts: Account[];
+}
+
 /** Who the ingested statements belong to. Every field is nullable: "no PDF
  *  ingested yet" is a normal state, not an error. */
 export interface Profile {

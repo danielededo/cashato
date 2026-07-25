@@ -19,14 +19,65 @@ from pathlib import Path
 from sqlalchemy import text
 
 from cashato.db.db import get_engine
+from cashato.parsers.base import bank_from_iban
 from cashato.parsers.categorize import Categorizer
-from cashato.parsers.registry import ADAPTERS, HOLDER_EXTRACTORS  # (auto-discovered)
+from cashato.parsers.registry import (  # (auto-discovered)
+    ACCOUNT_EXTRACTORS,
+    ADAPTERS,
+    HOLDER_EXTRACTORS,
+)
 
 # The loader only applies the deterministic fast-path (MCC + rules): lightweight,
 # no torch/model dependency. ML categorization is a separate concern
 # (ml/recategorize.py locally; a categorizer calling the KServe-served model in
 # phase C). This keeps the etl-worker light and fast.
 _CATEGORIZER = Categorizer.load()
+
+
+def _upsert_accounts(conn, path: Path, source: str) -> int:
+    """Record what this document says about the accounts it covers.
+
+    Never fatal, and never destructive: a statement that omits a field must not
+    erase what an earlier one told us, so each column only moves from NULL to a
+    value (COALESCE on the new value first, existing second). The bank name is
+    resolved here rather than in the adapters — most statements do not name their
+    own bank, but every one of them carries an IBAN, and the ABI inside it does.
+    """
+    extract = ACCOUNT_EXTRACTORS.get(source)
+    if extract is None:
+        return 0
+    try:
+        accounts = extract(path)
+    except Exception:  # noqa: BLE001 - descriptive metadata, never blocks ingestion
+        return 0
+
+    for a in accounts:
+        conn.execute(
+            text(
+                """
+                INSERT INTO silver.accounts
+                    (account_id, source, bank_name, product, holding_modality, currency, iban)
+                VALUES (:id, :source, :bank, :product, :modality, :currency, :iban)
+                ON CONFLICT (account_id) DO UPDATE SET
+                    bank_name        = COALESCE(EXCLUDED.bank_name, accounts.bank_name),
+                    product          = COALESCE(EXCLUDED.product, accounts.product),
+                    holding_modality = COALESCE(EXCLUDED.holding_modality, accounts.holding_modality),
+                    currency         = COALESCE(EXCLUDED.currency, accounts.currency),
+                    iban             = COALESCE(EXCLUDED.iban, accounts.iban),
+                    updated_at       = now()
+                """
+            ),
+            {
+                "id": a.account_id,
+                "source": source,
+                "bank": a.bank_name or bank_from_iban(a.iban),
+                "product": a.product,
+                "modality": a.holding_modality,
+                "currency": a.currency,
+                "iban": a.iban,
+            },
+        )
+    return len(accounts)
 
 
 def _account_holder(path: Path, source: str) -> str | None:
@@ -103,6 +154,7 @@ def load(path: Path, source: str, force: bool = False) -> int:
 
     # 3. Load into silver (dedup on natural_key) and finalize the file status.
     with engine.begin() as conn:
+        _upsert_accounts(conn, path, source)
         inserted = 0
         for t in txs:
             # Inline provider-agnostic categorization: MCC -> rules -> model.

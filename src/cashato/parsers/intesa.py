@@ -28,9 +28,11 @@ import pdfplumber
 
 from .base import (
     FAMILY_FIRST,
+    AccountInfo,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
+    find_iban,
     parse_money,
 )
 
@@ -136,6 +138,42 @@ class _Tx:
 
 # Italian statements address the holder surname-first: "ROSSI MARIO".
 NAME_ORDER = FAMILY_FIRST
+
+# Product label in the left column of page 1; the value sits on the NEXT
+# left-column line ("Tipologia conto:" / "XME Conto"), not on the same one.
+_PRODUCT_LABEL = "tipologia conto"
+_LEFT_COL_MAX_X = 270
+
+
+def extract_accounts(path: str | Path) -> list[AccountInfo]:
+    """The single current account behind the statement.
+
+    Intesa never spells its own name out — the quarterly statement carries the
+    IBAN and nothing else identifying the bank — so we return the IBAN and let
+    the shared ABI lookup resolve the name. The product ("XME Conto") is stated,
+    and the holding modality is not: ``None`` means undisclosed, not individual.
+    """
+    if not str(path).lower().endswith(".pdf"):
+        return []
+    with pdfplumber.open(path) as pdf:
+        page = pdf.pages[0]
+        head = page.extract_text() or ""
+        # Scope to the left column: "Tipologia conto:" sits within a couple of
+        # points of the addressee block on the right, so a whole-page line
+        # grouping would splice the two together.
+        left = [w for w in page.extract_words(keep_blank_chars=False) if w["x0"] < _LEFT_COL_MAX_X]
+        lines = [" ".join(w["text"] for w in ws) for _top, ws in _group_lines(left)]
+
+    product = None
+    for i, text in enumerate(lines[:-1]):
+        if text.lower().startswith(_PRODUCT_LABEL):
+            product = lines[i + 1].strip() or None
+            break
+    return [
+        AccountInfo(
+            account_id=ACCOUNT, product=product, currency=CURRENCY, iban=find_iban(head)
+        )
+    ]
 
 
 def extract_holder(path: str | Path) -> str | None:

@@ -10,8 +10,10 @@ from cashato.parsers.base import (
     GIVEN_FIRST,
     MoneyParseError,
     Transaction,
+    abi_from_iban,
     addressee_from_words,
     assign_occurrence_keys,
+    find_iban,
     format_holder,
     given_name,
     normalize_desc,
@@ -180,6 +182,26 @@ class TestAccountHolder:
     def test_given_name_follows_the_source_convention(self):
         assert given_name("DANIELE ROSSI", GIVEN_FIRST) == "Daniele"
         assert given_name("ROSSI MARIO", FAMILY_FIRST) == "Daniele"
+
+    def test_iban_found_next_to_its_label(self):
+        # il caso che rompe l'approccio "compatta tutto": senza spazi "IBAN" e
+        # "IT47" si attaccano e il confine di parola sparisce
+        assert find_iban("IBAN IT47 K030 6915 4601 0000 0014 132") == "IT60X0306912345100000067890"
+        assert find_iban("IBAN IT30D0367412345100000011111") == "IT30D0367412345100000011111"
+        assert find_iban("Account Number (IT IBAN),IT12A0366912345100000022222") == (
+            "IT12A0366912345100000022222"
+        )
+
+    def test_iban_absent_or_foreign(self):
+        assert find_iban("Account Number N/A") is None
+        assert find_iban("LT313250048123456789") is None  # non italiano -> nessun ABI
+        assert find_iban("") is None
+
+    def test_abi_is_the_bank_code_inside_the_iban(self):
+        assert abi_from_iban("IT60X0306912345100000067890") == "03069"
+        assert abi_from_iban("IT71 N036 6901 6007 0617 9872 079") == "03669"
+        assert abi_from_iban(None) is None
+        assert abi_from_iban("not an iban") is None
 
     def test_format_holder_titlecases_only_all_caps(self):
         assert format_holder("ROSSI MARIO") == "Rossi Mario"

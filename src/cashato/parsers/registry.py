@@ -10,7 +10,9 @@ and, optionally:
   - ``extract_holder(path) -> str | None`` — the account holder off the document
     header (``None`` when the format has none, e.g. CSV exports);
   - ``NAME_ORDER`` — whether that source's documents write the given name first
-    or the surname first (see ``base.GIVEN_FIRST`` / ``base.FAMILY_FIRST``).
+    or the surname first (see ``base.GIVEN_FIRST`` / ``base.FAMILY_FIRST``);
+  - ``extract_accounts(path) -> list[base.AccountInfo]`` — what the document says
+    about the accounts it covers (bank, product, joint/individual, IBAN).
 
 Adding a bank = drop in a module exposing those two names; nothing here changes
 (the module name IS the source id). The package's non-adapter helpers are skipped
@@ -36,6 +38,8 @@ _DETECTION: dict[str, list[list[str]]] = {}
 HOLDER_EXTRACTORS: dict[str, Callable[..., str | None]] = {}
 #: source -> name-order convention of that source's documents (optional).
 NAME_ORDERS: dict[str, str] = {}
+#: source -> account-metadata extractor (optional).
+ACCOUNT_EXTRACTORS: dict[str, Callable[..., list]] = {}
 
 for _info in sorted(pkgutil.iter_modules(_PKG_PATH), key=lambda m: m.name):
     if _info.ispkg or _info.name in _NON_ADAPTERS:
@@ -48,6 +52,8 @@ for _info in sorted(pkgutil.iter_modules(_PKG_PATH), key=lambda m: m.name):
             HOLDER_EXTRACTORS[_info.name] = _mod.extract_holder
         if hasattr(_mod, "NAME_ORDER"):
             NAME_ORDERS[_info.name] = _mod.NAME_ORDER
+        if hasattr(_mod, "extract_accounts"):
+            ACCOUNT_EXTRACTORS[_info.name] = _mod.extract_accounts
 
 # Ordered list of supported source identifiers (single source of truth).
 SOURCE_NAMES: list[str] = list(ADAPTERS)

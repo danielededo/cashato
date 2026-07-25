@@ -1,0 +1,34 @@
+# Bank names by ABI code (runtime config, NOT code — mounted as part of the
+# cashato-config ConfigMap, so adding a bank needs no image rebuild).
+#
+# Why this file exists: statements disagree on whether they name their own bank.
+# Revolut and Trade Republic print it as a labelled field, Intesa Sanpaolo does
+# not — its quarterly statement only carries the IBAN. Every Italian IBAN embeds
+# the 5-digit ABI (bank) code at positions 5..10, e.g.
+#
+#     IT60X0306912345100000067890
+#           ^^^^^ ABI -> Intesa Sanpaolo
+#
+# so the bank is derivable from data the document always has. Adapters use the
+# document's own field when it has one and fall back to this lookup otherwise.
+#
+# Add a bank = add a line. Keys are strings: the leading zero is significant.
+
+abi:
+  "03069": Intesa Sanpaolo
+  "03669": Revolut Bank UAB
+  "03674": Trade Republic Bank
+  # Common Italian banks, so a newly added source resolves out of the box.
+  "01005": BNL
+  "01015": Banco di Sardegna
+  "02008": UniCredit
+  "03015": Fineco
+  "03104": Banca Sella
+  "03268": Banca Sella Holding
+  "05034": Banco BPM
+  "05387": BPER Banca
+  "05696": Banca Popolare di Sondrio
+  "06230": Gruppo Cassa di Risparmio
+  "07601": Poste Italiane (BancoPosta)
+  "08327": Banca di Credito Cooperativo
+  "36081": Banca Widiba
