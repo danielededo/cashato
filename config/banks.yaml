@@ -6,7 +6,7 @@
 # not — its quarterly statement only carries the IBAN. Every Italian IBAN embeds
 # the 5-digit ABI (bank) code at positions 5..10, e.g.
 #
-#     IT60X0306912345100000067890
+#     IT60 X 03069 12345 100000067890
 #           ^^^^^ ABI -> Intesa Sanpaolo
 #
 # so the bank is derivable from data the document always has. Adapters use the

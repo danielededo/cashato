@@ -38,7 +38,7 @@ from cashato.obs import (
     start_metrics_server,
     tracing_enabled,
 )
-from cashato.parsers.base import GIVEN_FIRST, format_holder, given_name
+from cashato.parsers.base import GIVEN_FIRST, format_holder, given_name, person_key
 from cashato.parsers.categorize import Categorizer
 from cashato.parsers.registry import NAME_ORDERS, SOURCE_NAMES
 
@@ -141,8 +141,18 @@ class Profile(BaseModel):
     CSV/XLSX exports carry no addressee, so "unknown" is a normal state."""
 
     display_name: str | None = Field(default=None, examples=["Mario Rossi"])
-    given_name: str | None = Field(default=None, examples=["Daniele"])
+    given_name: str | None = Field(default=None, examples=["Mario"])
     source: str | None = Field(default=None, description="Source the name was read from.")
+    people: list[str] = Field(
+        default_factory=list,
+        description="Distinct PEOPLE named across the files, compared by name tokens so "
+        "'MARIO ROSSI' and 'ROSSI MARIO' count as one.",
+    )
+    mixed_holders: bool = Field(
+        default=False,
+        description="More than one person appears. Legitimate for a joint account, "
+        "but surfaced so a mistaken upload does not pass unnoticed.",
+    )
     variants: list[str] = Field(
         default_factory=list, description="Distinct holder spellings seen across sources."
     )
@@ -293,11 +303,11 @@ async def profile():
     """Who the ingested statements belong to, for a personalized home page.
 
     The holder is read off the statement headers at ingestion time; CSV/XLSX
-    exports carry none. Sources disagree on name order (Revolut writes "DANIELE
-    ROSSI", Italian statements "ROSSI MARIO"), so the greeting
-    name is derived from the *declared* convention of the source that supplied
-    the name rather than guessed from the string. Everything is nullable: an
-    empty profile is a normal state (no PDF ingested yet).
+    exports carry none. Sources disagree on name order (Revolut writes "MARIO
+    ROSSI", Italian statements "ROSSI MARIO"), so the greeting name is derived
+    from the *declared* convention of the source that supplied it rather than
+    guessed from the string. Everything is nullable: an empty profile is a
+    normal state (no PDF ingested yet).
     """
     engine = get_engine()
     with engine.connect() as conn:
@@ -318,12 +328,24 @@ async def profile():
         return Profile()
     top = rows[0]
     order = NAME_ORDERS.get(top["source"], GIVEN_FIRST)
+
+    # Distinct PEOPLE, not distinct spellings: the same person is written
+    # "MARIO ROSSI" by Revolut and "ROSSI MARIO" by an Italian
+    # statement, and counting strings would report one person as two. One
+    # display form is kept per person (the first seen, which is the commonest).
+    people: dict[frozenset[str], str] = {}
+    for r in rows:
+        people.setdefault(person_key(r["account_holder"]), format_holder(r["account_holder"]))
+
     return Profile(
         display_name=format_holder(top["account_holder"]),
         given_name=given_name(top["account_holder"], order) or None,
         source=top["source"],
-        # Distinct spellings seen across sources — transparency, and a hint that
-        # statements from more than one holder were mixed in.
+        people=sorted(people.values()),
+        # More than one person across the ingested files. Not an error on its
+        # own — a joint account legitimately names two — but worth surfacing, so
+        # loading someone else's statements by mistake does not pass unnoticed.
+        mixed_holders=len(people) > 1,
         variants=sorted({format_holder(r["account_holder"]) for r in rows}),
     )
 

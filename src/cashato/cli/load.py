@@ -34,6 +34,41 @@ from cashato.parsers.registry import (  # (auto-discovered)
 _CATEGORIZER = Categorizer.load()
 
 
+def record_unsupported(path: Path, filename: str, bank: str | None) -> None:
+    """Register a file no adapter can read, so it does not vanish silently.
+
+    Without this the object is stored and the job is consumed, but nothing ever
+    appears in ``/files`` — from the UI the upload simply did nothing. Recording
+    it as ``failed`` with a useful reason is the difference between "cashato is
+    broken" and "cashato does not support this bank yet".
+    """
+    reason = (
+        f"Statement appears to be from {bank}, which has no adapter yet."
+        if bank
+        else "Unrecognized statement format: no adapter matched this file's content."
+    )
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO bronze.raw_files (source, filename, sha256, size_bytes, status, error)
+                VALUES (:source, :filename, :sha256, :size, 'failed', :error)
+                ON CONFLICT (sha256) DO UPDATE
+                    SET status = 'failed', error = EXCLUDED.error, filename = EXCLUDED.filename
+                """
+            ),
+            {
+                "source": bank or "unknown",
+                # `path` is the fetched temp copy (hash/size come from it); the
+                # display name must be the one the user actually uploaded.
+                "filename": filename,
+                "sha256": sha256_of(path),
+                "size": path.stat().st_size,
+                "error": reason,
+            },
+        )
+
+
 def _upsert_accounts(conn, path: Path, source: str) -> int:
     """Record what this document says about the accounts it covers.
 

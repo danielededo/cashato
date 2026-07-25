@@ -58,7 +58,7 @@ The design is built so adding a bank touches **one adapter module**, nothing els
      the CAP line of the addressee block. Return `None` for formats that carry no
      addressee (CSV/XLSX exports): unknown is a normal outcome, not an error;
    - `NAME_ORDER` — `base.GIVEN_FIRST` or `base.FAMILY_FIRST`, i.e. whether that
-     source's documents write "DANIELE ROSSI" or "ROSSI MARIO".
+     source's documents write "MARIO ROSSI" or "ROSSI MARIO".
      Declaring the *document's* convention is what lets the API pick out the first
      name without guessing which token is the surname.
 

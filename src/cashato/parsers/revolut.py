@@ -273,7 +273,7 @@ def iter_rows_pdf(path: str | Path) -> Iterator[RevolutRow]:
     yield from rows
 
 
-# Revolut addresses the statement "DANIELE ROSSI" (given name first).
+# Revolut addresses the statement "MARIO ROSSI" (given name first).
 NAME_ORDER = GIVEN_FIRST
 
 # The consolidated statement opens each account with a titled block followed by

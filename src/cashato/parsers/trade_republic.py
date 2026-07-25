@@ -254,7 +254,7 @@ def _parse_blocks(lines: list[tuple[float, list[dict]]], cols: _Cols) -> list[_B
     return blocks
 
 
-# Trade Republic addresses the statement "DANIELE ROSSI" (given name first).
+# Trade Republic addresses the statement "MARIO ROSSI" (given name first).
 NAME_ORDER = GIVEN_FIRST
 
 

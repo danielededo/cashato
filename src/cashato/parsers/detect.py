@@ -43,7 +43,7 @@ def _xlsx_head(path: Path, max_rows: int = 25) -> str:
     return " ".join(parts).lower()
 
 
-def _head_text(path: Path) -> str | None:
+def head_text(path: Path) -> str | None:
     suffix = path.suffix.lower()
     try:
         if suffix == ".csv":
@@ -58,10 +58,25 @@ def _head_text(path: Path) -> str | None:
 
 
 def detect_source(path: str | Path) -> str | None:
-    text = _head_text(Path(path))
+    text = head_text(Path(path))
     if not text:
         return None
     for source, groups in detection_signatures():
         if any(all(marker in text for marker in group) for group in groups):
             return source
     return None
+
+
+def identify_bank(path: str | Path) -> str | None:
+    """Name the bank behind a file we have no adapter for.
+
+    Knowing *which* bank a statement comes from and being able to *parse* it are
+    separate problems: parsing needs code that knows the layout, but identifying
+    only needs the IBAN, which every Italian statement carries. So a file from an
+    unsupported bank can say "this looks like BPER Banca" instead of just
+    "unrecognized source".
+    """
+    from cashato.parsers.base import bank_from_iban, find_iban
+
+    text = head_text(Path(path))
+    return bank_from_iban(find_iban(text)) if text else None

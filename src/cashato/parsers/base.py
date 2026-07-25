@@ -164,9 +164,9 @@ def bank_from_iban(iban: str | None) -> str | None:
 #
 # Every statement PDF carries an addressee block laid out the same way:
 #
-#     DANIELE ROSSI        <- the account holder
-#     Via Roma 1  <- street
-#     00100 Roma                <- CAP (5-digit Italian postal code) + city
+#     MARIO ROSSI   <- the account holder
+#     Via Roma 1    <- street
+#     00100 Roma    <- CAP (5-digit Italian postal code) + city
 #
 # so one position-aware helper serves all three sources: anchor on the CAP line
 # and walk two lines up, staying inside the same column. Column-scoping matters —
@@ -177,7 +177,7 @@ def bank_from_iban(iban: str | None) -> str | None:
 #: via ``NAME_ORDER``. This is a documented property of the statement *layout*,
 #: not a guess about the name: which token is the surname is not derivable from
 #: the string alone ("ROSSI MARIO" has a two-token surname).
-GIVEN_FIRST = "given_first"  # "DANIELE ROSSI"  — Revolut, Trade Republic
+GIVEN_FIRST = "given_first"  # "MARIO ROSSI"  — Revolut, Trade Republic
 FAMILY_FIRST = "family_first"  # "ROSSI MARIO"  — Italian bank statements
 
 _CAP_RE = re.compile(r"^\d{5}$")
@@ -250,6 +250,16 @@ def format_holder(raw: str) -> str:
     """
     name = " ".join(raw.split())
     return name.title() if name.isupper() else name
+
+
+def person_key(holder: str) -> frozenset[str]:
+    """Identity of a holder, independent of how a source writes the name.
+
+    Sources disagree on word order — Revolut prints "MARIO ROSSI", an
+    Italian statement "ROSSI MARIO" — so comparing the strings would
+    report one person as two. Comparing the normalized token SET does not.
+    """
+    return frozenset(normalize_desc(holder).split())
 
 
 def given_name(holder: str, name_order: str) -> str:

@@ -1,0 +1,87 @@
+transaction_id,date,type,status,currency,amount,fee,tax,name,description,counterparty_name,category,mcc_code,asset_class,isin
+79699ed2ec48bf55,2025-01-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+175a81ec112fa612,2025-01-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+15da705cd4ef00aa,2025-01-19,CARD_PAYMENT,EXECUTED,EUR,-48.10,,,Amazon EU,Card payment,,card,5942,,
+6e8f75a117dded81,2025-01-28,INTEREST,EXECUTED,EUR,2.08,,-0.54,Trade Republic,Interest payout,,interest,,,
+be9d61ee18b87245,2025-02-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+5f65c8cebd21bc11,2025-02-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+214f3f12cfd01cbd,2025-02-22,CARD_PAYMENT,EXECUTED,EUR,-64.76,,,Amazon EU,Card payment,,card,5942,,
+0f5ae9d38e6e5003,2025-02-28,INTEREST,EXECUTED,EUR,2.50,,-0.65,Trade Republic,Interest payout,,interest,,,
+f4e559e596229348,2025-03-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+8fca7b6a8fc42092,2025-03-05,CARD_PAYMENT,EXECUTED,EUR,-21.42,,,Esselunga Milano,Card payment,,card,5411,,
+ab85fd595463adc7,2025-03-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+692ac1391f4a8ca1,2025-03-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+dfa4bb9f5a856750,2025-03-27,CARD_PAYMENT,EXECUTED,EUR,-57.08,,,REWE Berlin,Card payment,,card,5411,,
+f0ede303aa53c19c,2025-03-28,INTEREST,EXECUTED,EUR,2.63,,-0.68,Trade Republic,Interest payout,,interest,,,
+6c4596f6c012a0ff,2025-04-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+ea74bb18de3b496f,2025-04-04,CARD_PAYMENT,EXECUTED,EUR,-14.11,,,REWE Berlin,Card payment,,card,5411,,
+0d2b91efb8976ec5,2025-04-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+49a214aef7e8f8e5,2025-04-28,INTEREST,EXECUTED,EUR,1.70,,-0.44,Trade Republic,Interest payout,,interest,,,
+4ffca6b199b479d4,2025-05-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+1a85910d5a057c11,2025-05-12,CARD_PAYMENT,EXECUTED,EUR,-12.65,,,Esselunga Milano,Card payment,,card,5411,,
+81e5c9f693f277cc,2025-05-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+279c658a36760ce5,2025-05-15,CARD_PAYMENT,EXECUTED,EUR,-15.54,,,REWE Berlin,Card payment,,card,5411,,
+7b70c3b8a81fdec3,2025-05-28,INTEREST,EXECUTED,EUR,2.51,,-0.65,Trade Republic,Interest payout,,interest,,,
+d8e7012f39681c81,2025-06-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+59a1120e1bb43332,2025-06-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+8e676a01d86a6460,2025-06-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+1d691fba5e187b24,2025-06-18,CARD_PAYMENT,EXECUTED,EUR,-31.07,,,Esselunga Milano,Card payment,,card,5411,,
+47503f1dc33a1f6c,2025-06-28,INTEREST,EXECUTED,EUR,2.19,,-0.57,Trade Republic,Interest payout,,interest,,,
+39e58ff092f837d4,2025-07-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+6dda4f8dcea60f4c,2025-07-09,CARD_PAYMENT,EXECUTED,EUR,-50.37,,,REWE Berlin,Card payment,,card,5411,,
+8f9b72aed85c16bd,2025-07-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+c4767556f97be2dd,2025-07-26,CARD_PAYMENT,EXECUTED,EUR,-59.11,,,REWE Berlin,Card payment,,card,5411,,
+9f294a8bd1846c39,2025-07-28,INTEREST,EXECUTED,EUR,2.74,,-0.71,Trade Republic,Interest payout,,interest,,,
+accb461a9d132363,2025-08-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+8e867f3ca487eeab,2025-08-06,CARD_PAYMENT,EXECUTED,EUR,-32.98,,,REWE Berlin,Card payment,,card,5411,,
+9be7173706b89231,2025-08-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+a867a096edd877c8,2025-08-28,INTEREST,EXECUTED,EUR,1.75,,-0.46,Trade Republic,Interest payout,,interest,,,
+b18753e6d4578ad9,2025-09-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+076979d644777442,2025-09-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+45f50c522e2fbf77,2025-09-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+c32d4526b3e4110a,2025-09-22,CARD_PAYMENT,EXECUTED,EUR,-14.12,,,Amazon EU,Card payment,,card,5942,,
+ebe9e2074f199ec0,2025-09-28,INTEREST,EXECUTED,EUR,3.31,,-0.86,Trade Republic,Interest payout,,interest,,,
+59dcabd056febfb9,2025-10-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+2e70983801902620,2025-10-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+24ac2130deaf528d,2025-10-16,CARD_PAYMENT,EXECUTED,EUR,-26.74,,,REWE Berlin,Card payment,,card,5411,,
+a847bce790fa6b57,2025-10-28,INTEREST,EXECUTED,EUR,2.08,,-0.54,Trade Republic,Interest payout,,interest,,,
+11d059b26699cd99,2025-11-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+bdb025ff2451e5a4,2025-11-13,CARD_PAYMENT,EXECUTED,EUR,-27.77,,,REWE Berlin,Card payment,,card,5411,,
+f8c88faea2178f84,2025-11-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+177d6e7e07d924ce,2025-11-28,INTEREST,EXECUTED,EUR,2.67,,-0.69,Trade Republic,Interest payout,,interest,,,
+87cdb6a1bf012e32,2025-12-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+604e46cb3712f2d1,2025-12-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+742221676b7a2460,2025-12-10,CARD_PAYMENT,EXECUTED,EUR,-51.24,,,REWE Berlin,Card payment,,card,5411,,
+284bf9625744f596,2025-12-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+4fc777685ebbcca5,2025-12-27,CARD_PAYMENT,EXECUTED,EUR,-45.39,,,Amazon EU,Card payment,,card,5942,,
+530ac1c7b8ba8368,2025-12-28,INTEREST,EXECUTED,EUR,2.11,,-0.55,Trade Republic,Interest payout,,interest,,,
+f10013a7c6deb2f0,2026-01-02,CARD_PAYMENT,EXECUTED,EUR,-59.50,,,Amazon EU,Card payment,,card,5942,,
+98a21f1c914dcfae,2026-01-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+e222b6a615bfbe97,2026-01-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+27d415b60d77c5a0,2026-01-16,CARD_PAYMENT,EXECUTED,EUR,-62.16,,,Amazon EU,Card payment,,card,5942,,
+c122b5b3284c03d2,2026-01-28,INTEREST,EXECUTED,EUR,3.35,,-0.87,Trade Republic,Interest payout,,interest,,,
+0cbd3c039e2aa4ac,2026-02-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+14e286e5ac8936bc,2026-02-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+716fda0a45a88829,2026-02-17,CARD_PAYMENT,EXECUTED,EUR,-68.85,,,Amazon EU,Card payment,,card,5942,,
+6c8c3b6aa974d079,2026-02-27,CARD_PAYMENT,EXECUTED,EUR,-69.30,,,Esselunga Milano,Card payment,,card,5411,,
+9b69554d7c54535f,2026-02-28,INTEREST,EXECUTED,EUR,3.24,,-0.84,Trade Republic,Interest payout,,interest,,,
+6a07f2137129cec7,2026-03-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+372f871a45ee432d,2026-03-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+832920b7c143f426,2026-03-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+585d3f861d2324e6,2026-03-23,CARD_PAYMENT,EXECUTED,EUR,-64.07,,,Esselunga Milano,Card payment,,card,5411,,
+1c6345ab6e0ed1e8,2026-03-27,CARD_PAYMENT,EXECUTED,EUR,-10.56,,,Amazon EU,Card payment,,card,5942,,
+ad9fb00d4882d73c,2026-03-28,INTEREST,EXECUTED,EUR,2.06,,-0.54,Trade Republic,Interest payout,,interest,,,
+97d7a560adb14670,2026-04-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+86e527537c93f6cc,2026-04-14,CARD_PAYMENT,EXECUTED,EUR,-53.45,,,Amazon EU,Card payment,,card,5942,,
+4ef492c1aac93316,2026-04-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+3873e57f0ba078e8,2026-04-28,INTEREST,EXECUTED,EUR,1.85,,-0.48,Trade Republic,Interest payout,,interest,,,
+fc04a168652ffb49,2026-05-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+0e0630cd996d5c50,2026-05-09,CARD_PAYMENT,EXECUTED,EUR,-22.96,,,Amazon EU,Card payment,,card,5942,,
+345512f701f7c7ec,2026-05-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+f200c2614d29d1ab,2026-05-28,INTEREST,EXECUTED,EUR,3.09,,-0.80,Trade Republic,Interest payout,,interest,,,
+c47104c036136e15,2026-06-04,DEPOSIT,EXECUTED,EUR,400.00,,,Mario Bianchi,Incoming bank transfer,Mario Bianchi,transfer,,,
+c3a00c6f2321d1e1,2026-06-09,TRADE,EXECUTED,EUR,-500.00,-1.00,,Vanguard FTSE All-World UCITS,Buy order,,funds,,ETF,IE00B3RBWM25
+4a1935014169b9fc,2026-06-10,CARD_PAYMENT,EXECUTED,EUR,-28.75,,,Esselunga Milano,Card payment,,card,5411,,
+1eb74b5653ffd3a2,2026-06-15,TRADE,EXECUTED,EUR,-200.00,,,iShares Core MSCI World USD Acc,Savings plan execution,,funds,,ETF,IE00B4L5Y983
+7f54a51101fa964e,2026-06-23,CARD_PAYMENT,EXECUTED,EUR,-67.22,,,Esselunga Milano,Card payment,,card,5411,,
+6e3f683abf3c5140,2026-06-28,INTEREST,EXECUTED,EUR,2.91,,-0.76,Trade Republic,Interest payout,,interest,,,

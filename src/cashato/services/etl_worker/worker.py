@@ -40,7 +40,7 @@ from cashato.obs import (
     start_metrics_server,
     tracing_enabled,
 )
-from cashato.parsers.detect import detect_source
+from cashato.parsers.detect import detect_source, identify_bank
 
 log = setup_logging("etl-worker")
 setup_tracing("etl-worker")
@@ -68,8 +68,12 @@ def _process(key: str, filename: str | None, source_override: str | None, force:
         objstore.fget(key, dest)
         source = source_override if source_override in load.ADAPTERS else detect_source(dest)
         if not source:
+            # No adapter — but the IBAN usually still says which bank it is, and
+            # recording that beats dropping the file with no trace in /files.
+            bank = identify_bank(dest)
+            load.record_unsupported(Path(dest), filename or key, bank)
             JOBS.labels(status="skipped").inc()
-            log.warning("unrecognized source", extra={"fields": {"key": key}})
+            log.warning("unrecognized source", extra={"fields": {"key": key, "bank": bank}})
             return 0
         with PROC.time():
             # force: an ordinary upload stops at the sha256 check (cheap dedup of

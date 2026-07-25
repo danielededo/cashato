@@ -134,25 +134,25 @@ class TestAccountHolder:
         # blocco a sinistra, CAP su riga propria, colonna destra con altri dati
         words = _words(
             (104.4, 446.2, "Generated on the Jul 18, 2026"),
-            (144.0, 39.7, "DANIELE ROSSI"),
+            (144.0, 39.7, "MARIO ROSSI"),
             (170.0, 39.7, "Via Roma 1"),
             (170.0, 383.0, "Tax residency: Italy"),
             (182.4, 39.7, "20127"),
             (194.8, 39.7, "Milano"),
         )
-        assert addressee_from_words(words) == "DANIELE ROSSI"
+        assert addressee_from_words(words) == "MARIO ROSSI"
 
     def test_trade_republic_ignores_facing_column_on_the_name_line(self):
         # la riga del nome contiene ANCHE il periodo dell'estratto, a destra:
         # senza il ritaglio per colonna finirebbe dentro al nome
         words = _words(
             (104.7, 73.7, "TRADE REPUBLIC BANK GMBH, BRANCH ITALY 20154 MILANO (MI)"),
-            (139.9, 75.2, "DANIELE ROSSI"),
+            (139.9, 75.2, "MARIO ROSSI"),
             (139.9, 388.7, "DATA 01 gen 2025 - 17 lug 2026"),
             (148.2, 75.2, "Via Roma 1"),
             (157.2, 75.2, "00100 Roma"),
         )
-        assert addressee_from_words(words) == "DANIELE ROSSI"
+        assert addressee_from_words(words) == "MARIO ROSSI"
 
     def test_intesa_right_column_ignores_left_column(self):
         # "Tipologia conto:" è a sinistra e quasi alla stessa altezza del nome
@@ -160,9 +160,9 @@ class TestAccountHolder:
             (151.1, 8.0, "Coordinate bancarie: 0140371"),
             (183.1, 283.0, "ROSSI MARIO"),
             (185.0, 8.0, "Tipologia conto:"),
-            (193.2, 283.0, "VIA ACQUACORRENTE 3"),
+            (193.2, 283.0, "VIA GARIBALDI 5"),
             (197.8, 8.0, "XME Conto"),
-            (203.3, 283.0, "00100 ROMA PE"),
+            (203.3, 283.0, "00100 ROMA RM"),
         )
         assert addressee_from_words(words) == "ROSSI MARIO"
 
@@ -180,13 +180,13 @@ class TestAccountHolder:
         assert addressee_from_words(words) is None
 
     def test_given_name_follows_the_source_convention(self):
-        assert given_name("DANIELE ROSSI", GIVEN_FIRST) == "Daniele"
-        assert given_name("ROSSI MARIO", FAMILY_FIRST) == "Daniele"
+        assert given_name("MARIO ROSSI", GIVEN_FIRST) == "Mario"
+        assert given_name("ROSSI MARIO", FAMILY_FIRST) == "Mario"
 
     def test_iban_found_next_to_its_label(self):
         # il caso che rompe l'approccio "compatta tutto": senza spazi "IBAN" e
         # "IT47" si attaccano e il confine di parola sparisce
-        assert find_iban("IBAN IT47 K030 6915 4601 0000 0014 132") == "IT60X0306912345100000067890"
+        assert find_iban("IBAN IT60 X030 6912 3451 0000 0067 890") == "IT60X0306912345100000067890"
         assert find_iban("IBAN IT30D0367412345100000011111") == "IT30D0367412345100000011111"
         assert find_iban("Account Number (IT IBAN),IT12A0366912345100000022222") == (
             "IT12A0366912345100000022222"
@@ -199,7 +199,7 @@ class TestAccountHolder:
 
     def test_abi_is_the_bank_code_inside_the_iban(self):
         assert abi_from_iban("IT60X0306912345100000067890") == "03069"
-        assert abi_from_iban("IT71 N036 6901 6007 0617 9872 079") == "03669"
+        assert abi_from_iban("IT12 A036 6912 3451 0000 0022 222") == "03669"
         assert abi_from_iban(None) is None
         assert abi_from_iban("not an iban") is None
 
