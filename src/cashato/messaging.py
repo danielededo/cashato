@@ -92,21 +92,41 @@ async def ensure_consumer(js, subject: str, durable: str, *, log):
 
     sub = await js.pull_subscribe(subject, durable=durable)
 
-    with contextlib.suppress(Exception):
+    # Deliberately NOT wrapped in suppress: this IS the check that the config
+    # took, and swallowing its failure would put us back to assuming.
+    try:
         live = (await js.consumer_info(STREAM, durable)).config
-        if live.ack_wait != ACK_WAIT_SECONDS or live.max_deliver != MAX_DELIVER:
-            log.warning(
-                "consumer config not applied; client-side retry budget still holds",
-                extra={
-                    "fields": {
-                        "durable": durable,
-                        "server_ack_wait": live.ack_wait,
-                        "server_max_deliver": live.max_deliver,
-                        "wanted_ack_wait": ACK_WAIT_SECONDS,
-                        "wanted_max_deliver": MAX_DELIVER,
-                    }
-                },
-            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "could not read back consumer config",
+            extra={"fields": {"durable": durable, "error": str(exc)}},
+        )
+        return sub
+
+    if live.ack_wait != ACK_WAIT_SECONDS or live.max_deliver != MAX_DELIVER:
+        log.warning(
+            "consumer config not applied; client-side retry budget still holds",
+            extra={
+                "fields": {
+                    "durable": durable,
+                    "server_ack_wait": live.ack_wait,
+                    "server_max_deliver": live.max_deliver,
+                    "wanted_ack_wait": ACK_WAIT_SECONDS,
+                    "wanted_max_deliver": MAX_DELIVER,
+                }
+            },
+        )
+    else:
+        log.info(
+            "consumer ready",
+            extra={
+                "fields": {
+                    "durable": durable,
+                    "ack_wait": live.ack_wait,
+                    "max_deliver": live.max_deliver,
+                }
+            },
+        )
     return sub
 
 
