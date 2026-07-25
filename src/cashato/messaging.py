@@ -17,7 +17,7 @@ import json
 import os
 
 import nats
-from nats.js.api import ConsumerConfig, RetentionPolicy, StreamConfig
+from nats.js.api import AckPolicy, ConsumerConfig, RetentionPolicy, StreamConfig
 
 from cashato.obs import extract_trace_context
 
@@ -54,19 +54,60 @@ MAX_DELIVER = int(os.environ.get("NATS_MAX_DELIVER", 5))
 NAK_DELAY_SECONDS = float(os.environ.get("NATS_NAK_DELAY_SECONDS", 30))
 
 
-def consumer_config(durable: str) -> ConsumerConfig:
+def consumer_config(durable: str, subject: str) -> ConsumerConfig:
     """Pull-consumer config with a redelivery budget.
 
     ``ack_wait`` must exceed the slowest realistic job (parsing a large PDF), or
-    JetStream redelivers while the first attempt is still running. ``max_deliver``
-    bounds a poison message: without it a job that always fails is redelivered
-    until ``max_age`` reaps it, crash-looping the worker in between.
+    JetStream redelivers while the first attempt is still running and the same
+    file is processed twice. ``max_deliver`` bounds a poison message server-side.
     """
     return ConsumerConfig(
         durable_name=durable,
+        filter_subject=subject,
+        ack_policy=AckPolicy.EXPLICIT,
         ack_wait=ACK_WAIT_SECONDS,
         max_deliver=MAX_DELIVER,
     )
+
+
+async def ensure_consumer(js, subject: str, durable: str, *, log):
+    """Bind a pull subscription with the delivery budget ACTUALLY applied.
+
+    ``pull_subscribe(config=...)`` silently ignores the config when the durable
+    already exists — it just binds to whatever is on the server. That is how a
+    deployed worker ended up running with the defaults (``ack_wait`` 30s,
+    ``max_deliver`` unlimited) while the code asked for 300s and 5, with nothing
+    reporting the mismatch. So reconcile explicitly with ``add_consumer`` (which
+    is create-or-update), then READ BACK what the server accepted and warn if it
+    still differs, rather than assuming it took.
+    """
+    cfg = consumer_config(durable, subject)
+    try:
+        await js.add_consumer(STREAM, config=cfg)
+    except Exception as exc:  # noqa: BLE001 - reconcile is best-effort, binding is not
+        log.warning(
+            "could not reconcile consumer config",
+            extra={"fields": {"durable": durable, "error": str(exc)}},
+        )
+
+    sub = await js.pull_subscribe(subject, durable=durable)
+
+    with contextlib.suppress(Exception):
+        live = (await js.consumer_info(STREAM, durable)).config
+        if live.ack_wait != ACK_WAIT_SECONDS or live.max_deliver != MAX_DELIVER:
+            log.warning(
+                "consumer config not applied; client-side retry budget still holds",
+                extra={
+                    "fields": {
+                        "durable": durable,
+                        "server_ack_wait": live.ack_wait,
+                        "server_max_deliver": live.max_deliver,
+                        "wanted_ack_wait": ACK_WAIT_SECONDS,
+                        "wanted_max_deliver": MAX_DELIVER,
+                    }
+                },
+            )
+    return sub
 
 
 async def consume_one(sub, handler, *, log, tracer, span_name: str) -> bool:

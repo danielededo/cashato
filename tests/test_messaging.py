@@ -141,8 +141,9 @@ class TestFetchErrors:
 
 @pytest.mark.parametrize("durable", ["etl-worker", "categorizer"])
 def test_consumer_config_bounds_redelivery(durable):
-    cfg = messaging.consumer_config(durable)
+    cfg = messaging.consumer_config(durable, "test.subject")
     assert cfg.durable_name == durable
+    assert cfg.filter_subject == "test.subject"
     assert cfg.max_deliver == messaging.MAX_DELIVER
     # ack_wait deve superare il job più lento (un PDF grosso), altrimenti
     # JetStream riconsegna mentre il primo tentativo sta ancora girando

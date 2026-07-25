@@ -23,7 +23,7 @@ from cashato.messaging import (
     SUBJECT_RECATEGORIZE,
     connect_jetstream,
     consume_one,
-    consumer_config,
+    ensure_consumer,
 )
 from cashato.model_client import KServeModel
 from cashato.obs import (
@@ -108,9 +108,7 @@ async def _handle_counted(data: dict) -> None:
 async def main() -> None:
     port = start_metrics_server()
     nc, js = await connect_jetstream()
-    sub = await js.pull_subscribe(
-        SUBJECT_RECATEGORIZE, durable="categorizer", config=consumer_config("categorizer")
-    )
+    sub = await ensure_consumer(js, SUBJECT_RECATEGORIZE, "categorizer", log=log)
     log.info(
         "categorizer listening",
         extra={"fields": {"subject": SUBJECT_RECATEGORIZE, "metrics_port": port}},

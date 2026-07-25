@@ -30,7 +30,7 @@ from cashato.messaging import (
     SUBJECT_RECATEGORIZE,
     connect_jetstream,
     consume_one,
-    consumer_config,
+    ensure_consumer,
 )
 from cashato.obs import (
     inject_trace_headers,
@@ -156,12 +156,8 @@ async def _handle_feedback(data: dict) -> None:
 async def main() -> None:
     port = start_metrics_server()
     nc, js = await connect_jetstream()
-    ingest_sub = await js.pull_subscribe(
-        SUBJECT_INGEST, durable="etl-worker", config=consumer_config("etl-worker")
-    )
-    feedback_sub = await js.pull_subscribe(
-        SUBJECT_FEEDBACK, durable="etl-feedback", config=consumer_config("etl-feedback")
-    )
+    ingest_sub = await ensure_consumer(js, SUBJECT_INGEST, "etl-worker", log=log)
+    feedback_sub = await ensure_consumer(js, SUBJECT_FEEDBACK, "etl-feedback", log=log)
     log.info(
         "etl-worker listening",
         extra={"fields": {"subjects": [SUBJECT_INGEST, SUBJECT_FEEDBACK], "metrics_port": port}},
