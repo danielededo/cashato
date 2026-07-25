@@ -396,19 +396,21 @@ def investments(lang: str = _LANG):
                 "has_instruments": False,
             },
         )
-        k["net_invested"] += m["net_invested"] or 0
-        k["contributed"] += m["contributed"] or 0
-        k["returned"] += m["returned"] or 0
+        # psycopg hands back Decimal for NUMERIC. Pydantic coerces on the way
+        # out, but this roll-up happens first, and Decimal + float raises.
+        k["net_invested"] += float(m["net_invested"] or 0)
+        k["contributed"] += float(m["contributed"] or 0)
+        k["returned"] += float(m["returned"] or 0)
         k["n_movements"] += m["n_movements"]
         k["has_instruments"] = k["has_instruments"] or bool(m["into_known"])
 
-    known = sum(m["into_known"] or 0 for m in months)
-    unknown = sum(m["into_unknown"] or 0 for m in months)
+    known = sum(float(m["into_known"] or 0) for m in months)
+    unknown = sum(float(m["into_unknown"] or 0) for m in months)
     return {
         "holdings": holdings,
         "months": months,
         "kinds": sorted(kinds.values(), key=lambda k: -k["net_invested"]),
-        "total_invested": sum(m["net_invested"] or 0 for m in months),
+        "total_invested": sum(float(m["net_invested"] or 0) for m in months),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,
     }
