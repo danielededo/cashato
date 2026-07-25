@@ -10,4 +10,12 @@ COPY pyproject.toml README.md alembic.ini ./
 COPY src ./src
 RUN pip install --no-cache-dir '.[migrate]'
 
-ENV PYTHONUNBUFFERED=1
+# Do not write .pyc at runtime: the root filesystem is mounted read-only in the
+# cluster, and pip already byte-compiled everything at build time.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Non-root: the migrator only reads the repo and talks to Postgres, so it has no
+# reason to be root. Numeric UID so runAsNonRoot can verify it without resolving
+# a name against /etc/passwd.
+USER 1000

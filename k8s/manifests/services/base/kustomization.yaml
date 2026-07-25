@@ -30,8 +30,13 @@ configMapGenerator:
 generatorOptions:
   disableNameSuffixHash: true
 
-# One JSON patch mounts the ConfigMap into all four services (container 0) and
-# points CASHATO_CONFIG_DIR at the mount.
+# One JSON patch applies the cross-cutting concerns to all four services
+# (container 0): the config ConfigMap, a writable /tmp, and the hardened
+# securityContext.
+#
+# NOTE these `op: add` values REPLACE the whole array — anything written into a
+# Deployment's own `volumes`/`volumeMounts` is silently discarded here. Which is
+# why /tmp belongs in this patch and not in the four files.
 patches:
   - target:
       kind: Deployment
@@ -42,12 +47,34 @@ patches:
           - name: config
             configMap:
               name: cashato-config
+          # The only writable path the services need, and the reason a
+          # read-only root filesystem is viable: uploads stream through a temp
+          # file and stored statements are fetched to a temp copy before parsing.
+          - name: tmp
+            emptyDir: {}
       - op: add
         path: /spec/template/spec/containers/0/volumeMounts
         value:
           - name: config
             mountPath: /etc/cashato/config
             readOnly: true
+          - name: tmp
+            mountPath: /tmp
+      # Same posture the frontend Deployment already runs with. It matters most
+      # for the etl-worker, which parses UNTRUSTED uploaded PDFs through
+      # pdfplumber/pdfminer — a historically CVE-bearing surface that has no
+      # business running as root on a writable filesystem.
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:

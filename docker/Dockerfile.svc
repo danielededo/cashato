@@ -15,4 +15,14 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir '.[svc]'
 
-ENV PYTHONUNBUFFERED=1
+# Do not write .pyc at runtime: the root filesystem is mounted read-only in the
+# cluster, and pip already byte-compiled everything at build time.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Run as a non-root UID. The etl-worker parses UNTRUSTED uploaded PDFs through
+# pdfplumber/pdfminer — a historically CVE-bearing surface — so it should not be
+# root with a writable filesystem. Numeric so runAsNonRoot can verify it without
+# resolving a name. Nothing is written outside /tmp, which the Deployment mounts
+# as an emptyDir.
+USER 1000
