@@ -14,12 +14,17 @@ import { useLang } from "./lang";
 import { useAsync } from "./useAsync";
 
 // Reference data: changes only on deploy or a config edit, and several pages
-// want it. One in-flight request, shared.
-let cached: Promise<MetaResponse | null> | null = null;
+// want it. One in-flight request, shared — but a REJECTION is never cached, or
+// a single transient error at startup would leave every selector empty for the
+// rest of the session with no way back but a reload.
+let cached: Promise<MetaResponse> | null = null;
 
 function load(): Promise<MetaResponse | null> {
-  cached ??= api.meta().catch(() => null);
-  return cached;
+  cached ??= api.meta().catch((err) => {
+    cached = null;
+    throw err;
+  });
+  return cached.catch(() => null);
 }
 
 export interface Meta {

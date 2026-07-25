@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { dateLabel } from "../lib/format";
-import { useAccounts } from "../lib/accounts";
+import { invalidateAccounts, useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
 import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
@@ -30,7 +30,11 @@ export function Upload() {
     try {
       const r = await api.upload(file, source || undefined);
       setMsg({ ok: true, text: `Queued ${r.filename}${r.source ? ` as ${sourceLabel(r.source)}` : ""}. Parsing…` });
-      setTimeout(reload, 800);
+      // An ingested statement can describe an account we did not know about.
+      setTimeout(() => {
+        invalidateAccounts();
+        reload();
+      }, 800);
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
     } finally {

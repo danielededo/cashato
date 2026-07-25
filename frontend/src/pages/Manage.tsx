@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
+import { invalidateAccounts } from "../lib/accounts";
 import { useAsync } from "../lib/useAsync";
 
 type Busy = null | "reprocess" | "reset";
@@ -17,6 +18,8 @@ export function Manage() {
     setMsg(null);
     try {
       const r = await fn();
+      // reset/reprocess change which accounts exist and what they are called
+      invalidateAccounts();
       setMsg({ ok: true, text: r.detail ?? r.status });
     } catch (e) {
       const notDeployed = e instanceof ApiError && (e.status === 404 || e.status === 405);
@@ -118,6 +121,9 @@ function AccountsPanel() {
     try {
       await api.renameAccount(id, name);
       setDraft((d) => ({ ...d, [id]: "" }));
+      // Every other page reads names from the shared cache; without this they
+      // keep showing the old one while this panel shows the new.
+      invalidateAccounts();
       accounts.reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));

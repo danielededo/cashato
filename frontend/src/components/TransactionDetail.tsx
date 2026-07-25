@@ -8,7 +8,7 @@
 
 import { useEffect } from "react";
 import { api } from "../api/client";
-import { dateLabel, money } from "../lib/format";
+import { dateLabel, money, num } from "../lib/format";
 import { useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
 import { useAsync } from "../lib/useAsync";
@@ -113,7 +113,7 @@ export function TransactionDetail({
                 <h3>{t("det.transfer")}</h3>
                 <p className="det-note">
                   {t("det.transferNote")} <strong>{accountLabel(d.transfer_counterpart.account)}</strong>{" "}
-                  ({money(d.transfer_counterpart.amount)}, {dateLabel(d.transfer_counterpart.value_date)})
+                  ({money(num(d.transfer_counterpart.amount))}, {dateLabel(d.transfer_counterpart.value_date)})
                 </p>
               </div>
             ) : null}

@@ -156,33 +156,43 @@ export interface TransactionFilters {
   offset?: number;
 }
 
+/** Exact decimal as it arrives on the wire.
+ *
+ *  Money is `Decimal` server-side (the project's founding rule) and Pydantic
+ *  serializes that to a JSON STRING, not a number — a JSON number is an IEEE754
+ *  double, exactly what the rule exists to avoid. Typed as `string` so every use
+ *  is forced through `num()` and the conversion to a JS number is deliberate:
+ *  these were typed `number` while the API sent strings, which type-checked
+ *  perfectly and produced NaN across the whole Wealth page at runtime. */
+export type Money = string;
+
 /** A position, aggregated from the trades a source disclosed. */
 export interface Holding {
   isin: string | null;
   instrument: string | null;
   asset_class: string | null;
-  units: number;
+  units: Money;
   /** Cash cost basis: what actually left the account (fees included). */
-  invested: number;
+  invested: Money;
   n_trades: number;
   first_trade: string | null;
   last_trade: string | null;
   /** Last price seen ON A STATEMENT, not a market quote — it ages. */
-  last_price: number | null;
-  value_at_last_price: number | null;
+  last_price: Money | null;
+  value_at_last_price: Money | null;
 }
 
 export interface InvestmentMonth {
   month: string;
   /** Wealth destination kind: investments, crypto, pension_fund, deposits, … */
   category: string;
-  contributed: number | null;
-  returned: number | null;
-  net_invested: number | null;
+  contributed: Money | null;
+  returned: Money | null;
+  net_invested: Money | null;
   /** Contributions whose instrument the source disclosed. */
-  into_known: number | null;
+  into_known: Money | null;
   /** Contributions with no instrument detail (e.g. transfer to an outside broker). */
-  into_unknown: number | null;
+  into_unknown: Money | null;
   n_movements: number;
 }
 
@@ -190,9 +200,9 @@ export interface InvestmentMonth {
 export interface WealthKind {
   category: string;
   category_label: string;
-  net_invested: number;
-  contributed: number;
-  returned: number;
+  net_invested: Money;
+  contributed: Money;
+  returned: Money;
   n_movements: number;
   /** Instruments are only knowable where the source discloses them. */
   has_instruments: boolean;
@@ -203,19 +213,19 @@ export interface InvestmentsResponse {
   months: InvestmentMonth[];
   kinds: WealthKind[];
   /** Gross money in; known + unknown add up to exactly this. */
-  total_contributed: number;
-  total_returned: number;
+  total_contributed: Money;
+  total_returned: Money;
   /** Net of returns. Deliberately distinct from total_contributed. */
-  total_invested: number;
-  total_in_known_instruments: number;
-  total_in_unknown: number;
+  total_invested: Money;
+  total_in_known_instruments: Money;
+  total_in_unknown: Money;
 }
 
 export interface TransferLeg {
   natural_key: string;
   value_date: string;
   account: string;
-  amount: number;
+  amount: Money;
   description: string;
 }
 

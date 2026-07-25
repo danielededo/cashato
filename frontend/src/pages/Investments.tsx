@@ -27,7 +27,7 @@ import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Donut, RankBars, Sparkline, type DonutSlice, type RankItem } from "../components/primitives";
 import { colorFor, seriesColor } from "../lib/colors";
-import { dateLabel, money, monthShort } from "../lib/format";
+import { dateLabel, money, monthShort, num } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
@@ -61,8 +61,8 @@ export function Investments() {
     const byMonth = new Map<string, Row>();
     for (const m of data.months) {
       const row = byMonth.get(m.month) ?? { month: monthShort(m.month) };
-      row[KNOWN] = ((row[KNOWN] as number) ?? 0) + (m.into_known ?? 0);
-      row[UNKNOWN] = ((row[UNKNOWN] as number) ?? 0) + (m.into_unknown ?? 0);
+      row[KNOWN] = ((row[KNOWN] as number) ?? 0) + num(m.into_known);
+      row[UNKNOWN] = ((row[UNKNOWN] as number) ?? 0) + num(m.into_unknown);
       byMonth.set(m.month, row);
     }
     const monthly: Row[] = [...byMonth.entries()]
@@ -93,16 +93,15 @@ export function Investments() {
 
     const split: RankItem[] = data.holdings.map((h, i) => {
       const id = h.isin ?? h.instrument ?? String(i);
-      return { category: id, label: h.instrument ?? h.isin ?? "—", value: h.invested, color: colorOf(id) };
+      return { category: id, label: h.instrument ?? h.isin ?? "—", value: num(h.invested), color: colorOf(id) };
     });
     const donut: DonutSlice[] = data.holdings.map((h, i) => {
       const id = h.isin ?? h.instrument ?? String(i);
-      return { key: id, label: h.instrument ?? h.isin ?? "—", value: h.invested, color: colorOf(id) };
+      return { key: id, label: h.instrument ?? h.isin ?? "—", value: num(h.invested), color: colorOf(id) };
     });
 
-    const unknownPct = data.total_contributed
-      ? (data.total_in_unknown / data.total_contributed) * 100
-      : 0;
+    const contributed = num(data.total_contributed);
+    const unknownPct = contributed ? (num(data.total_in_unknown) / contributed) * 100 : 0;
     return { ...data, series, stackData, spark, split, donut, unknownPct };
   }, [inv.data, t, cumulative]);
 
@@ -125,9 +124,9 @@ export function Investments() {
                   is the footnote: three figures where two do not sum to the
                   first is an invitation to misread them. */}
               <div className="k">{t("inv.invested")}</div>
-              <div className="v">{money(d.total_contributed)}</div>
+              <div className="v">{money(num(d.total_contributed))}</div>
               <div className="foot">
-                <span className="dim">{t("inv.net", { v: money(d.total_invested) })}</span>
+                <span className="dim">{t("inv.net", { v: money(num(d.total_invested)) })}</span>
                 <span className="spark" style={{ color: "var(--series-1)" }}>
                   <Sparkline values={d.spark} />
                 </span>
@@ -135,7 +134,7 @@ export function Investments() {
             </div>
             <div className="kpi">
               <div className="k">{t("inv.known")}</div>
-              <div className="v">{money(d.total_in_known_instruments)}</div>
+              <div className="v">{money(num(d.total_in_known_instruments))}</div>
               <div className="foot">
                 <span className="dim">
                   {d.holdings.length} {t("inv.instruments")}
@@ -144,14 +143,14 @@ export function Investments() {
             </div>
             <div className="kpi">
               <div className="k">{t("inv.unknown")}</div>
-              <div className="v">{money(d.total_in_unknown)}</div>
+              <div className="v">{money(num(d.total_in_unknown))}</div>
               <div className="foot">
                 <span className="dim">{Math.round(d.unknownPct)}% {t("inv.ofTotal")}</span>
               </div>
             </div>
             <div className="kpi">
               <div className="k">{t("inv.returns")}</div>
-              <div className="v">{money(d.total_returned)}</div>
+              <div className="v">{money(num(d.total_returned))}</div>
               <div className="foot">
                 <span className="dim">{t("inv.returns.foot")}</span>
               </div>
@@ -185,8 +184,8 @@ export function Investments() {
                           {k.category_label}
                         </span>
                       </td>
-                      <td className="num mono">{money(k.net_invested)}</td>
-                      <td className="num mono dim">{money(k.returned)}</td>
+                      <td className="num mono">{money(num(k.net_invested))}</td>
+                      <td className="num mono dim">{money(num(k.returned))}</td>
                       <td className="num mono dim">{k.n_movements}</td>
                       <td className="dim">
                         {k.has_instruments ? t("inv.withInstruments") : t("inv.amountOnly")}
@@ -200,7 +199,7 @@ export function Investments() {
 
           {/* Honesty note, not decoration: without it the instrument table reads
               as the whole portfolio when it may be only part of it. */}
-          {d.total_in_unknown > 0 ? (
+          {num(d.total_in_unknown) > 0 ? (
             <div className="panel notice">{t("inv.unknownNote")}</div>
           ) : null}
 
@@ -234,7 +233,7 @@ export function Investments() {
                 <div className="alloc">
                   <Donut
                     slices={d.donut}
-                    total={d.total_in_known_instruments}
+                    total={num(d.total_in_known_instruments)}
                     centerLabel={t("inv.known")}
                   />
                   <RankBars items={d.split} />
@@ -263,13 +262,13 @@ export function Investments() {
                       <tr key={h.isin ?? h.instrument}>
                         <td className="desc" title={h.instrument ?? ""}>{h.instrument ?? "—"}</td>
                         <td className="mono dim">{h.isin ?? "—"}</td>
-                        <td className="num mono">{h.units.toFixed(4)}</td>
-                        <td className="num mono">{money(h.invested)}</td>
+                        <td className="num mono">{num(h.units).toFixed(4)}</td>
+                        <td className="num mono">{money(num(h.invested))}</td>
                         <td className="num mono dim">
-                          {h.units ? money(h.invested / h.units) : "—"}
+                          {num(h.units) ? money(num(h.invested) / num(h.units)) : "—"}
                         </td>
                         <td className="num mono dim" title={h.last_trade ? t("inv.asOf", { d: dateLabel(h.last_trade) }) : ""}>
-                          {h.last_price != null ? money(h.last_price) : "—"}
+                          {h.last_price != null ? money(num(h.last_price)) : "—"}
                         </td>
                         <td className="num mono dim">{h.n_trades}</td>
                       </tr>

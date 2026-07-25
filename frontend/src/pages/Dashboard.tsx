@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Delta, Heatmap, RankBars, Sparkline, type HeatRow, type RankItem } from "../components/primitives";
 import { HeaderPortal } from "../lib/headerSlot";
-import { money } from "../lib/format";
+import { isoDate, money } from "../lib/format";
 import { monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { useLang } from "../lib/lang";
@@ -20,7 +20,9 @@ const TOP_STACK = 6;
 
 function endOfMonth(iso: string): string {
   const d = new Date(iso);
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+  // isoDate, not toISOString: the latter shifts to UTC and would return the
+  // 29th for a June month-end in Europe/Rome, dropping a day from the drill-down.
+  return isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }
 
 export function Dashboard() {

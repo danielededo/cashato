@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
 import { colorFor } from "../lib/colors";
-import { dateLabel, money } from "../lib/format";
+import { dateLabel, isoDate, money } from "../lib/format";
 import { TransactionDetail } from "../components/TransactionDetail";
 import { useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
@@ -95,19 +95,18 @@ export function Transactions() {
 
   function applyDatePreset(key: DatePreset) {
     setDatePreset(key);
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
     const now = new Date();
     if (key === "all") {
       setDateFrom("");
       setDateTo("");
     } else if (key === "ytd") {
-      setDateFrom(iso(new Date(now.getFullYear(), 0, 1)));
-      setDateTo(iso(now));
+      setDateFrom(isoDate(new Date(now.getFullYear(), 0, 1)));
+      setDateTo(isoDate(now));
     } else if (key !== "custom") {
       const f = new Date(now);
       f.setDate(f.getDate() - PRESET_DAYS[key]);
-      setDateFrom(iso(f));
-      setDateTo(iso(now));
+      setDateFrom(isoDate(f));
+      setDateTo(isoDate(now));
     }
   }
 

@@ -5,23 +5,43 @@
 // Everything degrades to the raw id when a document did not disclose enough —
 // showing `trade_republic` is honest, inventing "Trade Republic" is not.
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Account } from "../api/types";
 import { useAsync } from "./useAsync";
 
-// Accounts change only on ingest, and several pages want them. One in-flight
-// request is shared rather than refetched per mount.
+// Accounts change on ingest, reset and rename, and several pages want them, so
+// one in-flight request is shared rather than refetched per mount.
+//
+// Two things the cache must NOT do. It must not outlive a change — a rename or
+// a reset used to leave every page showing the old names while Manage, which
+// refetches independently, disagreed. And it must not memoize a REJECTION: one
+// transient error at startup used to pin an empty list for the whole session,
+// so accounts rendered as raw ids until a full page reload.
 let cached: Promise<Account[]> | null = null;
+// Bumped on invalidate() so mounted components refetch instead of sitting on a
+// stale promise they already resolved.
+let generation = 0;
 
 function load(): Promise<Account[]> {
   cached ??= api.accounts().then(
     (r) => r.accounts,
-    // Decorative: a failure just means we fall back to raw ids everywhere.
-    () => [],
+    (err) => {
+      cached = null; // do not cache the failure: the next caller retries
+      throw err;
+    },
   );
   return cached;
 }
+
+/** Drop the cached accounts. Call after anything that changes them. */
+export function invalidateAccounts(): void {
+  cached = null;
+  generation += 1;
+  for (const fn of listeners) fn();
+}
+
+const listeners = new Set<() => void>();
 
 export interface AccountNaming {
   accounts: Account[];
@@ -35,7 +55,19 @@ export interface AccountNaming {
 }
 
 export function useAccounts(): AccountNaming {
-  const { data } = useAsync(load, []);
+  // Re-subscribe on invalidation so every mounted page picks up new names,
+  // rather than only the one that triggered the change.
+  const [gen, setGen] = useState(generation);
+  useEffect(() => {
+    const fn = () => setGen(generation);
+    listeners.add(fn);
+    return () => {
+      listeners.delete(fn);
+    };
+  }, []);
+
+  // A failed fetch is not fatal here: naming degrades to raw ids.
+  const { data } = useAsync(() => load().catch(() => [] as Account[]), [gen]);
   const accounts = data ?? [];
 
   return useMemo(() => {
