@@ -22,7 +22,7 @@
 // statement, so anything derived from it is labelled as of that date rather
 // than dressed up as today's value.
 
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { RankBars, Sparkline, type RankItem } from "../components/primitives";
@@ -41,6 +41,10 @@ const UNKNOWN = "unknown";
 export function Investments() {
   const { t } = useT();
   const { lang } = useLang();
+  // Cumulative by default: this page is about accumulated wealth, and an area
+  // chart reads as a running total. Monthly stays available because it answers
+  // a different question — the pace of contribution, not the amount built up.
+  const [cumulative, setCumulative] = useState(true);
   const inv = useAsync(() => api.investments(lang), [lang]);
 
   const d = useMemo(() => {
@@ -61,10 +65,21 @@ export function Investments() {
       row[UNKNOWN] = ((row[UNKNOWN] as number) ?? 0) + (m.into_unknown ?? 0);
       byMonth.set(m.month, row);
     }
-    const stackData: Row[] = [...byMonth.entries()]
+    const monthly: Row[] = [...byMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([, row]) => row);
-    const spark = stackData.map((r) => ((r[KNOWN] as number) ?? 0) + ((r[UNKNOWN] as number) ?? 0));
+    // Running totals per series, so the stacked bands keep adding up.
+    let runK = 0;
+    let runU = 0;
+    const stackData: Row[] = cumulative
+      ? monthly.map((r) => {
+          runK += (r[KNOWN] as number) ?? 0;
+          runU += (r[UNKNOWN] as number) ?? 0;
+          return { month: r.month, [KNOWN]: runK, [UNKNOWN]: runU };
+        })
+      : monthly;
+    // Sparkline always shows the monthly pace, whatever the chart is showing.
+    const spark = monthly.map((r) => ((r[KNOWN] as number) ?? 0) + ((r[UNKNOWN] as number) ?? 0));
 
     // Keyed by ISIN so each row is distinct; colours come from the ramp because
     // an ISIN is not a category code.
@@ -79,7 +94,7 @@ export function Investments() {
       ? (data.total_in_unknown / data.total_contributed) * 100
       : 0;
     return { ...data, series, stackData, spark, split, unknownPct };
-  }, [inv.data, t]);
+  }, [inv.data, t, cumulative]);
 
   return (
     <div className="fade-in">
@@ -181,8 +196,18 @@ export function Investments() {
 
           <div className="panel">
             <div className="panel-head">
-              <h2>{t("inv.flow")}</h2>
-              <span className="hint">{t("inv.flow.hint")}</span>
+              <h2>{cumulative ? t("inv.flow.cum") : t("inv.flow")}</h2>
+              <span className="hint">
+                {cumulative ? t("inv.flow.cum.hint") : t("inv.flow.hint")}
+              </span>
+              <button
+                className="toggle"
+                aria-pressed={cumulative}
+                onClick={() => setCumulative((v) => !v)}
+                style={{ marginLeft: "auto" }}
+              >
+                <span className="sw" /> {t("inv.cumulative")}
+              </button>
             </div>
             <Suspense fallback={chartFallback}>
               <StackedArea data={d.stackData} series={d.series} />
