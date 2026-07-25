@@ -47,9 +47,9 @@ async function safeText(res: Response): Promise<string> {
   }
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(path: string, body: unknown, method = "POST"): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -76,6 +76,8 @@ export const api = {
   // admin (destructive / operational) — backend endpoints land with a deploy
   reprocessAll: () => postJson<AdminResult>("/admin/reprocess", {}),
   resetData: (scope: "data" | "all") => postJson<AdminResult>("/admin/reset", { scope }),
+  renameAccount: (id: string, display_name: string | null) =>
+    postJson<AdminResult>(`/admin/accounts/${encodeURIComponent(id)}`, { display_name }, "PATCH"),
 
   async upload(file: File, source?: string): Promise<UploadAccepted> {
     const form = new FormData();

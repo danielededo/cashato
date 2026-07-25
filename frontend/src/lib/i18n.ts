@@ -166,6 +166,16 @@ const UI: Dict = {
   // home greeting (falls back to the impersonal form when no statement named a holder)
   "home.hello": { it: "Ciao, {name}", en: "Hi, {name}" },
   "home.helloAnon": { it: "I tuoi conti", en: "Your accounts" },
+  "home.mixed": { it: "Attenzione: gli estratti caricati risultano intestati a {n} persone diverse.", en: "Heads up: the loaded statements name {n} different people." },
+  "home.mixed.hint": { it: "normale per un conto cointestato, altrimenti controlla di non aver caricato estratti di qualcun altro.", en: "normal for a joint account, otherwise check you have not loaded someone else's statements." },
+  "acc.title": { it: "Conti", en: "Accounts" },
+  "acc.hint": { it: "Nome, banca e intestazione ricavati dagli estratti. Puoi rinominarli.", en: "Name, bank and holding read off the statements. You can rename them." },
+  "acc.rename": { it: "Rinomina", en: "Rename" },
+  "acc.reset": { it: "Ripristina", en: "Reset" },
+  "acc.derived": { it: "nome ricavato", en: "derived name" },
+  "acc.custom": { it: "rinominato", en: "renamed" },
+  "acc.movements": { it: "movimenti", en: "movements" },
+  "acc.noMeta": { it: "nessun estratto descrive questo conto", en: "no statement describes this account" },
   "home.subtitle": { it: "Ecco come sono andate le tue finanze.", en: "Here is how your finances are doing." },
 };
 

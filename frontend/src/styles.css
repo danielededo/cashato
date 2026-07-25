@@ -295,3 +295,11 @@ button:disabled { opacity: 0.45; cursor: default; }
 .pager .count { font-family: var(--f-mono); }
 .filter-summary { display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--text-secondary); padding-top: 10px; flex-wrap: wrap; }
 .filter-summary .n { font-family: var(--f-mono); color: var(--text); }
+
+/* ---- Accounts management + notices ------------------------------------- */
+.panel.notice { border-left: 3px solid var(--series-2); font-size: 12.5px; padding: 11px 13px; }
+.acct-row { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(160px, 1fr) auto auto; gap: 9px; align-items: center; padding: 9px 0; border-top: 1px solid var(--rule); }
+.acct-row:first-of-type { border-top: none; }
+.acct-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.acct-id .dim { font-size: 11px; color: var(--muted); }
+@media (max-width: 760px) { .acct-row { grid-template-columns: 1fr 1fr; } }

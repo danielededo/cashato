@@ -47,7 +47,7 @@ Schemas within a single database (not separate DBs):
   `v_transactions` (projection of silver so the read API stays gold-only). Plus
   ML tables `training_labels`, `category_feedback` (active learning).
 
-Migrations: Alembic (`src/cashato/db/migrations`), currently through **0010**.
+Migrations: Alembic (`src/cashato/db/migrations`), currently through **0013**.
 
 ### Common schema (`silver.transactions`) — English
 
@@ -156,8 +156,11 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   persist + fast-path category) and `category.feedback` (apply correction to
   silver + record in `gold.category_feedback`). Stays light (no torch/model).
 - **query-api** — read-only over gold: `GET /summary`, `/monthly`,
-  `/categories/monthly`, `/transactions` (filterable/paginated), `/transfers`.
-  `?lang=it|en` for category labels.
+  `/categories/monthly`, `/transactions` (filterable/paginated), `/transfers`,
+  `/accounts` (bank/product/joint, composed display name). `?lang=it|en` for
+  category labels. The gateway routes ALL of `/api/v1` here and enumerates only
+  ingest-api's write paths — enumerating both meant a forgotten endpoint fell
+  through to the SPA and answered 200 with HTML instead of 404.
 
 ---
 
@@ -167,15 +170,18 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `src/cashato/parsers/<name>.py` exposing `parse(path) -> list[Transaction]` +
   `DETECTION: list[list[str]]` (content-detection marker groups) + `CURRENCY`,
   and optionally `extract_holder(path)` + `NAME_ORDER` (account holder off the
-  document header; `base.addressee_from_words` does the work). The registry
+  document header; `base.addressee_from_words` does the work) and
+  `extract_accounts(path)` (bank, product, joint/individual, IBAN). The registry
   (`registry.py`) auto-discovers it by scanning the package (module name ==
   source id). No config entry needed — detection is parser-coupled, so it lives
   with the parser. See CONTRIBUTING.
 - **Parametrized** (runtime `config/*.yaml`, mounted as the `cashato-config`
   ConfigMap — NOT baked into images, loaded via `CASHATO_CONFIG_DIR`):
   `config/settings.yaml` (thresholds, embed model, transfer window, upload caps),
-  `config/categorie.yaml`, `config/mcc.yaml`. Editing one deploys via Argo with no
-  image rebuild. Infra endpoints/secrets stay env/Secret. (There is no
+  `config/categorie.yaml`, `config/mcc.yaml`, `config/banks.yaml` (ABI -> bank
+  name; most statements never name their own bank but all carry an IBAN).
+  Editing one deploys via Argo with no image rebuild. Infra endpoints/secrets
+  stay env/Secret. (There is no
   `sources.yaml` — the source registry is code, see "Add a source".)
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
@@ -201,4 +207,16 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   Tempo/**Mimir**, backends on MinIO S3; collector **Grafana Alloy**) — NOT
   kube-prometheus-stack: metrics + logs + OTel cross-service traces (context
   propagated through NATS). metrics-server added (HPA/`kubectl top`).
+- Account **ids** are immutable: they are hashed into `natural_key`. Everything a
+  statement says about an account (bank, product, joint) is display metadata in
+  `silver.accounts`, projected as `gold.v_accounts`, with a user override on top.
+- DB Jobs (`db-migrate`, `db-grants`) are tracked resources with
+  `Replace=true`, NOT Argo Sync hooks: a Job's pod template is immutable so plain
+  apply can never update it, but hooks are excluded from Argo's diff, so as hooks
+  a new image produced no drift and the migration silently never ran.
+- **No personal data in repo files** — examples use `MARIO ROSSI` and fake IBANs;
+  the real name belongs only in LICENSE/pyproject authors. Git history still
+  contains earlier leaks: before any public GitHub mirror, start the public repo
+  from a **single squashed initial commit** rather than rewriting history (the
+  SHAs are image tags referenced by `cashato-deploy`).
 - Multi-user/household is future work (RLS + OIDC), not yet built.

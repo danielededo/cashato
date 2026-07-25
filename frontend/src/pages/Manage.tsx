@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
+import { useAsync } from "../lib/useAsync";
 
 type Busy = null | "reprocess" | "reset";
 
@@ -27,6 +28,8 @@ export function Manage() {
 
   return (
     <div className="fade-in">
+      <AccountsPanel />
+
       {/* reprocess */}
       <div className="panel">
         <div className="panel-head"><h2>{t("mng.reprocess")}</h2><span className="hint">{t("mng.reprocess.hint")}</span></div>
@@ -91,6 +94,84 @@ python -m cashato.ml.label --limit 2000</code></pre>
       </div>
 
       {msg ? <div className={`panel state ${msg.ok ? "" : "error"}`}>{msg.text}</div> : null}
+    </div>
+  );
+}
+
+/** Accounts as the statements describe them, with a rename override.
+ *
+ *  Only the override is editable: bank, product and holding modality are
+ *  evidence read off the documents, and clearing the name restores the derived
+ *  one rather than losing it. Accounts seen only in transactions have no
+ *  metadata row, so there is nothing to attach an override to — the API 404s
+ *  and we say so instead of pretending the field is editable. */
+function AccountsPanel() {
+  const { t } = useT();
+  const accounts = useAsync(() => api.accounts(), []);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save(id: string, name: string | null) {
+    setSaving(id);
+    setErr(null);
+    try {
+      await api.renameAccount(id, name);
+      setDraft((d) => ({ ...d, [id]: "" }));
+      accounts.reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const rows = accounts.data?.accounts ?? [];
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>{t("acc.title")}</h2>
+        <span className="hint">{t("acc.hint")}</span>
+      </div>
+      {accounts.loading && !accounts.data ? <div className="state">{t("common.loading")}</div> : null}
+      {err ? <div className="state error">{err}</div> : null}
+      {rows.map((a) => {
+        const value = draft[a.account_id] ?? a.display_name_override ?? "";
+        const described = a.bank_name !== null || a.product !== null;
+        return (
+          <div key={a.account_id} className="acct-row">
+            <div className="acct-id">
+              <span className="mono">{a.account_id}</span>
+              <span className="dim">
+                {a.transactions} {t("acc.movements")}
+                {a.is_joint ? " · Joint" : ""}
+                {described ? "" : ` · ${t("acc.noMeta")}`}
+              </span>
+            </div>
+            <input
+              className="input"
+              value={value}
+              placeholder={a.display_name}
+              disabled={!described || saving === a.account_id}
+              onChange={(e) => setDraft((d) => ({ ...d, [a.account_id]: e.target.value }))}
+            />
+            <button
+              className="btn"
+              disabled={!described || saving === a.account_id || !value.trim()}
+              onClick={() => void save(a.account_id, value)}
+            >
+              {t("acc.rename")}
+            </button>
+            <button
+              className="btn"
+              disabled={!described || saving === a.account_id || !a.display_name_override}
+              onClick={() => void save(a.account_id, null)}
+            >
+              {t("acc.reset")}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

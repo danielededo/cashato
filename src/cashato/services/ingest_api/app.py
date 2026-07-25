@@ -158,6 +158,15 @@ class Profile(BaseModel):
     )
 
 
+class RenameAccountRequest(BaseModel):
+    display_name: str | None = Field(
+        default=None,
+        description="Name to show for this account. Null or empty clears the override "
+        "and restores the name composed from the statements.",
+        examples=["Revolut"],
+    )
+
+
 class ResetRequest(BaseModel):
     scope: Literal["data", "all"] = Field(
         default="data",
@@ -347,6 +356,48 @@ async def profile():
         # loading someone else's statements by mistake does not pass unnoticed.
         mixed_holders=len(people) > 1,
         variants=sorted({format_holder(r["account_holder"]) for r in rows}),
+    )
+
+
+@api.patch(
+    "/admin/accounts/{account_id}",
+    response_model=AdminResult,
+    tags=["admin"],
+    summary="Rename an account",
+)
+async def rename_account(account_id: str, req: RenameAccountRequest):
+    """Set (or clear) the name shown for an account.
+
+    A write, so it lives here rather than in the read-only query-api — and under
+    ``/admin`` rather than ``/accounts`` because the gateway splits the two
+    services by path: ``GET /api/v1/accounts`` belongs to query-api, so putting
+    the PATCH there would need method-based routing to disambiguate.
+
+    Only the override is touched: what the statements disclosed stays as
+    evidence, and clearing the override restores the composed name rather than
+    losing it. The account id itself is never editable — it is hashed into
+    ``natural_key``.
+    """
+    name = (req.display_name or "").strip() or None
+    engine = get_engine()
+    with engine.begin() as conn:
+        updated = conn.execute(
+            text(
+                "UPDATE silver.accounts SET display_name_override = :n, updated_at = now() "
+                "WHERE account_id = :id"
+            ),
+            {"n": name, "id": account_id},
+        ).rowcount
+    if not updated:
+        # Accounts seen only in transactions have no row to carry an override.
+        raise HTTPException(
+            status_code=404,
+            detail=f"no account metadata for {account_id!r}; nothing to rename",
+        )
+    _log.info("account renamed", extra={"fields": {"account_id": account_id, "name": name}})
+    return AdminResult(
+        status="ok",
+        detail=f"{account_id} renamed to {name!r}" if name else f"{account_id} name reset",
     )
 
 

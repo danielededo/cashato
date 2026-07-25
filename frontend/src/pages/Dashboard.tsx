@@ -157,6 +157,15 @@ export function Dashboard() {
         <p>{t("home.subtitle")}</p>
       </header>
 
+      {/* Not an error: a joint account legitimately names two people. Surfaced
+          so loading someone else's statements by mistake does not go unnoticed. */}
+      {profile.data?.mixed_holders ? (
+        <div className="panel notice">
+          <strong>{t("home.mixed", { n: profile.data.people.length })}</strong>{" "}
+          {profile.data.people.join(" · ")} — {t("home.mixed.hint")}
+        </div>
+      ) : null}
+
       {error ? <div className="panel state error">{error}</div> : null}
       {loading && !d ? <div className="panel state">{t("dash.reconciling")}</div> : null}
 

@@ -106,6 +106,7 @@ export interface Account {
   is_joint: boolean | null;
   currency: string | null;
   iban: string | null;
+  display_name_override: string | null;
   display_name: string;
   transactions: number;
   first_movement: string | null;
@@ -121,6 +122,10 @@ export interface Profile {
   display_name: string | null;
   given_name: string | null;
   source: string | null;
+  /** Distinct PEOPLE, compared by name tokens so word order does not split one. */
+  people: string[];
+  /** More than one person across the files. Legitimate for a joint account. */
+  mixed_holders: boolean;
   variants: string[];
 }
 export interface FeedbackAccepted {
