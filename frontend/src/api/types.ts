@@ -136,7 +136,6 @@ export interface FeedbackAccepted {
 
 export type Lang = "it" | "en";
 export type Sign = "income" | "expense";
-export const SOURCES = ["intesa", "revolut", "trade_republic"] as const;
 
 export interface TransactionFilters {
   lang?: Lang;
@@ -247,4 +246,14 @@ export interface TransactionDetail {
   quantity: number | null;
   unit_price: number | null;
   side: string | null;
+}
+
+/** The vocabulary the UI builds its selectors from — sources from the adapter
+ *  registry, categories from categorie.yaml, limits from settings.yaml. */
+export interface MetaResponse {
+  sources: { id: string }[];
+  categories: { code: string; labels: Record<string, string> }[];
+  languages: string[];
+  allowed_extensions: string[];
+  max_file_bytes: number;
 }

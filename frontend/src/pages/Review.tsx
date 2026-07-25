@@ -3,13 +3,10 @@ import { api } from "../api/client";
 import type { TransactionRow } from "../api/types";
 import { colorFor } from "../lib/colors";
 import { dateLabel, money } from "../lib/format";
-import { catLabel, useT } from "../lib/i18n";
+import { useT } from "../lib/i18n";
+import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
 
-const CATEGORY_CODES = [
-  "groceries", "dining", "transport", "bills", "subscriptions", "salary", "rent",
-  "health", "shopping", "transfers", "investments", "crypto", "cash", "fees", "other",
-];
 const SAMPLE = 500;
 const QUEUE = 100;
 
@@ -28,6 +25,7 @@ const LOWCONF_MAX = 0.7;
 
 export function Review() {
   const { t, lang } = useT();
+  const { categoryCodes, catLabel } = useMeta();
   const [mode, setMode] = useState<"other" | "lowconf">("other");
   const sample = useAsync(() => api.transactions({ limit: SAMPLE, include_transfers: false, lang }), [lang]);
   const queue = useAsync(
@@ -159,8 +157,8 @@ export function Review() {
                       <span className="swatch" style={{ background: colorFor(tx.category) }} />
                       <select className="cat" defaultValue="" onChange={(e) => e.target.value && relabel(tx, e.target.value)}>
                         <option value="" disabled>{t("rev.choose")}</option>
-                        {CATEGORY_CODES.filter((c) => c !== "other").map((c) => (
-                          <option key={c} value={c}>{catLabel(c, lang)}</option>
+                        {categoryCodes.filter((c) => c !== "other").map((c) => (
+                          <option key={c} value={c}>{catLabel(c)}</option>
                         ))}
                       </select>
                     </span>

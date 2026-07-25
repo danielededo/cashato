@@ -8,34 +8,15 @@ import { useCallback } from "react";
 import type { Lang } from "../api/types";
 import { useLang } from "./lang";
 
-export const CATEGORY_LABELS: Record<string, { it: string; en: string }> = {
-  groceries: { it: "Spesa", en: "Groceries" },
-  dining: { it: "Ristorazione", en: "Dining" },
-  transport: { it: "Trasporti", en: "Transport" },
-  bills: { it: "Bollette", en: "Bills & utilities" },
-  subscriptions: { it: "Abbonamenti", en: "Subscriptions" },
-  salary: { it: "Stipendio", en: "Salary" },
-  rent: { it: "Affitti", en: "Rent" },
-  health: { it: "Salute", en: "Health" },
-  shopping: { it: "Acquisti", en: "Shopping" },
-  transfers: { it: "Trasferimenti", en: "Transfers" },
-  investments: { it: "Investimenti", en: "Investments" },
-  crypto: { it: "Crypto", en: "Crypto" },
-  cash: { it: "Contanti", en: "Cash" },
-  fees: { it: "Commissioni", en: "Fees" },
-  other: { it: "Altro", en: "Other" },
-};
-
-export function catLabel(code: string | null | undefined, lang: Lang): string {
-  if (!code) return lang === "it" ? "Altro" : "Other";
-  return CATEGORY_LABELS[code]?.[lang] ?? code;
-}
+// Category labels are NOT duplicated here: they come from the backend via
+// `useMeta()` (see lib/meta.ts), which reads the same categorie.yaml the
+// pipeline does. Only UI chrome lives in this file.
 
 type Dict = Record<string, { it: string; en: string }>;
 
 const UI: Dict = {
   // nav
-  "nav.dashboard": { it: "Cruscotto", en: "Dashboard" },
+  "nav.dashboard": { it: "Panoramica", en: "Dashboard" },
   "nav.transactions": { it: "Movimenti", en: "Transactions" },
   "nav.review": { it: "Revisione", en: "Review" },
   "nav.investments": { it: "Patrimonio", en: "Wealth" },
@@ -194,6 +175,8 @@ const UI: Dict = {
   },
 
   // upload
+  "up.override": { it: "Il file non viene riconosciuto? Indica tu la banca", en: "File not recognised? Pick the bank yourself" },
+  "up.override.hint": { it: "Normalmente non serve: la banca si ricava dal contenuto del file, non dal nome.", en: "Normally unnecessary: the bank is worked out from the file's content, not its name." },
   "up.source": { it: "Fonte", en: "Source" },
   "up.autodetect": { it: "Rileva automaticamente", en: "Detect automatically" },
   "up.drop": { it: "Trascina un estratto qui, o clicca per scegliere", en: "Drop a statement here, or click to choose" },

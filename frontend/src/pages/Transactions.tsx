@@ -2,19 +2,15 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
-import { SOURCES } from "../api/types";
 import { colorFor } from "../lib/colors";
 import { dateLabel, money } from "../lib/format";
 import { TransactionDetail } from "../components/TransactionDetail";
 import { useAccounts } from "../lib/accounts";
-import { catLabel, useT } from "../lib/i18n";
+import { useT } from "../lib/i18n";
+import { useMeta } from "../lib/meta";
 import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
 
-const CATEGORY_CODES = [
-  "groceries", "dining", "transport", "bills", "subscriptions", "salary", "rent",
-  "health", "shopping", "transfers", "investments", "crypto", "cash", "fees", "other",
-];
 const PAGE = 50;
 const SIGNS: { key: Sign | ""; tkey: string }[] = [
   { key: "", tkey: "common.all" },
@@ -39,7 +35,8 @@ export function Transactions() {
   const [params] = useSearchParams();
   const { lang } = useLang();
   const { t } = useT();
-  const { sourceLabel, accountLabel, accountShort } = useAccounts();
+  const { accounts, sourceLabel, accountLabel, accountShort } = useAccounts();
+  const { categoryCodes, catLabel } = useMeta();
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
   // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never
@@ -129,12 +126,19 @@ export function Transactions() {
     }
   }
 
+  // Filters over data that EXISTS: offering a bank you have not loaded is
+  // noise, and the list follows the ingested accounts rather than a fixed one.
+  const presentSources = useMemo(
+    () => [...new Set(accounts.filter((a) => a.transactions > 0).map((a) => a.source))].sort(),
+    [accounts],
+  );
+
   const total = state.data?.total ?? 0;
   const of = lang === "it" ? "di" : "of";
   const activeFilters = [
     sign && (sign === "income" ? t("common.income") : t("common.expense")),
-    source && source.replace("_", " "),
-    category && catLabel(category, lang),
+    source && sourceLabel(source),
+    category && catLabel(category),
     (dateFrom || dateTo) && `${dateFrom || "…"} → ${dateTo || "…"}`,
     !includeTransfers && `${t("tx.exclude")} ${t("tx.transfers").toLowerCase()}`,
     deferredSearch && `“${deferredSearch}”`,
@@ -156,7 +160,7 @@ export function Transactions() {
           <button className="chip" aria-pressed={source === ""} onClick={() => setSource("")}>
             {t("tx.allSources")}
           </button>
-          {SOURCES.map((s) => (
+          {presentSources.map((s) => (
             <button key={s} className="chip" aria-pressed={source === s} onClick={() => setSource(source === s ? "" : s)}>
               {sourceLabel(s)}
             </button>
@@ -187,7 +191,7 @@ export function Transactions() {
                 {t("common.category")}
                 <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">{t("common.all")}</option>
-                  {CATEGORY_CODES.map((c) => <option key={c} value={c}>{catLabel(c, lang)}</option>)}
+                  {categoryCodes.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
                 </select>
               </label>
               <label className="field">
@@ -249,8 +253,8 @@ export function Transactions() {
                         <span className="cat-cell">
                           <span className="swatch" style={{ background: colorFor(cat) }} />
                           <select className="cat" value={cat} onChange={(e) => recategorize(tx, e.target.value)}>
-                            {!CATEGORY_CODES.includes(cat) && cat ? <option value={cat}>{catLabel(cat, lang)}</option> : null}
-                            {CATEGORY_CODES.map((c) => <option key={c} value={c}>{catLabel(c, lang)}</option>)}
+                            {!categoryCodes.includes(cat) && cat ? <option value={cat}>{catLabel(cat)}</option> : null}
+                            {categoryCodes.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
                           </select>
                         </span>
                       </td>

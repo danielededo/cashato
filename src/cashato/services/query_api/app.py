@@ -19,6 +19,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from cashato.config import setting
 from cashato.db.db import get_engine
 from cashato.obs import (
     setup_logging,
@@ -27,6 +28,7 @@ from cashato.obs import (
     tracing_enabled,
 )
 from cashato.parsers.categorize import Categorizer
+from cashato.parsers.registry import SOURCE_NAMES
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("query-api")
@@ -166,6 +168,33 @@ class Account(BaseModel):
 
 class AccountsResponse(BaseModel):
     accounts: list[Account]
+
+
+class SourceMeta(BaseModel):
+    """A source cashato can parse, straight from the adapter registry."""
+
+    id: str = Field(examples=["trade_republic"])
+
+
+class CategoryMeta(BaseModel):
+    code: str = Field(examples=["groceries"])
+    labels: dict[str, str] = Field(description="Localized labels, one key per supported language.")
+
+
+class MetaResponse(BaseModel):
+    """The vocabulary the UI needs, from the same place the pipeline reads it.
+
+    Exists so no client has to restate the list of sources or categories. Those
+    lists live in the adapter registry and in `categorie.yaml`; a copy in the
+    frontend drifts the moment either changes — which it did, within a day of
+    the categories growing.
+    """
+
+    sources: list[SourceMeta]
+    categories: list[CategoryMeta]
+    languages: list[str]
+    allowed_extensions: list[str]
+    max_file_bytes: int
 
 
 class TransferLeg(BaseModel):
@@ -312,6 +341,27 @@ def summary(lang: str = _LANG):
     return {
         "lang": lang,
         "categories": [{**r, "category_label": _CAT.label(r["category"], lang)} for r in rows],
+    }
+
+
+@api.get("/meta", response_model=MetaResponse, summary="Sources, categories, upload limits")
+def meta():
+    """What the client needs to build its selectors, from the single source of truth.
+
+    Sources come from the adapter registry (dropping in a parser module adds one
+    with no further wiring); categories and their labels from `categorie.yaml`;
+    upload limits from `settings.yaml`. All three are runtime config or code
+    discovery, so a client that reads this can never be out of step with what
+    the pipeline actually accepts.
+    """
+    return {
+        "sources": [{"id": s} for s in SOURCE_NAMES],
+        "categories": [
+            {"code": code, "labels": labels} for code, labels in sorted(_CAT.categories.items())
+        ],
+        "languages": _CAT.languages,
+        "allowed_extensions": setting("uploads.allowed_extensions", [".pdf", ".csv", ".xlsx"]),
+        "max_file_bytes": int(setting("uploads.max_file_bytes", 10 * 1024 * 1024)),
     }
 
 

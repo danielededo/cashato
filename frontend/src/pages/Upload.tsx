@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { SOURCES } from "../api/types";
 import { dateLabel } from "../lib/format";
 import { useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
+import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
   const { sourceLabel } = useAccounts();
+  const { sources, acceptAttr } = useMeta();
   const [source, setSource] = useState("");
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,18 +48,6 @@ export function Upload() {
   return (
     <div className="fade-in">
       <div className="panel">
-        <div className="toolbar" style={{ marginBottom: 14 }}>
-          <label className="field">
-            {t("up.source")}
-            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">{t("up.autodetect")}</option>
-              {SOURCES.map((s) => (
-                <option key={s} value={s}>{sourceLabel(s)}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
         <div
           className={`dropzone ${over ? "over" : ""}`}
           onDragOver={(e) => {
@@ -77,7 +66,7 @@ export function Upload() {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.csv,.xlsx,.xls"
+            accept={acceptAttr}
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -87,6 +76,23 @@ export function Upload() {
         </div>
 
         {msg ? <div className={`state ${msg.ok ? "" : "error"}`}>{msg.text}</div> : null}
+
+        {/* The source is worked out from the file's CONTENT, so asking up front
+            makes the user do the system's job and advertises the supported list
+            as if it were a limit. Kept only as a recovery path, folded away. */}
+        <details className="override">
+          <summary>{t("up.override")}</summary>
+          <label className="field" style={{ marginTop: 9 }}>
+            {t("up.source")}
+            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="">{t("up.autodetect")}</option>
+              {sources.map((s) => (
+                <option key={s} value={s}>{sourceLabel(s)}</option>
+              ))}
+            </select>
+          </label>
+          <p className="hint" style={{ marginTop: 7 }}>{t("up.override.hint")}</p>
+        </details>
       </div>
 
       <div className="panel">
