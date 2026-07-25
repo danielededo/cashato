@@ -75,8 +75,8 @@ export function Investments() {
       color: seriesColor(i),
     }));
 
-    const unknownPct = data.total_invested
-      ? (data.total_in_unknown / data.total_invested) * 100
+    const unknownPct = data.total_contributed
+      ? (data.total_in_unknown / data.total_contributed) * 100
       : 0;
     return { ...data, series, stackData, spark, split, unknownPct };
   }, [inv.data, t]);
@@ -96,10 +96,13 @@ export function Investments() {
         <>
           <div className="kpis kpis-4">
             <div className="kpi">
+              {/* Gross, so that the two tiles beside it add up to this one. Net
+                  is the footnote: three figures where two do not sum to the
+                  first is an invitation to misread them. */}
               <div className="k">{t("inv.invested")}</div>
-              <div className="v">{money(d.total_invested)}</div>
+              <div className="v">{money(d.total_contributed)}</div>
               <div className="foot">
-                <span className="dim">{t("inv.invested.foot")}</span>
+                <span className="dim">{t("inv.net", { v: money(d.total_invested) })}</span>
                 <span className="spark" style={{ color: "var(--series-1)" }}>
                   <Sparkline values={d.spark} />
                 </span>
@@ -123,9 +126,7 @@ export function Investments() {
             </div>
             <div className="kpi">
               <div className="k">{t("inv.returns")}</div>
-              <div className="v">
-                {money(d.months.reduce((a, m) => a + (m.returned ?? 0), 0))}
-              </div>
+              <div className="v">{money(d.total_returned)}</div>
               <div className="foot">
                 <span className="dim">{t("inv.returns.foot")}</span>
               </div>

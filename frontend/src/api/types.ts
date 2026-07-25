@@ -203,6 +203,10 @@ export interface InvestmentsResponse {
   holdings: Holding[];
   months: InvestmentMonth[];
   kinds: WealthKind[];
+  /** Gross money in; known + unknown add up to exactly this. */
+  total_contributed: number;
+  total_returned: number;
+  /** Net of returns. Deliberately distinct from total_contributed. */
   total_invested: number;
   total_in_known_instruments: number;
   total_in_unknown: number;

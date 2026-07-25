@@ -267,7 +267,14 @@ class InvestmentsResponse(BaseModel):
     holdings: list[Holding]
     months: list[InvestmentMonth]
     kinds: list[WealthKind]
-    total_invested: float = Field(description="Net cash into all wealth destinations.")
+    #: Gross money in. `total_in_known_instruments + total_in_unknown` equals
+    #: this by construction — they are the same sum split by available detail.
+    total_contributed: float
+    total_returned: float = Field(description="Money back: sales, dividends, maturities.")
+    total_invested: float = Field(
+        description="NET of returns, i.e. total_contributed - total_returned. Reported "
+        "separately because the gross figure is what the known/unknown split adds up to."
+    )
     total_in_known_instruments: float
     total_in_unknown: float
 
@@ -410,6 +417,8 @@ def investments(lang: str = _LANG):
         "holdings": holdings,
         "months": months,
         "kinds": sorted(kinds.values(), key=lambda k: -k["net_invested"]),
+        "total_contributed": known + unknown,
+        "total_returned": sum(float(m["returned"] or 0) for m in months),
         "total_invested": sum(float(m["net_invested"] or 0) for m in months),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,
