@@ -1,7 +1,7 @@
 // Lightweight, dependency-free visuals (no Recharts) — cheap enough to render in
 // bulk (one sparkline per KPI, a full heatmap grid). Kept in the main bundle so
 // the console paints instantly; the heavy Recharts panels stay lazy.
-import { memo } from "react";
+import { memo, useState } from "react";
 import { colorFor } from "../lib/colors";
 import { money } from "../lib/format";
 
@@ -100,7 +100,7 @@ export const RankBars = memo(function RankBars({
           onClick={() => onSelect?.(it.category)}
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.(it.category)}
         >
-          <span className="name">
+          <span className="name" title={it.label}>
             <span className="swatch" style={{ background: it.color ?? colorFor(it.category) }} />
             {it.label}
           </span>
@@ -165,6 +165,98 @@ export const Heatmap = memo(function Heatmap({
                 />
               );
             })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+export interface DonutSlice {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+}
+
+/** Part-to-whole at a glance. Deliberately capped: past ~6 segments adjacent
+ *  slices blur and this stops being readable — the ranked bars beside it are
+ *  what you compare close values with.
+ *
+ *  The legend carries a percentage per slice on purpose. It is not decoration:
+ *  the project's categorical ramp has an orange/green pair that separates by
+ *  only ΔE 6.2 under protanopia, which is legal only when colour is not the
+ *  sole channel. Labels + the 2px gaps between segments are that second channel. */
+export const Donut = memo(function Donut({
+  slices,
+  total,
+  centerLabel,
+}: {
+  slices: DonutSlice[];
+  total: number;
+  centerLabel?: string;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+  if (!slices.length || total <= 0) return <div className="chart-fallback">No allocation.</div>;
+
+  const R = 68;
+  const STROKE = 22;
+  const GAP = 2; // surface gap between segments, in px along the circumference
+  const circumference = 2 * Math.PI * R;
+  let offset = 0;
+
+  return (
+    <div className="donut-wrap">
+      <svg viewBox="0 0 170 170" className="donut" role="img" aria-label={centerLabel ?? "Allocation"}>
+        <g transform="translate(85,85) rotate(-90)">
+          {slices.map((s) => {
+            const frac = s.value / total;
+            const len = Math.max(frac * circumference - GAP, 0.5);
+            const dash = `${len} ${circumference - len}`;
+            const el = (
+              <circle
+                key={s.key}
+                r={R}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={hover === s.key ? STROKE + 4 : STROKE}
+                strokeDasharray={dash}
+                strokeDashoffset={-offset}
+                onMouseEnter={() => setHover(s.key)}
+                onMouseLeave={() => setHover(null)}
+                style={{ transition: "stroke-width 0.12s" }}
+              />
+            );
+            offset += frac * circumference;
+            return el;
+          })}
+        </g>
+        {(() => {
+          const h = slices.find((s) => s.key === hover);
+          const pct = h ? (h.value / total) * 100 : 100;
+          return (
+            <>
+              <text x="85" y="82" className="donut-figure" textAnchor="middle">
+                {h ? `${pct.toFixed(1)}%` : money(total)}
+              </text>
+              <text x="85" y="97" className="donut-sub" textAnchor="middle">
+                {h ? h.label.slice(0, 22) : (centerLabel ?? "")}
+              </text>
+            </>
+          );
+        })()}
+      </svg>
+      <div className="donut-legend">
+        {slices.map((s) => (
+          <div
+            key={s.key}
+            className={`donut-item ${hover && hover !== s.key ? "off" : ""}`}
+            onMouseEnter={() => setHover(s.key)}
+            onMouseLeave={() => setHover(null)}
+          >
+            <span className="swatch" style={{ background: s.color }} />
+            <span className="donut-name" title={s.label}>{s.label}</span>
+            <span className="donut-pct mono">{((s.value / total) * 100).toFixed(1)}%</span>
           </div>
         ))}
       </div>

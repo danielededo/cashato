@@ -25,7 +25,7 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
-import { RankBars, Sparkline, type RankItem } from "../components/primitives";
+import { Donut, RankBars, Sparkline, type DonutSlice, type RankItem } from "../components/primitives";
 import { colorFor, seriesColor } from "../lib/colors";
 import { dateLabel, money, monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -81,19 +81,29 @@ export function Investments() {
     // Sparkline always shows the monthly pace, whatever the chart is showing.
     const spark = monthly.map((r) => ((r[KNOWN] as number) ?? 0) + ((r[UNKNOWN] as number) ?? 0));
 
-    // Keyed by ISIN so each row is distinct; colours come from the ramp because
-    // an ISIN is not a category code.
-    const split: RankItem[] = data.holdings.map((h, i) => ({
-      category: h.isin ?? h.instrument ?? String(i),
-      label: h.instrument ?? h.isin ?? "—",
-      value: h.invested,
-      color: seriesColor(i),
-    }));
+    // Colour follows the INSTRUMENT, not its rank: assigning by position in the
+    // invested-sorted list would repaint every holding as soon as one overtakes
+    // another, or as soon as a new one appears. Keyed off a stable alphabetical
+    // index instead, so a given ISIN keeps its colour for good.
+    const ids = data.holdings
+      .map((h, i) => h.isin ?? h.instrument ?? String(i))
+      .slice()
+      .sort();
+    const colorOf = (id: string) => seriesColor(ids.indexOf(id));
+
+    const split: RankItem[] = data.holdings.map((h, i) => {
+      const id = h.isin ?? h.instrument ?? String(i);
+      return { category: id, label: h.instrument ?? h.isin ?? "—", value: h.invested, color: colorOf(id) };
+    });
+    const donut: DonutSlice[] = data.holdings.map((h, i) => {
+      const id = h.isin ?? h.instrument ?? String(i);
+      return { key: id, label: h.instrument ?? h.isin ?? "—", value: h.invested, color: colorOf(id) };
+    });
 
     const unknownPct = data.total_contributed
       ? (data.total_in_unknown / data.total_contributed) * 100
       : 0;
-    return { ...data, series, stackData, spark, split, unknownPct };
+    return { ...data, series, stackData, spark, split, donut, unknownPct };
   }, [inv.data, t, cumulative]);
 
   return (
@@ -221,7 +231,14 @@ export function Investments() {
                   <h2>{t("inv.allocation")}</h2>
                   <span className="hint">{t("inv.allocation.hint")}</span>
                 </div>
-                <RankBars items={d.split} />
+                <div className="alloc">
+                  <Donut
+                    slices={d.donut}
+                    total={d.total_in_known_instruments}
+                    centerLabel={t("inv.known")}
+                  />
+                  <RankBars items={d.split} />
+                </div>
               </div>
 
               <div className="panel">
