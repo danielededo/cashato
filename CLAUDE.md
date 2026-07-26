@@ -200,7 +200,9 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   was cut) tagged by commit SHA → a `bump-deploy` step pins those tags in a
   **separate `cashato-deploy` config repo** (Argo watches it), so the build deploys
   automatically. The **source repo stays human-only** (no CI commits); a CEL
-  path-filter only builds on `src/**`/`docker/**`/`pyproject.toml` changes. Model
+  path-filter only builds on `src/**`/`frontend/**`/`docker/**`/
+  `pyproject.toml`/`alembic.ini` changes (pushes >50 commits build
+  unconditionally — Gitea truncates the payload the filter reads). Model
   registry = **MLflow**. Secrets: **Sealed Secrets**. Code → GitHub later (mirror).
 - Platform (phase C, DONE): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
   (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/

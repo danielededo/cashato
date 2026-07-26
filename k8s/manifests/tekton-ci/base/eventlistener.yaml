@@ -29,9 +29,14 @@ spec:
                 secretKey: secretToken
             - name: eventTypes
               value: ["push"]
-        # Only push to main, AND only when a source-relevant path changed — so a
-        # docs/k8s/infra/config-only push does NOT rebuild the images (config is a
-        # runtime ConfigMap now; only src/**, docker/**, or pyproject.toml matter).
+        # Only push to main, AND only when a path shipped in an image changed — so
+        # a docs/k8s/infra/config-only push does NOT rebuild (config is a runtime
+        # ConfigMap; what matters is src/**, frontend/**, docker/**, pyproject.toml,
+        # alembic.ini). body.commits is TRUNCATED by Gitea at PAYLOAD_COMMIT_LIMIT
+        # (raised to 50 in infra/modules/gitea/values.yaml — keep in sync): a
+        # truncated payload could hide the one commit that touched src/, so pushes
+        # bigger than the limit build unconditionally (fail closed: a spurious
+        # build beats a silent code/manifest skew).
         - name: only-main-and-source-changes
           ref:
             name: cel
@@ -40,8 +45,10 @@ spec:
             - name: filter
               value: >-
                 body.ref == 'refs/heads/main' &&
+                (body.total_commits > 50 ||
                 body.commits.exists(c, (c.added + c.modified + c.removed).exists(f,
-                  f.startsWith('src/') || f.startsWith('frontend/') || f.startsWith('docker/') || f == 'pyproject.toml'))
+                f.startsWith('src/') || f.startsWith('frontend/') || f.startsWith('docker/') ||
+                f == 'pyproject.toml' || f == 'alembic.ini')))
       bindings:
         - ref: cashato-ci-push
       template:

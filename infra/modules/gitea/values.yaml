@@ -45,6 +45,12 @@ gitea:
       # (el-cashato-ci.cashato-ci.svc → a 10.96/12 ClusterIP). `private` re-allows
       # RFC1918 ranges (covers the service CIDR) without opening external hosts.
       ALLOWED_HOST_LIST: private
+      # Max commits embedded in a push payload (default 15). The CI CEL path
+      # filter inspects body.commits[*], so a batched push could silently hide
+      # the one commit that touched src/ beyond the cut. 50 must match the
+      # filter's fail-closed guard (body.total_commits > 50 → build anyway) in
+      # k8s/manifests/tekton-ci/base/eventlistener.yaml.
+      PAYLOAD_COMMIT_LIMIT: 50
     "cron.cleanup_packages":
       # CI pushes three images per commit into the built-in OCI registry and
       # nothing ever removed them: after ~50 builds /data/packages was 4 GB, the
