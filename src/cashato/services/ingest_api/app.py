@@ -20,8 +20,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from fastapi import APIRouter, FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
@@ -202,6 +203,11 @@ class ResetRequest(BaseModel):
         "follow-up /admin/reprocess this rebuilds silver from the retained "
         "files (e.g. after a parser fix), instead of losing them.",
     )
+    confirm: str = Field(
+        default="",
+        description='Must be the literal string "RESET" — a stray API call '
+        "must not be able to truncate everything by accident.",
+    )
 
 
 class AdminResult(BaseModel):
@@ -239,7 +245,29 @@ async def readyz():
     return JSONResponse({"ready": ready}, status_code=200 if ready else 503)
 
 
-api = APIRouter(prefix="/api/v1", tags=["ingestion"])
+def _no_cross_origin_writes(request: Request) -> None:
+    """Reject browser-originated cross-site requests (CSRF guard).
+
+    Browsers ALWAYS attach ``Origin`` to cross-origin requests — a cross-site
+    form submit or a DNS-rebound fetch carries the attacker page's origin —
+    while non-browser clients (curl, scripts) send none. So: no Origin, or a
+    loopback one (the SPA's own), passes; anything else is a cross-site write
+    fired through the user's browser and gets a 403. Defense in depth with the
+    gateway's ``hostname:`` pin, which already 404s rebound Hosts at the edge.
+    """
+    origin = request.headers.get("origin")
+    if origin is None:
+        return
+    host = urlsplit(origin).hostname
+    if host not in ("localhost", "127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="cross-origin requests are not allowed")
+
+
+# The CSRF guard covers the whole router: harmless on reads (same-origin and
+# non-browser callers are unaffected) and load-bearing on every write.
+api = APIRouter(
+    prefix="/api/v1", tags=["ingestion"], dependencies=[Depends(_no_cross_origin_writes)]
+)
 
 
 @api.post("/uploads", response_model=UploadAccepted, status_code=202, summary="Upload a statement")
@@ -488,6 +516,8 @@ async def reset(req: ResetRequest):
     so a retry always converges. A job already DELIVERED to the worker can
     still land after the reset: avoid resetting while an ingest is running.
     """
+    if req.confirm != "RESET":
+        raise HTTPException(status_code=422, detail='confirm must be the string "RESET"')
     purge = await app.state.js.purge_stream(STREAM, subject=SUBJECT_INGEST)
     removed = 0 if req.keep_files else objstore.clear()
     tables = _RESET_TABLES[req.scope]

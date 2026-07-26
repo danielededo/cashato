@@ -82,8 +82,8 @@ export const api = {
 
   // admin (destructive / operational) — backend endpoints land with a deploy
   reprocessAll: () => postJson<AdminResult>("/admin/reprocess", {}),
-  resetData: (scope: "data" | "all", keepFiles = false) =>
-    postJson<AdminResult>("/admin/reset", { scope, keep_files: keepFiles }),
+  resetData: (scope: "data" | "all", keepFiles = false, confirm = "") =>
+    postJson<AdminResult>("/admin/reset", { scope, keep_files: keepFiles, confirm }),
   renameAccount: (id: string, display_name: string | null) =>
     postJson<AdminResult>(`/admin/accounts/${encodeURIComponent(id)}`, { display_name }, "PATCH"),
 

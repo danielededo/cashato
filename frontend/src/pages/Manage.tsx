@@ -93,7 +93,7 @@ python -m cashato.ml.label --limit 2000</code></pre>
               className="btn"
               style={{ borderColor: "var(--expense)", color: "var(--expense)" }}
               disabled={busy !== null || confirm !== "RESET"}
-              onClick={() => run("reset", () => api.resetData(scope, keepFiles))}
+              onClick={() => run("reset", () => api.resetData(scope, keepFiles, confirm))}
             >
               {busy === "reset" ? "…" : t("mng.resetBtn")}
             </button>

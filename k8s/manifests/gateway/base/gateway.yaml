@@ -1,7 +1,14 @@
-# The north-south entrypoint. A single HTTP listener on :80 for now; TLS and
-# host-based routing can be added later. HTTPRoutes arrive in C5 (they need the
-# service backends), attaching from the cashato namespace — hence
-# allowedRoutes.namespaces.from: All (revisit with a Selector in C5 if desired).
+# The north-south entrypoint. A single HTTP listener on :80 for now; TLS can
+# be added later. HTTPRoutes arrive in C5 (they need the service backends),
+# attaching from the cashato namespace — hence allowedRoutes.namespaces.from:
+# All (revisit with a Selector in C5 if desired).
+#
+# hostname pins the listener to the ONLY name this platform is reached by.
+# Without it the gateway answered any Host header, which is what DNS
+# rebinding needs: an attacker domain re-resolving to 127.0.0.1 becomes
+# same-origin in the victim's browser but still sends ITS OWN Host — now it
+# gets a 404 at the edge instead of the API. Port is ignored by the match,
+# so the :8080 port-forward keeps working.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -13,6 +20,7 @@ spec:
     - name: http
       protocol: HTTP
       port: 80
+      hostname: localhost
       allowedRoutes:
         namespaces:
           from: All
