@@ -232,13 +232,27 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
     with engine.begin() as conn:
         _upsert_accounts(conn, path, source)
         inserted = 0
+        enriched = 0  # existing rows whose description was upgraded
         for t in txs:
             # Inline provider-agnostic categorization: MCC -> rules -> model.
             r = _CATEGORIZER.resolve(t.description, t.source, t.mcc)
+            # Identity (natural_key, amount, dates, account) is immutable. The
+            # DESCRIPTIVE text converges to the RICHEST observed: with twin
+            # formats (quarterly PDF / 13m PDF / XLSX) the surviving text used
+            # to be whichever file loaded first — an accident of upload order
+            # that a rebuild could flip. Longer wins, strictly (ties keep the
+            # existing row, so re-loading the same file is still a no-op).
+            # The category follows the text — a category computed on the old
+            # text is not justified for the new one — UNLESS the user set it
+            # (manual is ground truth, and the feedback reapply below enforces
+            # it anyway). mcc rides along when it fills a gap.
+            # RETURNING (xmax = 0): true for a fresh insert, false for the
+            # enrichment update; no row at all when the conflict kept the
+            # existing text.
             res = conn.execute(
                 text(
                     """
-                    INSERT INTO silver.transactions
+                    INSERT INTO silver.transactions AS tx
                         (value_date, booking_date, description, amount, currency,
                          account, source, category, category_confidence,
                          category_source, native_category, mcc, natural_key, file_id)
@@ -246,7 +260,19 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                         (:value_date, :booking_date, :description, :amount, :currency,
                          :account, :source, :category, :category_confidence,
                          :category_source, :native_category, :mcc, :natural_key, :file_id)
-                    ON CONFLICT (natural_key) DO NOTHING
+                    ON CONFLICT (natural_key) DO UPDATE SET
+                        description = EXCLUDED.description,
+                        mcc = COALESCE(EXCLUDED.mcc, tx.mcc),
+                        category = CASE WHEN tx.category_source = 'manual'
+                                        THEN tx.category ELSE EXCLUDED.category END,
+                        category_confidence = CASE WHEN tx.category_source = 'manual'
+                                        THEN tx.category_confidence
+                                        ELSE EXCLUDED.category_confidence END,
+                        category_source = CASE WHEN tx.category_source = 'manual'
+                                        THEN tx.category_source
+                                        ELSE EXCLUDED.category_source END
+                    WHERE length(EXCLUDED.description) > length(tx.description)
+                    RETURNING (xmax = 0) AS fresh
                     """
                 ),
                 {
@@ -266,7 +292,12 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                     "file_id": file_id,
                 },
             )
-            inserted += res.rowcount
+            row = res.first()
+            if row is not None:
+                if row.fresh:
+                    inserted += 1
+                else:
+                    enriched += 1
             if t.trade is not None:
                 # Keyed by natural_key, so this inherits the movement's dedup:
                 # re-reading the same purchase updates one row instead of
@@ -335,9 +366,12 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
     print(f"Source: {source} | file_id={file_id}")
     print(
         f"Parsed transactions: {len(txs)} | newly inserted: {inserted} | "
-        f"duplicates skipped: {len(txs) - inserted} | corrections re-applied: {reapplied}"
+        f"descriptions enriched: {enriched} | duplicates skipped: "
+        f"{len(txs) - inserted - enriched} | corrections re-applied: {reapplied}"
     )
-    return inserted
+    # Enriched rows carry a fast-path category computed on the NEW text; the
+    # caller (etl-worker) must nudge the model for them exactly as for inserts.
+    return inserted + enriched
 
 
 def main() -> int:

@@ -24,6 +24,8 @@ const UI: Dict = {
   "nav.upload": { it: "Carica", en: "Upload" },
 
   // common
+  "privacy.hide": { it: "Nascondi gli importi", en: "Hide amounts" },
+  "privacy.show": { it: "Mostra gli importi", en: "Show amounts" },
   "common.loadingChart": { it: "Carico il grafico…", en: "Loading chart…" },
   "common.joint": { it: "Cointestato", en: "Joint" },
   "delta.vsPrev": { it: "vs prec.", en: "vs prev" },

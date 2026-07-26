@@ -337,6 +337,9 @@ def _parse_xlsx(path: str | Path) -> list[Transaction]:
             amount = parse_money(val, thousands_sep=".", decimal_sep=",")
         else:
             amount = Decimal(str(val))
+        if amount == 0:
+            # Rate-summary lines, as in the PDF paths: never a movement.
+            continue
         currency = str(r[hdr["Valuta"]]).strip().upper() if hdr.get("Valuta") is not None else "EUR"
         if currency != CURRENCY:
             continue
@@ -405,6 +408,10 @@ def _parse_operazioni_pdf(path: str | Path) -> list[Transaction]:
                         thousands_sep=".",
                         decimal_sep=",",
                     )
+                    if amount == 0:
+                        # Rate-summary lines ("0%"), same as in the quarterly
+                        # statements: a zero amount is never a movement.
+                        continue
                     cur = {
                         "d": _parse_date(_clean(dtok[0]["text"])),
                         "imp": amount,

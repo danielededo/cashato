@@ -351,3 +351,20 @@ button:disabled { opacity: 0.45; cursor: default; }
 .override { margin-top: 12px; border-top: 1px solid var(--rule); padding-top: 10px; }
 .override summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
 .override summary:hover { color: var(--text); }
+
+/* --- Privacy mode: every monetary figure blurred, layout untouched.
+   State lives on <html data-privacy> (see lib/privacy.tsx); text stays in the
+   DOM but is unreadable and unselectable — the threat model is a shared
+   screen or a glance, not forensics. Counts inside .num.mono cells blur too:
+   over-masking beats leaking. Hover `title`s can't be blurred by CSS; the
+   Heatmap gates those in code. */
+[data-privacy="on"] .amt,
+[data-privacy="on"] .kpi .v,
+[data-privacy="on"] td.num,
+[data-privacy="on"] .donut-figure,
+[data-privacy="on"] .recharts-yAxis text,
+[data-privacy="on"] .recharts-tooltip-wrapper,
+[data-privacy="on"] .range-note {
+  filter: blur(6px);
+  user-select: none;
+}

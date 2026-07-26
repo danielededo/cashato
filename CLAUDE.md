@@ -40,8 +40,12 @@ Schemas within a single database (not separate DBs):
   `pending|parsed|failed`, `rows_total`, `rows_new`, `error`, `account_holder`).
   Raw row landing (`raw_rows`) was intentionally dropped (YAGNI): reprocessing
   uses the retained file + sha256.
-- **silver** — `transactions`, the common normalized schema (below). Idempotent
-  upsert `ON CONFLICT (natural_key) DO NOTHING`.
+- **silver** — `transactions`, the common normalized schema (below). Upsert on
+  `natural_key`: identity (amount/dates/account) is immutable; the DESCRIPTION
+  converges to the richest observed (strictly longer wins — twin formats carry
+  the same movement with different text, and "first file loaded wins" made the
+  surviving text an accident of upload order). Category follows the text
+  unless `manual`. Re-loading the same file is still a no-op.
 - **gold** — read-only views for the query API: `v_category_totals`,
   `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
   `v_transactions` (projection of silver so the read API stays gold-only). Plus

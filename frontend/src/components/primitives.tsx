@@ -5,6 +5,7 @@ import { memo, useState } from "react";
 import { colorFor } from "../lib/colors";
 import { money } from "../lib/format";
 import { useT } from "../lib/i18n";
+import { usePrivacy } from "../lib/privacy";
 
 /** Localized empty-state line for charts/panels. */
 export function EmptyNote({ k }: { k: string }) {
@@ -143,6 +144,7 @@ export const Heatmap = memo(function Heatmap({
   valueOf: (category: string, month: string) => number;
   onPick?: (category: string, month: string) => void;
 }) {
+  const { hidden } = usePrivacy();
   if (!rows.length || !months.length) return <EmptyNote k="empty.noHistory" />;
   let max = 0;
   for (const r of rows) for (const m of months) { const v = valueOf(r.category, m); if (v > max) max = v; }
@@ -170,7 +172,7 @@ export const Heatmap = memo(function Heatmap({
                   role="button"
                   tabIndex={0}
                   aria-label={`${r.label} ${monthLabels[months.indexOf(m)] ?? m}`}
-                  title={`${r.label} · ${v ? money(v) : "—"}`}
+                  title={hidden ? r.label : `${r.label} · ${v ? money(v) : "—"}`}
                   onClick={() => onPick?.(r.category, m)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPick?.(r.category, m)}
                   style={{ background: pct ? `color-mix(in srgb, ${colorFor(r.category)} ${pct}%, var(--panel-2))` : "var(--panel-2)" }}
