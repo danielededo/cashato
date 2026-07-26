@@ -7,6 +7,7 @@ import { HeaderPortal } from "../lib/headerSlot";
 import { isoDate, money, num } from "../lib/format";
 import { monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
+import { PrivacyToggle } from "../lib/privacy";
 import { useLang } from "../lib/lang";
 import { monthsFor, PERIODS, splitWindows, type PeriodKey } from "../lib/period";
 import { useAsync } from "../lib/useAsync";
@@ -156,6 +157,7 @@ export function Dashboard() {
           {profile.data?.given_name
             ? t("home.hello", { name: profile.data.given_name })
             : t("home.helloAnon")}
+          <PrivacyToggle />
         </h1>
         <p>{t("home.subtitle")}</p>
       </header>

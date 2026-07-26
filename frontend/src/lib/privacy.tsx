@@ -3,6 +3,7 @@
 // layout untouched); this context exists for the few spots where money leaks
 // through ATTRIBUTES (hover `title`s), which CSS cannot blur.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useT } from "./i18n";
 
 const KEY = "cashato.privacy.v1";
 
@@ -24,4 +25,17 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
 
 export function usePrivacy() {
   return useContext(Ctx);
+}
+
+/** Hide/show every monetary amount. Lives next to the holder's name in the
+ *  dashboard greeting — where the eye goes when a screen is being shared. */
+export function PrivacyToggle() {
+  const { hidden, toggle } = usePrivacy();
+  const { t } = useT();
+  const label = t(hidden ? "privacy.show" : "privacy.hide");
+  return (
+    <button className="icon-btn" onClick={toggle} aria-pressed={hidden} aria-label={label} title={label}>
+      {hidden ? "\u25cc" : "\u25c9"}
+    </button>
+  );
 }

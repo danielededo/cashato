@@ -8,7 +8,7 @@ import { Investments } from "./pages/Investments";
 import { Manage } from "./pages/Manage";
 import { HeaderSlotContext } from "./lib/headerSlot";
 import { useT } from "./lib/i18n";
-import { PrivacyProvider, usePrivacy } from "./lib/privacy";
+import { PrivacyProvider } from "./lib/privacy";
 import { useLang } from "./lib/lang";
 
 const NAV = [
@@ -61,7 +61,6 @@ export function App() {
               <button aria-pressed={lang === "it"} onClick={() => setLang("it")}>IT</button>
               <button aria-pressed={lang === "en"} onClick={() => setLang("en")}>EN</button>
             </div>
-            <PrivacyToggle />
             <button
               className="icon-btn"
               onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -90,14 +89,6 @@ export function App() {
   );
 }
 
-/** Hide/show every monetary amount (privacy mode — screen sharing, cafés). */
-function PrivacyToggle() {
-  const { hidden, toggle } = usePrivacy();
-  const { t } = useT();
-  const label = t(hidden ? "privacy.show" : "privacy.hide");
-  return (
-    <button className="icon-btn" onClick={toggle} aria-pressed={hidden} aria-label={label} title={label}>
-      {hidden ? "\u25cc" : "\u25c9"}
     </button>
   );
 }
