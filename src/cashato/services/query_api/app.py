@@ -68,13 +68,19 @@ if tracing_enabled():
 
 
 # --- response models (typed OpenAPI schema + examples) ---
+# Money fields are Decimal end to end (the founding rule): pydantic serializes
+# them as JSON STRINGS, and the frontend's `Money` type + num() convert
+# deliberately — a JSON number is an IEEE754 double, which is what the rule
+# exists to avoid. (Half of these used to be float; latent, never visibly
+# wrong at 2 dp, but the SQL sums exposed here are exactly where a 17-digit
+# float artifact would first appear.)
 class CategoryTotal(BaseModel):
     category: str = Field(examples=["groceries"])
     category_label: str = Field(examples=["Groceries"])
     n_movements: int = Field(examples=[618])
-    income: float | None = Field(default=None, examples=[0.0])
-    expense: float | None = Field(default=None, examples=[-19019.12])
-    net: float | None = Field(examples=[-19019.12])
+    income: Decimal | None = Field(default=None, examples=[0.0])
+    expense: Decimal | None = Field(default=None, examples=[-19019.12])
+    net: Decimal | None = Field(examples=[-19019.12])
 
 
 class SummaryResponse(BaseModel):
@@ -84,10 +90,9 @@ class SummaryResponse(BaseModel):
 
 class MonthRow(BaseModel):
     month: date = Field(examples=["2025-01-01"])
-    income: float | None = None
-    expense: float | None = None
-    net: float | None = None
-    net_excl_investments: float | None = None
+    income: Decimal | None = None
+    expense: Decimal | None = None
+    net: Decimal | None = None
 
 
 class MonthlyResponse(BaseModel):
@@ -99,7 +104,7 @@ class CategoryMonthRow(BaseModel):
     category: str
     category_label: str
     n_movements: int
-    total: float | None = None
+    total: Decimal | None = None
 
 
 class CategoriesMonthlyResponse(BaseModel):
@@ -112,7 +117,7 @@ class TransactionRow(BaseModel):
     value_date: date
     booking_date: date
     description: str
-    amount: float
+    amount: Decimal
     currency: str
     account: str
     source: str
@@ -214,7 +219,7 @@ class TransferLeg(BaseModel):
     natural_key: str
     value_date: date
     account: str
-    amount: float
+    amount: Decimal
     description: str
 
 
@@ -225,7 +230,7 @@ class TransactionDetail(BaseModel):
     value_date: date
     booking_date: date
     description: str
-    amount: float
+    amount: Decimal
     currency: str
     account: str
     source: str
@@ -249,8 +254,8 @@ class TransactionDetail(BaseModel):
     isin: str | None = None
     instrument: str | None = None
     asset_class: str | None = None
-    quantity: float | None = None
-    unit_price: float | None = None
+    quantity: Decimal | None = None
+    unit_price: Decimal | None = None
     side: str | None = None
 
 
@@ -511,7 +516,8 @@ def investments(lang: str = _LANG):
 
 @api.get("/monthly", response_model=MonthlyResponse, summary="Monthly income/expense")
 def monthly():
-    """Monthly income/expense/net (with and without investments/crypto)."""
+    """Monthly income/expense/net. Asset-destined movements (investments,
+    crypto, …) and internal transfers are excluded by the view itself."""
     return {"months": _rows("SELECT * FROM gold.v_income_expense_month ORDER BY month")}
 
 

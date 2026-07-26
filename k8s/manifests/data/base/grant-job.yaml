@@ -65,7 +65,11 @@ spec:
               -- Instrument legs of investment movements (what was bought/sold).
               GRANT SELECT, INSERT, UPDATE ON silver.trades TO etl_writer;
               -- asset_categories is reference data seeded by the migration and
-              -- read by the gold views; the writer never needs to change it.
+              -- read by the gold views; the writer never needs to change it —
+              -- and since its rows directly rewrite what counts as spending in
+              -- every gold view, the blanket silver grant above is REVOKED here
+              -- (it used to silently include this table).
+              REVOKE INSERT, UPDATE ON silver.asset_categories FROM etl_writer;
 
               -- ingest-api /admin/reset needs to TRUNCATE ingested data. Bounded
               -- to the specific reset-target tables (not a blanket DELETE grant).
