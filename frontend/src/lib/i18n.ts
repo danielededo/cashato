@@ -49,6 +49,7 @@ const UI: Dict = {
   "common.next": { it: "Succ →", en: "Next →" },
 
   // dashboard
+  "dash.period": { it: "Periodo", en: "Period" },
   "dash.compare": { it: "Confronta", en: "Compare" },
   "dash.compareTitle": {
     it: "Confronta ogni metrica col periodo precedente di pari durata",

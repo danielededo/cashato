@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Delta, Heatmap, RankBars, Sparkline, type HeatRow, type RankItem } from "../components/primitives";
-import { HeaderPortal } from "../lib/headerSlot";
 import { isoDate, money, num } from "../lib/format";
 import { monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -133,25 +132,6 @@ export function Dashboard() {
 
   return (
     <div className="fade-in">
-      <HeaderPortal>
-        <div className="segmented" role="group" aria-label="Period">
-          {PERIODS.map((pp) => (
-            <button key={pp.key} aria-pressed={period === pp.key} onClick={() => setPeriod(pp.key)}>
-              {pp.key === "all" ? t("common.all") : pp.label}
-            </button>
-          ))}
-        </div>
-        <button
-          className="toggle"
-          aria-pressed={compare}
-          onClick={() => setCompare((v) => !v)}
-          title={t("dash.compareTitle")}
-        >
-          <span className="sw" /> {t("dash.compare")}
-        </button>
-        {rangeNote ? <span className="range-note">{rangeNote}</span> : null}
-      </HeaderPortal>
-
       <header className="greeting">
         <h1>
           {profile.data?.given_name
@@ -176,6 +156,27 @@ export function Dashboard() {
 
       {d ? (
         <>
+          {/* Page-level controls live IN the page: portaled into the topbar
+              they crowded the chrome (user feedback). */}
+          <div className="page-controls">
+            <div className="segmented" role="group" aria-label={t("dash.period")}>
+              {PERIODS.map((pp) => (
+                <button key={pp.key} aria-pressed={period === pp.key} onClick={() => setPeriod(pp.key)}>
+                  {pp.key === "all" ? t("common.all") : pp.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="toggle"
+              aria-pressed={compare}
+              onClick={() => setCompare((v) => !v)}
+              title={t("dash.compareTitle")}
+            >
+              <span className="sw" /> {t("dash.compare")}
+            </button>
+            {rangeNote ? <span className="range-note">{rangeNote}</span> : null}
+          </div>
+
           {/* The page's one headline (hero-number pattern): net for the
               period, colored by sign, with the vs-previous delta beside it. */}
           <section className="hero">
