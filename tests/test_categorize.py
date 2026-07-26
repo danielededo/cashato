@@ -1,4 +1,4 @@
-"""Test unitari del Categorizer (senza modello ML: MCC + regole + default)."""
+"""Categorizer unit tests (no ML model: MCC + rules + default)."""
 
 from cashato.parsers.categorize import Categorizer, build_text
 
@@ -24,6 +24,28 @@ class TestResolverChain:
     def test_default_when_unknown(self):
         r = _cat().resolve("xyzzy merchant sconosciuto 123")
         assert r.code == "other" and r.source == "default"
+
+    def test_mcc_range_lookup(self):
+        # 3246 (an airline: brand-specific block 3000-3299) is not an exact
+        # entry — the "3000-3299" range in mcc.yaml must catch it. Seen in
+        # real card data miscategorized as groceries by the model.
+        r = _cat().resolve("qualcosa", mcc="3246")
+        assert r.code == "travel" and r.source == "mcc"
+
+    def test_mcc_exact_beats_range(self):
+        c = Categorizer(
+            {"categories": {}}, mcc_map={"3000-3999": "travel", "3246": "other"}
+        )
+        assert c.mcc_category("3246") == "other"
+        assert c.mcc_category("3247") == "travel"
+        assert c.mcc_category("4000") is None
+
+    def test_every_mcc_category_has_labels(self):
+        # Every code mcc.yaml can emit must be renderable: an unlabeled code
+        # would surface raw in the UI (labels come from /meta).
+        c = _cat()
+        targets = set(c.mcc_map.values()) | {cat for _, _, cat in c.mcc_ranges}
+        assert targets <= set(c.categories)
 
 
 class TestI18nLabels:

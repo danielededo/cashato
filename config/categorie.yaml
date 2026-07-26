@@ -19,6 +19,11 @@ categories:
   groceries:     {it: "Spesa",          en: "Groceries"}
   dining:        {it: "Ristorazione",   en: "Dining"}
   transport:     {it: "Trasporti",      en: "Transport"}
+  # Travel (flights/hotels/rentals) split from daily commuting; leisure and
+  # education mostly arrive via MCC (see mcc.yaml), rarely via rules.
+  travel:        {it: "Viaggi",         en: "Travel"}
+  leisure:       {it: "Tempo libero",   en: "Leisure"}
+  education:     {it: "Istruzione",     en: "Education"}
   bills:         {it: "Bollette",       en: "Bills & utilities"}
   subscriptions: {it: "Abbonamenti",    en: "Subscriptions"}
   salary:        {it: "Stipendio",      en: "Salary"}
@@ -79,7 +84,7 @@ seeds:
     "Altre uscite": other
     "Altre entrate": other
   trade_republic:
-    # dal campo `category`/`type` del CSV export
+    # from the CSV export's `category`/`type` field
     "TRADING": investments
     "INTEREST_PAYMENT": investments
     "CASH": null   # generico: lascia decidere alle regole

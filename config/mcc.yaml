@@ -1,67 +1,385 @@
-# Merchant Category Code (ISO 18245) -> codice categoria canonico.
-# Standard e language-agnostic. Presente nel CSV Trade Republic (campo mcc_code);
-# le altre fonti spesso non lo hanno. Resolver deterministico ad alta precisione.
-# Chiave = MCC a 4 cifre (stringa).
+# Merchant Category Code (ISO 18245) -> canonical category code.
+# Standard and language-agnostic; present in the Trade Republic CSV
+# (mcc_code field), often absent elsewhere. Highest-precision resolver in
+# the chain (priority 1, before the embedding model).
+#
+# Coverage: the Banca d'Italia list of reportable MCCs (Circolare 154,
+# "Merchant Category Code - lista segnalabili agg.2", 335 codes) plus the
+# brand-specific ISO ranges the list omits, each code with its official
+# English description. Key = 4-digit MCC as a string, or a "lo-hi" range
+# (see Categorizer.mcc_category: exact entries win over ranges).
 
-# --- alimentari / spesa ---
-"5411": groceries   # supermercati
-"5422": groceries   # macellerie
-"5441": groceries   # dolciumi
-"5451": groceries   # latticini
-"5462": groceries   # panetterie
-"5499": groceries   # alimentari vari
+# --- travel: brand-specific ISO blocks (one code PER airline/car-rental/
+# hotel chain, e.g. 3246 seen in real card data). Not in the BdI list, but
+# issuers use them; enumerating ~1000 brands is what the range form is for.
+"3000-3299": travel   # airlines (brand-specific)
+"3300-3499": travel   # car rental agencies (brand-specific)
+"3500-3999": travel   # lodging (brand-specific)
 
-# --- ristorazione ---
-"5811": dining      # catering
-"5812": dining      # ristoranti
-"5813": dining      # bar/locali
-"5814": dining      # fast food
+# --- groceries (food) ---
+"0743": groceries     # Wine producers
+"0744": groceries     # Champagne producers
+"1353": groceries     # Dia (Spain)-Hypermarkets of Food
+"5411": groceries     # Groceries and supermarkets
+"5422": groceries     # Freezer and locker meat provisioners
+"5441": groceries     # Candy, nut and confectionery shops
+"5451": groceries     # Dairies
+"5462": groceries     # Bakeries
+"5499": groceries     # Miscellaneous food shops — convenience and speciality retail outlets
+"5921": groceries     # Package shops — beer, wine and liquor
 
-# --- trasporti ---
-"4111": transport   # trasporto locale/pendolari
-"4112": transport   # treni
-"4121": transport   # taxi
-"4131": transport   # autobus
-"4304": transport
-"4411": transport
-"4511": transport   # compagnie aeree
-"4722": transport   # agenzie viaggi
-"4784": transport   # pedaggi
-"5541": transport   # distributori carburante
-"5542": transport   # carburante self-service
-"7512": transport   # noleggio auto
-"7523": transport   # parcheggi
+# --- dining (restaurants, bars, fast food) ---
+"5811": dining        # Caterers
+"5812": dining        # Eating places and restaurants
+"5813": dining        # Drinking places (alcoholic beverages) — bars, taverns, night-clubs, cocktail lounges and discothèques
+"5814": dining        # Fast food restaurants
 
-# --- salute ---
-"5912": health      # farmacie
-"8011": health      # medici
-"8021": health      # dentisti
-"8042": health      # ottici
-"8062": health      # ospedali
+# --- travel (airlines, hotels, cruises, rentals, agencies) ---
+"4411": travel        # Steamships and cruise lines
+"4511": travel        # Airlines and Air Carriers (Not Elsewhere Classified)
+"4582": travel        # Airports, Flying Fields, and Airport Terminals
+"4722": travel        # Travel agencies and tour operators
+"7011": travel        # Lodging — hotels, motels and resorts
+"7012": travel        # Timeshares
+"7032": travel        # Sporting and recreational camps
+"7033": travel        # Trailer parks and camp-sites
+"7512": travel        # Automobile Rental Agency—not elsewhere classified
+"7513": travel        # Truck and utility trailer rentals
+"7519": travel        # Motor home and recreational vehicle rentals
 
-# --- bollette / utenze / telecom ---
-"4814": bills       # telecom
-"4899": bills       # tv via cavo/streaming
-"4900": bills       # utenze (acqua/gas/luce)
+# --- transport (local transit, vehicles, fuel, tolls, parking) ---
+"4011": transport     # Railroads
+"4111": transport     # Local and suburban commuter passenger transportation, including ferries
+"4112": transport     # Passenger railways
+"4119": transport     # Ambulance Services
+"4121": transport     # Taxi-cabs and limousines
+"4131": transport     # Bus Lines
+"4214": transport     # companies and local delivery
+"4215": transport     # Courier services — air and ground and freight forwarders
+"4304": transport     # local commuter transport (legacy, seen in TR data)
+"4784": transport     # Tolls and bridge fees
+"4789": transport     # Transportation services — not elsewhere classified
+"5511": transport     # Car and truck dealers (new and used) sales, services, repairs, parts and leasing
+"5521": transport     # Car and truck dealers (used only) sales, service, repairs, parts and leasing
+"5531": transport     # Auto Store
+"5532": transport     # Automotive Tire Stores
+"5533": transport     # Automotive Parts and Accessories Stores
+"5541": transport     # Service stations (with or without ancillary services)
+"5542": transport     # Automated Fuel Dispensers
+"5552": transport     # Electric Vehicle Charging
+"5561": transport     # Camper, recreational and utility trailer dealers
+"5571": transport     # Motorcycle shops and dealers
+"5592": transport     # Motor home dealers
+"5598": transport     # Snowmobile dealers
+"5599": transport     # Miscellaneous automotive, aircraft and farm equipment dealers — not elsewhere classified
+"7523": transport     # Parking lots and garages
+"7531": transport     # Automotive Body Repair Shops
+"7534": transport     # Tyre retreading and repair shops
+"7535": transport     # Automotive Paint Shops
+"7538": transport     # Automotive Service Shops (Non-Dealer)
+"7539": transport     # Automotive Service Shops (Spain) - Other Merchant Categories
+"7542": transport     # Car washes
+"7549": transport     # Towing services
 
-# --- abbonamenti / digitale ---
-"5815": subscriptions  # media digitali
-"5816": subscriptions  # giochi digitali
-"5817": subscriptions  # app software
-"5818": subscriptions
+# --- bills (utilities and telecom) ---
+"4812": bills         # Telecommunication equipment and telephone sales
+"4813": bills         # Key-entry Telecom Merchant providing single local and long-distance phone calls
+"4814": bills         # Telecommunication services, including local and long distance calls, credit card calls, calls through use of magnetic stripe reading telephones and faxes
+"4815": bills         # Monthly summary telephone charges
+"4816": bills         # Computer network/information services
+"4821": bills         # Telegraph services
+"4899": bills         # Cable and other pay television services
+"4900": bills         # Utilities — electric, gas, water and sanitary
+"5983": bills         # Fuel dealers — fuel oil, wood, coal and liquefied petroleum
 
-# --- shopping / retail ---
-"5311": shopping    # grandi magazzini
-"5399": shopping
-"5651": shopping    # abbigliamento
-"5691": shopping
-"5732": shopping    # elettronica
-"5734": shopping    # software
-"5735": shopping
-"5999": shopping    # retail vario
-"7995": other       # scommesse
+# --- subscriptions (digital goods) ---
+"5815": subscriptions # Digital Goods Media – Books, Movies, Music
+"5816": subscriptions # Digital Goods – Games
+"5817": subscriptions # Digital Goods – Applications (Excludes Games)
+"5818": subscriptions # Digital Goods – Large Digital Goods Merchant
 
-# --- contanti / trasferimenti ---
-"6011": cash        # prelievo ATM
-"6012": transfers   # istituti finanziari
-"4829": transfers   # money transfer
+# --- health (medical, pharmacies, personal care) ---
+"5912": health        # Drug stores and pharmacies
+"5975": health        # Hearing aids — sales, service and supplies
+"5976": health        # Orthopaedic goods and prosthetic devices
+"7230": health        # Barber and Beauty Shops
+"7277": health        # Counselling services — debt, marriage and personal
+"7297": health        # Massage parlours
+"7298": health        # Health and beauty spas
+"8011": health        # Doctors and physicians — not elsewhere classified
+"8021": health        # Dentists and orthodontists
+"8031": health        # Osteopaths
+"8041": health        # Chiropractors
+"8042": health        # Optometrists and ophthalmologists
+"8043": health        # Opticians, optical goods and eyeglasses
+"8044": health        # Optical Goods and Eyeglasses
+"8049": health        # Podiatrists and chiropodists
+"8050": health        # Nursing and personal care facilities
+"8062": health        # Hospitals
+"8071": health        # Medical and dental laboratories
+"8099": health        # Medical services and health practitioners — not elsewhere classified
+
+# --- shopping (retail) ---
+"1406": shopping      # H&M Moda (Spain)-Retail Merchants
+"5013": shopping      # Motor vehicle supplies and new parts
+"5021": shopping      # Office and commercial furniture
+"5039": shopping      # Construction materials — not elsewhere classified
+"5044": shopping      # Office, photographic, photocopy and microfilm equipment
+"5045": shopping      # Computers, computer peripheral equipment — not elsewhere classified
+"5046": shopping      # Commercial equipment — not elsewhere classified
+"5047": shopping      # Dental/laboratory/medical/ophthalmic hospital equipment and supplies
+"5051": shopping      # Metal service centres and offices
+"5065": shopping      # Electrical parts and equipment
+"5072": shopping      # Hardware equipment and supplies
+"5074": shopping      # Plumbing and heating equipment and supplies
+"5085": shopping      # Industrial supplies — not elsewhere classified
+"5094": shopping      # Precious stones and metals, watches and jewellery
+"5099": shopping      # Durable goods — not elsewhere classified
+"5111": shopping      # Stationery, office supplies and printing and writing paper
+"5122": shopping      # Drugs, drug proprietors
+"5131": shopping      # Piece goods, notions and other dry goods
+"5137": shopping      # Men’s, women’s and children’s uniforms and commercial clothing
+"5139": shopping      # Commercial footwear
+"5169": shopping      # Chemicals and allied products — not elsewhere classified
+"5172": shopping      # Petroleum and petroleum products
+"5192": shopping      # Books, Periodicals and Newspapers
+"5193": shopping      # Florists’ supplies, nursery stock and flowers
+"5198": shopping      # Paints, varnishes and supplies
+"5199": shopping      # Non-durable goods — not elsewhere classified
+"5200": shopping      # Home supply warehouse outlets
+"5211": shopping      # Lumber and building materials outlets
+"5231": shopping      # Glass, paint and wallpaper shops
+"5251": shopping      # Hardware shops
+"5261": shopping      # Lawn and garden supply outlets, including nurseries
+"5262": shopping      # Marketpalce
+"5271": shopping      # Mobile home dealers
+"5300": shopping      # Wholesale clubs
+"5309": shopping      # Duty-free shops
+"5310": shopping      # Discount shops
+"5311": shopping      # Department stores
+"5331": shopping      # Variety stores
+"5333": shopping      # HYPERMARKETS OF FOOD
+"5399": shopping      # Miscellaneous general merchandise
+"5611": shopping      # Men’s and boys’ clothing and accessory shops
+"5621": shopping      # Women’s ready-to-wear shops
+"5631": shopping      # Women’s accessory and speciality shops
+"5641": shopping      # Children’s and infants’ wear shops
+"5651": shopping      # Family clothing shops
+"5655": shopping      # Sports and riding apparel shops
+"5661": shopping      # Shoe shops
+"5681": shopping      # Furriers and fur shops
+"5691": shopping      # Men’s and women’s clothing shops
+"5697": shopping      # Tailors, seamstresses, mending and alterations
+"5698": shopping      # Wig and toupee shops
+"5699": shopping      # Miscellaneous apparel and accessory shops
+"5712": shopping      # Furniture, home furnishings and equipment shops and manufacturers, except appliances
+"5713": shopping      # Floor covering services
+"5714": shopping      # Drapery, window covering and upholstery shops
+"5715": shopping      # Alcoholic beverage wholesalers
+"5718": shopping      # Fireplaces, fireplace screens and accessories shops
+"5719": shopping      # Miscellaneous home furnishing speciality shops
+"5722": shopping      # Household appliance shops
+"5723": shopping      # Gun and Ammunition Stores |
+"5732": shopping      # Electronics shops
+"5733": shopping      # Music shops — musical instruments, pianos and sheet music
+"5734": shopping      # Computer software outlets
+"5735": shopping      # Record shops
+"5931": shopping      # Used merchandise and second-hand shops
+"5932": shopping      # Antique Shops – Sales, Repairs, and Restoration Services
+"5933": shopping      # Pawn shops
+"5935": shopping      # Wrecking and salvage yards
+"5937": shopping      # Antique Reproductions
+"5940": shopping      # Bicycle Shops – Sales and Service
+"5941": shopping      # Sporting goods shops
+"5942": shopping      # Book Stores
+"5943": shopping      # Stationery, office and school supply shops
+"5944": shopping      # Jewellery, watch, clock and silverware shops
+"5945": shopping      # Hobby, toy and game shops
+"5946": shopping      # Camera and photographic supply shops
+"5947": shopping      # Gift, card, novelty and souvenir shops
+"5948": shopping      # Luggage and leather goods shops
+"5949": shopping      # Sewing, needlework, fabric and piece goods shops
+"5950": shopping      # Glassware and crystal shops
+"5960": shopping      # Direct marketing — insurance services
+"5961": shopping      # Mail Order Houses Including Catalog Order Stores
+"5962": shopping      # Telemarketing — travel-related arrangement services
+"5963": shopping      # Door-to-door sales
+"5964": shopping      # Direct marketing — catalogue merchants
+"5965": shopping      # Direct marketing — combination catalogue and retail merchants
+"5966": shopping      # Direct marketing — outbound telemarketing merchants
+"5967": shopping      # Direct marketing — inbound telemarketing merchants
+"5968": shopping      # Direct marketing — continuity/subscription merchants
+"5969": shopping      # Direct marketing/direct marketers — not elsewhere classified
+"5970": shopping      # Artist’s Supply and Craft Shops
+"5971": shopping      # Art Dealers and Galleries
+"5972": shopping      # Stamp and coin shops
+"5973": shopping      # Religious goods and shops
+"5974": shopping      # Rubber Stamp Store
+"5977": shopping      # Cosmetic Stores
+"5978": shopping      # Typewriter outlets — sales, service and rentals
+"5992": shopping      # Florists
+"5993": shopping      # Cigar shops and stands
+"5994": shopping      # Newsagents and news-stands
+"5995": shopping      # Pet shops, pet food and supplies
+"5996": shopping      # Swimming pools — sales, supplies and services
+"5997": shopping      # Electric razor outlets — sales and service
+"5998": shopping      # Tent and awning shops
+"5999": shopping      # Miscellaneous and speciality retail outlets
+"7296": shopping      # Clothing rentals — costumes, uniforms and formal wear
+
+# --- leisure (entertainment and recreation) ---
+"4457": leisure       # Boat Rentals and Leasing
+"4468": leisure       # Marinas, marine service and supplies
+"5551": leisure       # Boat Dealers
+"7800": leisure       # Government-Owned Lotteries (US Region only)
+"7801": leisure       # Government Licensed On-Line Casinos (On-Line Gambling) (US Region only)
+"7802": leisure       # Government-Licensed Horse/Dog Racing (US Region only)
+"7829": leisure       # Motion picture and video tape production and distribution
+"7832": leisure       # Motion picture theatres
+"7833": leisure       # Express Payment Service — Motion Picture Theater
+"7841": leisure       # Video tape rentals
+"7911": leisure       # Dance halls, studios and schools
+"7922": leisure       # Theatrical producers (except motion pictures) and ticket agencies
+"7929": leisure       # Bands, Orchestras, and Miscellaneous Entertainers (Not Elsewhere Classified)
+"7932": leisure       # Billiard and Pool Establishments
+"7933": leisure       # Bowling Alleys
+"7941": leisure       # Commercial sports, professional sports clubs, athletic fields and sports promoters
+"7991": leisure       # Tourist attractions and exhibits
+"7992": leisure       # Public golf courses
+"7993": leisure       # Video amusement game supplies
+"7994": leisure       # Video game arcades and establishments
+"7995": leisure       # Betting, including Lottery Tickets, Casino Gaming Chips, Off-Track Betting, and Wagers at Race Tracks
+"7996": leisure       # Amusement Parks, Circuses, Carnivals, and Fortune Tellers
+"7997": leisure       # courses
+"7998": leisure       # Aquariums, Seaquariums, Dolphinariums, and Zoos
+"7999": leisure       # Recreation services — not elsewhere classified
+
+# --- education (schools and child care) ---
+"8211": education     # Elementary and secondary schools
+"8220": education     # Colleges, universities, professional schools and junior colleges
+"8241": education     # Correspondence schools
+"8244": education     # Business and secretarial schools
+"8249": education     # Trade and vocational schools
+"8299": education     # Schools and educational services — not elsewhere classified
+"8351": education     # Child care services
+
+# --- insurance ---
+"6300": insurance     # Insurance sales, underwriting and premiums
+"6381": insurance     # Insurance–Premiums
+"6399": insurance     # Insurance, Not Elsewhere Classified ( no longer valid for first presentment work)
+
+# --- investments ---
+"6211": investments   # Securities — brokers and dealers
+
+# --- rent ---
+"6513": rent          # Real Estate Agents and Managers
+
+# --- cash ---
+"6010": cash          # Financial institutions — manual cash disbursements
+"6011": cash          # Financial institutions — automated cash disbursements
+
+# --- transfers (money movement and payment providers) ---
+"4829": transfers     # Wire transfers and money orders
+"6012": transfers     # Financial institutions — merchandise and services
+"6051": transfers     # Non-financial institutions — foreign currency, money orders (not wire transfer), scrip and travellers’ checks
+"6529": transfers     # Remote Stored Value Load — Member Financial Institution
+"6530": transfers     # Remove Stored Value Load — Merchant
+"6532": transfers     # Payment Transaction—Customer Financial Institution
+"6533": transfers     # Payment Transaction—Merchant
+"6535": transfers     # Value Purchase–Member Financial Institution
+"6536": transfers     # MoneySend Intracountry
+"6537": transfers     # MoneySend Intercountry
+"6538": transfers     # MoneySend Funding
+"6539": transfers     # Funding Transaction (Excluding MoneySend)
+"6540": transfers     # Non-Financial Institutions – Stored Value Card Purchase/Load
+
+# --- other (services, contractors, organizations, government) ---
+"0742": other         # Veterinary services
+"0763": other         # Agricultural Cooperatives
+"0780": other         # Landscaping and horticultural services
+"1520": other         # General contractors — residential and commercial
+"1711": other         # Heating, plumbing and air-conditioning contractors
+"1731": other         # Electrical contractors
+"1740": other         # Masonry, stonework, tile setting, plastering and insulation contractors
+"1750": other         # Carpentry contractors
+"1761": other         # Roofing, siding and sheet metal work contractors
+"1771": other         # Concrete work contractors
+"1799": other         # Special trade contractors — not elsewhere classified
+"2741": other         # Miscellaneous publishing and printing services
+"2791": other         # Typesetting, platemaking and related services
+"2842": other         # Speciality cleaning, polishing and sanitation preparations
+"4225": other         # Public warehousing and storage — farm products, refrigerated goods and household goods
+"4723": other         # Package Tour Operators – Germany Only
+"5299": other         # Warehouse Club Gas
+"6050": other         # Quasi Cash—Customer Financial Institution
+"6611": other         # Overpayments
+"6760": other         # Savings Bonds
+"7210": other         # Laundry, cleaning and garment services
+"7211": other         # Laundry services — family and commercial
+"7216": other         # Dry cleaners
+"7217": other         # Carpet and upholstery cleaning
+"7221": other         # Photographic studios
+"7251": other         # Shoe repair shops, shoe shine parlours and hat cleaning shops
+"7261": other         # Funeral services and crematoriums
+"7273": other         # Dating and escort services
+"7276": other         # Tax preparation services
+"7278": other         # Buying and shopping services and clubs
+"7280": other         # Hospital Patient-Personal Funds Withdrawal
+"7295": other         # Babysitting Services
+"7299": other         # Miscellaneous personal services — not elsewhere classified
+"7311": other         # Advertising Services
+"7321": other         # Consumer credit reporting agencies
+"7322": other         # Debt collection agencies
+"7332": other         # Blueprinting and Photocopying Services
+"7333": other         # Commercial photography, art and graphics
+"7338": other         # Quick copy, reproduction and blueprinting services
+"7339": other         # Stenographic and secretarial support services
+"7342": other         # Exterminating and disinfecting services
+"7349": other         # Cleaning, maintenance and janitorial services
+"7361": other         # Employment agencies and temporary help services
+"7372": other         # Computer programming, data processing and integrated systems design services
+"7375": other         # Information retrieval services
+"7379": other         # Computer maintenance and repair services — not elsewhere classified
+"7392": other         # Management, consulting and public relations services
+"7393": other         # Detective agencies, protective agencies and security services, including armoured cars and guard dogs
+"7394": other         # Equipment, tool, furniture and appliance rentals and leasing
+"7395": other         # Photofinishing laboratories and photo developing
+"7399": other         # Business services — not elsewhere classified
+"7511": other         # Truck Stop
+"7524": other         # Express Payment Service Merchants–Parking Lots and Garages
+"7622": other         # Electronics repair shops
+"7623": other         # Air Conditioning and Refrigeration Repair Shops
+"7629": other         # Electrical and small appliance repair shops
+"7631": other         # Watch, clock and jewellery repair shops
+"7641": other         # Furniture reupholstery, repair and refinishing
+"7692": other         # Welding services
+"7699": other         # Miscellaneous repair shops and related services
+"8111": other         # Legal services and attorneys
+"8398": other         # Charitable and social service organizations
+"8641": other         # Civic, social and fraternal associations
+"8651": other         # Political organizations
+"8661": other         # Religious organizations
+"8675": other         # Automobile Associations
+"8699": other         # Membership organization — not elsewhere classified
+"8734": other         # Testing laboratories (non-medical)
+"8911": other         # Architectural, Engineering, and Surveying Services
+"8912": other         # Fitment, ornaments and gardening |
+"8931": other         # Accounting, Auditing, and Bookkeeping Services
+"8999": other         # Professional services — not elsewhere classified
+"9034": other         # I-Purchasing Pilot
+"9211": other         # Court costs, including alimony and child support
+"9222": other         # Fines
+"9223": other         # Bail and Bond Payments
+"9311": other         # Tax payments
+"9399": other         # Government services — not elsewhere classified
+"9400": other         # Fee for embassy and consulate |
+"9402": other         # Postal services — government only
+"9405": other         # U.S. Federal Government Agencies or Departments
+"9406": other         # Government-Owned Lotteries (Non-U.S. region)
+"9700": other         # Automated Referral Service
+"9701": other         # Visa Credential Server
+"9702": other         # Emergency Services (GCAS) (Visa use only)
+"9751": other         # UK Supermarkets, Electronic Hot File
+"9752": other         # UK Petrol Stations, Electronic Hot File
+"9754": other         # Gambling-Horse, Dog Racing, State Lottery
+"9950": other         # Intra-Company Purchases

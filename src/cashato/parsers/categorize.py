@@ -65,7 +65,19 @@ class Categorizer:
             (re.compile(r["pattern"], re.IGNORECASE), r["category"])
             for r in config.get("rules", [])
         ]
-        self.mcc_map = {str(k): v for k, v in (mcc_map or {}).items()}
+        # mcc.yaml keys are exact 4-digit codes or "lo-hi" ranges. Ranges cover
+        # the brand-specific ISO blocks (3000-3299 airlines, 3300-3499 car
+        # rentals, 3500-3999 lodging): one code PER BRAND, so enumerating them
+        # would be ~1000 entries mapping to the same category.
+        self.mcc_map: dict[str, str] = {}
+        self.mcc_ranges: list[tuple[int, int, str]] = []
+        for k, v in (mcc_map or {}).items():
+            key = str(k)
+            if "-" in key:
+                lo, hi = key.split("-", 1)
+                self.mcc_ranges.append((int(lo), int(hi), v))
+            else:
+                self.mcc_map[key] = v
         # seeds: only for optional training bootstrap, NOT for runtime
         self._seeds_ci = {
             src: {str(k).strip().lower(): v for k, v in m.items()}
@@ -97,6 +109,19 @@ class Categorizer:
             langs.update(labels.keys())
         return sorted(langs)
 
+    def mcc_category(self, mcc: str) -> str | None:
+        """Category for an MCC: exact entry first, then the range blocks."""
+        key = str(mcc).strip()
+        code = self.mcc_map.get(key)
+        if code:
+            return code
+        if key.isdigit():
+            n = int(key)
+            for lo, hi, cat in self.mcc_ranges:
+                if lo <= n <= hi:
+                    return cat
+        return None
+
     # --- runtime: provider-agnostic resolver chain ---
     def resolve(
         self,
@@ -106,9 +131,9 @@ class Categorizer:
     ) -> Result:
         # 1. MCC (ISO standard): exact, highest precision
         if mcc:
-            code = self.mcc_map.get(str(mcc).strip())
-            if code:
-                return Result(code, 1.0, "mcc")
+            mcc_code = self.mcc_category(mcc)
+            if mcc_code:
+                return Result(mcc_code, 1.0, "mcc")
         # 2. embedding model (does the bulk of the work) if confident
         if self.model is not None:
             pred = self._predict(description)
@@ -137,8 +162,8 @@ class Categorizer:
         pending_idx: list[int] = []
         pending_desc: list[str] = []
         for i, (descr, _source, mcc) in enumerate(items):
-            if mcc and self.mcc_map.get(str(mcc).strip()):
-                results[i] = Result(self.mcc_map[str(mcc).strip()], 1.0, "mcc")
+            if mcc and (code := self.mcc_category(mcc)):
+                results[i] = Result(code, 1.0, "mcc")
             else:
                 pending_idx.append(i)
                 pending_desc.append(descr)
