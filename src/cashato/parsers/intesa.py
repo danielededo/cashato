@@ -292,10 +292,16 @@ def _parse_xlsx(path: str | Path) -> list[Transaction]:
 
     import openpyxl
 
-    warnings.filterwarnings("ignore")
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
+    # Scoped suppression: filterwarnings("ignore") without a context manager
+    # silenced EVERY warning from EVERY library for the process's whole life.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+    finally:
+        wb.close()  # read-only workbooks hold the file handle until closed
 
     hdr = None
     start = 0

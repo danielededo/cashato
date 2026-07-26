@@ -69,6 +69,12 @@ class TestParseMoney:
     def test_accounting_parentheses(self):
         assert parse_money("(5.00)") == Decimal("-5.00")
         assert parse_money("(€1,281.64)") == Decimal("-1281.64")
+        # The paren must be read AFTER the currency strip, like the minus:
+        # "€(5.00)" silently came out positive.
+        assert parse_money("€(5.00)") == Decimal("-5.00")
+        assert parse_money("EUR (1.234,56)", thousands_sep=".", decimal_sep=",") == Decimal(
+            "-1234.56"
+        )
 
     def test_invalid_raises(self):
         with pytest.raises(MoneyParseError):

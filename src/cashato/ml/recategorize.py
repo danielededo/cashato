@@ -52,9 +52,13 @@ def main() -> int:
         # Categorize in BATCH (a single encode for all rows)
         results = cat.resolve_many([(r.description, r.source, r.mcc) for r in rows])
         conn.execute(
+            # The manual predicate is repeated in the UPDATE on purpose (same
+            # as the categorizer worker): a POST /feedback can flip a row to
+            # 'manual' during the minutes this batch spends embedding, and an
+            # id-only UPDATE would overwrite the fresh correction.
             text(
                 "UPDATE silver.transactions SET category=:c, category_confidence=:cf, "
-                "category_source=:s WHERE id=:id"
+                "category_source=:s WHERE id=:id AND category_source IS DISTINCT FROM 'manual'"
             ),
             [
                 {"c": res.code, "cf": res.confidence, "s": res.source, "id": r.id}

@@ -62,8 +62,10 @@ class EmbeddingKNN:
         for i in idx:
             scores[self._labels[i]] = scores.get(self._labels[i], 0.0) + float(sims[i])
         best = max(scores, key=lambda kk: scores[kk])
-        # confidence = similarity of the best neighbor (0..1)
-        conf = float(sims[idx[0]])
+        # Confidence = best similarity AMONG THE WINNING LABEL's neighbors: the
+        # top-1 neighbor can belong to a label the vote rejected, and reporting
+        # its similarity gated the threshold on evidence for the wrong class.
+        conf = max(float(sims[i]) for i in idx if self._labels[i] == best)
         return best, conf
 
     def predict_batch(self, texts: list[str]) -> list[tuple[str, float] | None]:
@@ -81,7 +83,8 @@ class EmbeddingKNN:
             for i in idx:
                 scores[self._labels[i]] = scores.get(self._labels[i], 0.0) + float(row[i])
             best = max(scores, key=lambda kk: scores[kk])
-            out.append((best, float(row[idx[0]])))
+            conf = max(float(row[i]) for i in idx if self._labels[i] == best)
+            out.append((best, conf))
         return out
 
     # --- persistence (lightweight artifact: vectors + labels + model name) ---

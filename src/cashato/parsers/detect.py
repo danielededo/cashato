@@ -42,15 +42,21 @@ def _xlsx_head(path: Path, max_rows: int = 25) -> str:
 
     import openpyxl
 
-    warnings.filterwarnings("ignore")
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    parts: list[str] = []
-    for i, row in enumerate(ws.iter_rows(values_only=True)):
-        if i > max_rows:
-            break
-        parts.extend(str(c) for c in row if c is not None)
-    return " ".join(parts).lower()
+    # Scoped suppression: filterwarnings("ignore") without a context manager
+    # silenced EVERY warning from EVERY library for the process's whole life.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        parts: list[str] = []
+        for i, row in enumerate(ws.iter_rows(values_only=True)):
+            if i > max_rows:
+                break
+            parts.extend(str(c) for c in row if c is not None)
+        return " ".join(parts).lower()
+    finally:
+        wb.close()  # read-only workbooks hold the file handle until closed
 
 
 def head_text(path: Path) -> str | None:

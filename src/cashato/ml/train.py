@@ -49,12 +49,23 @@ def load_dataset(include_rules: bool) -> tuple[list[str], list[str]]:
                 )
             ):
                 seen[build_text(descr)] = cat
-        for t, cat in conn.execute(text("SELECT text_norm, category FROM gold.training_labels")):
+        # Deterministic precedence: manual labels beat llm/native for the same
+        # text (last write into `seen` wins), instead of heap-scan luck.
+        for t, cat in conn.execute(
+            text(
+                "SELECT text_norm, category FROM gold.training_labels "
+                "ORDER BY CASE source WHEN 'manual' THEN 2 ELSE 1 END, id"
+            )
+        ):
             seen[t] = cat
+        # Latest correction per natural_key wins — same contract as the
+        # loader's reapply; an unordered scan could train on a superseded fix.
         for cat, descr in conn.execute(
             text(
-                "SELECT f.category, s.description FROM gold.category_feedback f "
-                "JOIN silver.transactions s ON s.natural_key = f.natural_key"
+                "SELECT f.category, s.description FROM ("
+                "  SELECT DISTINCT ON (natural_key) natural_key, category"
+                "  FROM gold.category_feedback ORDER BY natural_key, id DESC"
+                ") f JOIN silver.transactions s ON s.natural_key = f.natural_key"
             )
         ):
             seen[build_text(descr)] = cat
