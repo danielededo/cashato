@@ -1,11 +1,10 @@
-"""Verifica end-to-end dell'adapter Intesa sui 21 estratti trimestrali (Fase B).
+"""End-to-end verification of the Intesa adapter on the 21 quarterly statements (phase B).
 
-Per ogni file riconcilia le somme estratte con i totali dichiarati a pagina 1
-(Totale accrediti / Totale addebiti / Saldo iniziale+finale). Poi deduplica
-l'insieme completo via natural_key per misurare le sovrapposizioni ai bordi
-trimestre.
+For each file it reconciles the extracted sums against the totals declared on
+page 1 (Totale accrediti / Totale addebiti / Saldo iniziale+finale). It then
+dedups the full set via natural_key to measure the quarter-boundary overlaps.
 
-Uso:  ./.venv/bin/python tests/verify_intesa.py [cartella]
+Usage:  ./.venv/bin/python tests/verify_intesa.py [directory]
 """
 
 from __future__ import annotations
@@ -31,17 +30,17 @@ def _summary(path: str) -> dict:
     with pdfplumber.open(path) as pdf:
         lines = intesa._group_lines(pdf.pages[0].extract_words(keep_blank_chars=False))
     keys = {
-        "iniziale": "Saldo iniziale",
-        "accrediti": "Totale accrediti",
-        "addebiti": "Totale addebiti",
-        "finale": "Saldo finale",
+        "opening": "Saldo iniziale",
+        "credits": "Totale accrediti",
+        "debits": "Totale addebiti",
+        "closing": "Saldo finale",
     }
     out: dict = {}
     for _top, ws in lines:
         joined = " ".join(w["text"] for w in ws)
         for k, label in keys.items():
             if label in joined:
-                # ricompone l'amount dai token a destra (x0>=440)
+                # reassemble the amount from the right-hand tokens (x0>=440)
                 raw = "".join(intesa._clean(w["text"]) for w in ws if w["x0"] >= 440)
                 raw = raw.replace("€", "").replace(" ", "")
                 if raw:
@@ -53,7 +52,7 @@ def main() -> int:
     base = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DIR
     files = sorted(glob.glob(str(Path(base) / PATTERN)))
     if not files:
-        print(f"[ERRORE] nessun estratto trimestrale in {base}")
+        print(f"[ERROR] no quarterly statement in {base}")
         return 2
 
     all_keys: list[str] = []
@@ -66,12 +65,12 @@ def main() -> int:
         all_keys.extend(t.natural_key for t in txs)
 
         checks = []
-        if "accrediti" in s:
-            checks.append(abs(acc - s["accrediti"]) <= CENT)
-        if "addebiti" in s:
-            checks.append(abs(add - s["addebiti"]) <= CENT)
-        if "iniziale" in s and "finale" in s:
-            checks.append(abs(s["iniziale"] + acc + add - s["finale"]) <= CENT)
+        if "credits" in s:
+            checks.append(abs(acc - s["credits"]) <= CENT)
+        if "debits" in s:
+            checks.append(abs(add - s["debits"]) <= CENT)
+        if "opening" in s and "closing" in s:
+            checks.append(abs(s["opening"] + acc + add - s["closing"]) <= CENT)
         ok = bool(checks) and all(checks)
         files_ok += ok
         flag = "OK " if ok else "ERR"
@@ -79,9 +78,9 @@ def main() -> int:
 
     uniq = len(set(all_keys))
     dup = len(all_keys) - uniq
-    print(f"\nFile riconciliati: {files_ok}/{len(files)}")
-    print(f"Transazioni totali: {len(all_keys)} | uniche: {uniq} | dedup ai bordi: {dup}")
-    print("\nESITO:", "OK" if files_ok == len(files) else "DA VERIFICARE")
+    print(f"\nFiles reconciled: {files_ok}/{len(files)}")
+    print(f"Total transactions: {len(all_keys)} | unique: {uniq} | boundary dedup: {dup}")
+    print("\nRESULT:", "OK" if files_ok == len(files) else "NEEDS REVIEW")
     return 0 if files_ok == len(files) else 1
 
 

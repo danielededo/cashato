@@ -1,4 +1,4 @@
-"""Ambiente Alembic. La URL arriva da DATABASE_URL (vedi db/db.py)."""
+"""Alembic environment. The URL comes from DATABASE_URL (see db/db.py)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# Rende importabile il pacchetto db/
+# Makes the db/ package importable
 from cashato.db.db import database_url
 
 config = context.config
@@ -16,7 +16,7 @@ config.set_main_option("sqlalchemy.url", database_url())
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Migrazioni in SQL esplicito (no autogenerate): nessun MetaData target.
+# Migrations are explicit SQL (no autogenerate): no target MetaData.
 target_metadata = None
 
 

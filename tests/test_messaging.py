@@ -1,8 +1,8 @@
-"""Come viene 'chiuso' un messaggio NATS.
+"""How a NATS message gets 'settled'.
 
-Su uno stream WorkQueue l'ack CANCELLA il messaggio, quindi ackare un job
-fallito perde l'ingest per sempre. Questi test fissano le quattro uscite
-possibili, che prima erano una sola: ack in un `finally`, sempre.
+On a WorkQueue stream an ack DELETES the message, so acking a failed job
+loses the ingest forever. These tests pin the four possible outcomes, which
+used to be a single one: ack in a `finally`, always.
 """
 
 import asyncio
@@ -21,7 +21,7 @@ class _Meta:
 
 
 class _Msg:
-    """Messaggio finto che registra come è stato chiuso."""
+    """Fake message that records how it was settled."""
 
     def __init__(self, payload=b"{}", num_delivered=1):
         self.data = payload
@@ -93,21 +93,21 @@ class TestSettlement:
         assert m.settled == "ack"
 
     def test_transient_failure_naks_for_redelivery(self):
-        # il caso che prima perdeva l'ingest: un blip di un secondo su MinIO o
-        # Postgres veniva ackato e il messaggio cancellato
+        # the case that used to lose the ingest: a one-second blip on MinIO or
+        # Postgres got acked and the message deleted
         m = _Msg(num_delivered=1)
         _run(_Sub([m]), _boom)
         assert m.settled == "nak"
         assert m.nak_delay == messaging.NAK_DELAY_SECONDS
 
     def test_gives_up_once_the_delivery_budget_is_spent(self):
-        # un poison job non deve essere riconsegnato all'infinito
+        # a poison job must not be redelivered forever
         m = _Msg(num_delivered=messaging.MAX_DELIVER)
         _run(_Sub([m]), _boom)
         assert m.settled == "term"
 
     def test_malformed_payload_is_terminated_not_retried(self):
-        # non si parserà mai: riconsegnarlo è un ciclo garantito
+        # it will never parse: redelivering it is a guaranteed loop
         m = _Msg(payload=b"{not json")
         _run(_Sub([m]), _ok)
         assert m.settled == "term"
@@ -129,9 +129,9 @@ class TestFetchErrors:
         assert caplog.records == []
 
     def test_real_fetch_error_is_reported_not_mistaken_for_idle(self, caplog, monkeypatch):
-        # una consumer-config in conflitto o uno stream cancellato venivano
-        # scambiati per "nessun messaggio": il worker sembrava sano mentre ogni
-        # upload restava in coda
+        # a conflicting consumer config or a deleted stream used to be mistaken
+        # for "no message": the worker looked healthy while every upload sat
+        # in the queue
         monkeypatch.setattr(messaging.asyncio, "sleep", _ok)
         sub = _Sub(raises=RuntimeError("consumer config conflict"))
         with caplog.at_level(logging.ERROR):
@@ -145,6 +145,6 @@ def test_consumer_config_bounds_redelivery(durable):
     assert cfg.durable_name == durable
     assert cfg.filter_subject == "test.subject"
     assert cfg.max_deliver == messaging.MAX_DELIVER
-    # ack_wait deve superare il job più lento (un PDF grosso), altrimenti
-    # JetStream riconsegna mentre il primo tentativo sta ancora girando
+    # ack_wait must exceed the slowest job (a big PDF), or JetStream redelivers
+    # while the first attempt is still running
     assert cfg.ack_wait >= 60

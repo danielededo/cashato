@@ -1,11 +1,11 @@
-"""Verifica end-to-end dell'adapter Trade Republic sul PDF reale (Fase B).
+"""End-to-end verification of the Trade Republic adapter on the real PDF (phase B).
 
-Auto-riconciliante: estrae dal riquadro "ESTRATTO CONTO RIASSUNTIVO" i totali
-dichiarati (saldo iniziale, in entrata, in uscita, saldo finale) e li confronta
-con la somma delle transazioni estratte. Controlla anche la continuita' del
-saldo riga per riga e l'assenza di natural_key duplicate.
+Self-reconciling: it extracts the declared totals from the "ESTRATTO CONTO
+RIASSUNTIVO" box (opening balance, inflows, outflows, closing balance) and
+compares them with the sum of the extracted transactions. It also checks the
+row-by-row balance continuity and the absence of duplicate natural_keys.
 
-Uso:  ./.venv/bin/python tests/verify_trade_republic.py [percorso_pdf]
+Usage:  ./.venv/bin/python tests/verify_trade_republic.py [pdf_path]
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ DEFAULT_PDF = "data/trade_republic/Account statement.pdf"
 
 
 def _summary_totals(path: str):
-    """Estrae (saldo_iniziale, entrata, uscita, saldo_finale) dal riepilogo."""
+    """Extract (opening_balance, inflow, outflow, closing_balance) from the summary."""
     with pdfplumber.open(path) as pdf:
         lines = tr._group_lines(pdf.pages[0].extract_words(keep_blank_chars=False))
     for _top, ws in lines:
@@ -37,46 +37,46 @@ def _summary_totals(path: str):
 def main() -> int:
     path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PDF
     if not Path(path).exists():
-        print(f"[ERRORE] file non trovato: {path}")
+        print(f"[ERROR] file not found: {path}")
         return 2
 
     txs = tr.parse(path)
-    entrate = sum((t.amount for t in txs if t.amount > 0), Decimal("0"))
-    uscite = sum((t.amount for t in txs if t.amount < 0), Decimal("0"))
-    netto = entrate + uscite
+    inflows = sum((t.amount for t in txs if t.amount > 0), Decimal("0"))
+    outflows = sum((t.amount for t in txs if t.amount < 0), Decimal("0"))
+    net = inflows + outflows
 
     print(f"File: {path}")
-    print(f"Transazioni:            {len(txs)}")
-    print(f"Entrate:                {entrate}")
-    print(f"Uscite:                 {uscite}")
-    print(f"Netto:                  {netto}")
-    print(f"Investimenti:           {sum(1 for t in txs if t.category == 'investimenti')}")
+    print(f"Transactions:           {len(txs)}")
+    print(f"Inflows:                {inflows}")
+    print(f"Outflows:               {outflows}")
+    print(f"Net:                    {net}")
+    print(f"Investments:            {sum(1 for t in txs if t.category == 'investments')}")
 
     ok = len(txs) > 0
 
-    # 1. Riconciliazione col riepilogo
+    # 1. Reconciliation against the summary box
     tot = _summary_totals(path)
     if tot:
-        s_ini, in_ent, in_usc, s_fin = tot
-        print(f"\nRiepilogo PDF: iniziale={s_ini} entrata={in_ent} uscita={in_usc} finale={s_fin}")
+        s_open, s_in, s_out, s_close = tot
+        print(f"\nPDF summary: opening={s_open} inflow={s_in} outflow={s_out} closing={s_close}")
         checks = [
-            ("entrate", entrate, in_ent),
-            ("uscite", -uscite, in_usc),
-            ("saldo finale", s_ini + netto, s_fin),
+            ("inflows", inflows, s_in),
+            ("outflows", -outflows, s_out),
+            ("closing balance", s_open + net, s_close),
         ]
-        for nome, got, exp in checks:
+        for name, got, exp in checks:
             good = abs(got - exp) <= Decimal("0.01")
             ok = ok and good
-            print(f"  {'OK ' if good else 'ERR'} {nome}: {got} vs {exp}")
+            print(f"  {'OK ' if good else 'ERR'} {name}: {got} vs {exp}")
     else:
-        print("\n[warn] riepilogo non trovato: salto la riconciliazione")
+        print("\n[warn] summary box not found: skipping the reconciliation")
 
     # 2. Balance continuity + dedup
     dup = len(txs) - len({t.natural_key for t in txs})
-    print(f"\nNatural key duplicate:  {dup}")
+    print(f"\nDuplicate natural keys: {dup}")
     ok = ok and dup == 0
 
-    print("\nESITO:", "OK" if ok else "DA VERIFICARE")
+    print("\nRESULT:", "OK" if ok else "NEEDS REVIEW")
     return 0 if ok else 1
 
 

@@ -1,4 +1,4 @@
-"""Test unitari dello schema comune e delle utility (nessun DB/dato reale)."""
+"""Unit tests for the common schema and utilities (no DB / no real data)."""
 
 from datetime import date
 from decimal import Decimal
@@ -22,7 +22,7 @@ from cashato.parsers.base import (
 
 
 def _words(*lines):
-    """Costruisce l'output di ``extract_words()`` da (top, x0, "testo ...")."""
+    """Build the output of ``extract_words()`` from (top, x0, "text ...")."""
     out = []
     for top, x0, text in lines:
         x = x0
@@ -89,23 +89,23 @@ class TestNormalizeDesc:
 
 
 class TestTransaction:
-    def test_importo_quantized_to_cents(self):
-        # formati con scale diverse (es. CSV a 6 decimali) -> 2 decimali
+    def test_amount_quantized_to_cents(self):
+        # formats with different scale (e.g. 6-decimal CSV) -> 2 decimals
         assert _tx("1000.000000").amount == Decimal("1000.00")
 
-    def test_importo_must_be_decimal(self):
+    def test_amount_must_be_decimal(self):
         with pytest.raises(TypeError):
             Transaction(
                 value_date=date(2025, 1, 1),
                 booking_date=date(2025, 1, 1),
                 description="x",
                 amount=1000.0,
-                currency="EUR",  # float -> errore
+                currency="EUR",  # float -> error
                 account="c",
                 source="revolut",
             )
 
-    def test_invalid_tipo_origine(self):
+    def test_invalid_source_rejected(self):
         with pytest.raises(ValueError):
             _tx_bad = Transaction(
                 value_date=date(2025, 1, 1),
@@ -120,8 +120,8 @@ class TestTransaction:
 
 class TestDedup:
     def test_natural_key_ignores_description(self):
-        # stessa (account, data, amount, occorrenza) -> stessa chiave anche con
-        # description diversa (dedup cross-formato)
+        # same (account, date, amount, occurrence) -> same key even with a
+        # different description (cross-format dedup)
         a = _tx("10.00", descr="Transazione COOP con carta")
         b = _tx("10.00", descr="COOP LOMBARDIA SC")
         assign_occurrence_keys([a])
@@ -129,14 +129,14 @@ class TestDedup:
         assert a.natural_key == b.natural_key
 
     def test_occurrence_index_distinguishes_identical(self):
-        # due operazioni identiche stesso giorno -> chiavi diverse (#1, #2)
+        # two identical same-day operations -> distinct keys (#1, #2)
         a = _tx("40.00")
         b = _tx("40.00")
         assign_occurrence_keys([a, b])
         assert a.natural_key != b.natural_key
 
     def test_same_set_same_keys_across_formats(self):
-        # lo stesso insieme importato due volte -> stesse chiavi -> dedup
+        # the same set imported twice -> same keys -> dedup
         s1 = [_tx("40.00"), _tx("40.00"), _tx("10.00")]
         s2 = [_tx("40.00", descr="altro testo"), _tx("40.00"), _tx("10.00")]
         assign_occurrence_keys(s1)
@@ -145,10 +145,10 @@ class TestDedup:
 
 
 class TestAccountHolder:
-    """I tre layout reali dell'intestatario (coordinate come nei PDF veri)."""
+    """The three real account-holder layouts (coordinates as in the real PDFs)."""
 
     def test_revolut_layout(self):
-        # blocco a sinistra, CAP su riga propria, colonna destra con altri dati
+        # left-hand block, postal code on its own line, right column with other data
         words = _words(
             (104.4, 446.2, "Generated on the Jul 18, 2026"),
             (144.0, 39.7, "MARIO ROSSI"),
@@ -160,8 +160,8 @@ class TestAccountHolder:
         assert addressee_from_words(words) == "MARIO ROSSI"
 
     def test_trade_republic_ignores_facing_column_on_the_name_line(self):
-        # la riga del nome contiene ANCHE il periodo dell'estratto, a destra:
-        # senza il ritaglio per colonna finirebbe dentro al nome
+        # the name line ALSO carries the statement period, on the right: without
+        # the per-column crop it would end up inside the name
         words = _words(
             (104.7, 73.7, "TRADE REPUBLIC BANK GMBH, BRANCH ITALY 20154 MILANO (MI)"),
             (139.9, 75.2, "MARIO ROSSI"),
@@ -172,7 +172,7 @@ class TestAccountHolder:
         assert addressee_from_words(words) == "MARIO ROSSI"
 
     def test_intesa_right_column_ignores_left_column(self):
-        # "Tipologia conto:" è a sinistra e quasi alla stessa altezza del nome
+        # "Tipologia conto:" sits on the left at almost the same height as the name
         words = _words(
             (151.1, 8.0, "Coordinate bancarie: 0140371"),
             (183.1, 283.0, "ROSSI MARIO"),
@@ -184,11 +184,11 @@ class TestAccountHolder:
         assert addressee_from_words(words) == "ROSSI MARIO"
 
     def test_none_when_no_address_block(self):
-        # export CSV/XLSX: nessun destinatario -> vuoto, non è un errore
+        # CSV/XLSX exports: no addressee -> empty, and that is not an error
         assert addressee_from_words(_words((10.0, 10.0, "DATA OPERAZIONE IMPORTO"))) is None
 
     def test_street_line_is_not_mistaken_for_a_name(self):
-        # niente due righe sopra il CAP che sembrino un nome -> None
+        # nothing above the postal code that looks like a name -> None
         words = _words(
             (100.0, 40.0, "Via Roma 1"),
             (110.0, 40.0, "Scala B interno 4"),
@@ -201,8 +201,8 @@ class TestAccountHolder:
         assert given_name("ROSSI MARIO", FAMILY_FIRST) == "Mario"
 
     def test_iban_found_next_to_its_label(self):
-        # il caso che rompe l'approccio "compatta tutto": senza spazi "IBAN" e
-        # "IT47" si attaccano e il confine di parola sparisce
+        # the case that breaks the "flatten everything" approach: without spaces
+        # "IBAN" and "IT47" join up and the word boundary disappears
         assert find_iban("IBAN IT60 X030 6912 3451 0000 0067 890") == "IT60X0306912345100000067890"
         assert find_iban("IBAN IT30D0367412345100000011111") == "IT30D0367412345100000011111"
         assert find_iban("Account Number (IT IBAN),IT12A0366912345100000022222") == (
@@ -211,7 +211,7 @@ class TestAccountHolder:
 
     def test_iban_absent_or_foreign(self):
         assert find_iban("Account Number N/A") is None
-        assert find_iban("LT313250048123456789") is None  # non italiano -> nessun ABI
+        assert find_iban("LT313250048123456789") is None  # not Italian -> no ABI
         assert find_iban("") is None
 
     def test_abi_is_the_bank_code_inside_the_iban(self):
@@ -222,7 +222,7 @@ class TestAccountHolder:
 
     def test_format_holder_titlecases_only_all_caps(self):
         assert format_holder("ROSSI MARIO") == "Rossi Mario"
-        # già in maiuscolo/minuscolo: la fonte sa meglio di str.title()
+        # already mixed-case: the source knows better than str.title()
         assert format_holder("Mario de Rossi") == "Mario de Rossi"
 
 

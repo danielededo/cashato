@@ -165,7 +165,7 @@ def bank_from_iban(iban: str | None) -> str | None:
     return bank_names().get(abi)
 
 
-# --- Account holder (intestatario) -------------------------------------------
+# --- Account holder extraction -------------------------------------------
 #
 # Every statement PDF carries an addressee block laid out the same way:
 #

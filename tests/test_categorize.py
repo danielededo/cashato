@@ -9,7 +9,7 @@ def _cat():
 
 class TestResolverChain:
     def test_mcc_wins(self):
-        # 5411 = supermercati -> groceries, con source 'mcc'
+        # 5411 = supermarkets -> groceries, with source 'mcc'
         r = _cat().resolve("qualsiasi cosa", mcc="5411")
         assert r.code == "groceries" and r.source == "mcc"
 
@@ -64,16 +64,16 @@ class TestBuildText:
 
 
 class TestWealthDestinations:
-    """Patrimonio: non solo titoli. Le destinazioni non sono consumo, tranne
-    le polizze di protezione, che lo sono."""
+    """Wealth is not just securities. Destinations are not consumption —
+    except protection policies, which are."""
 
     def test_pension_fund_contribution(self):
         assert _cat().resolve("Bonifico fondo pensione Cometa").code == "pension_fund"
         assert _cat().resolve("Piano individuale pensionistico").code == "pension_fund"
 
     def test_pension_received_is_still_income(self):
-        # la regola salary contiene "pension": senza precedenza esplicita
-        # inghiottirebbe "fondo pensione" (vince la prima regola che matcha)
+        # the salary rule contains "pension": without explicit precedence it
+        # would swallow "fondo pensione" (the first matching rule wins)
         assert _cat().resolve("Pensione INPS accredito").code == "salary"
 
     def test_deposits_both_legs(self):
@@ -81,8 +81,8 @@ class TestWealthDestinations:
         assert _cat().resolve("Svincolo deposito").code == "deposits"
 
     def test_insurance_defaults_to_expense_not_wealth(self):
-        # una polizza di puro rischio E' consumo: classificarla come patrimonio
-        # cancellerebbe una spesa reale dal tasso di risparmio
+        # a pure-risk policy IS consumption: filing it as wealth would erase
+        # a real expense from the savings rate
         assert _cat().resolve("Premio polizza RC auto").code == "insurance"
 
 
@@ -125,7 +125,7 @@ class TestDetectionSpecificity:
 
 
 class TestDetectionIsNotOrderDependent:
-    """L'esito non deve dipendere dall'ordine alfabetico dei moduli."""
+    """The outcome must not depend on the modules' alphabetical order."""
 
     def _detect(self, monkeypatch, text, signatures):
         from cashato.parsers import detect
@@ -135,18 +135,18 @@ class TestDetectionIsNotOrderDependent:
         return detect.detect_source("x.pdf"), detect.detect_candidates("x.pdf")
 
     def test_more_specific_match_wins_regardless_of_order(self, monkeypatch):
-        # "banca" generico contro un gruppo a due marker: vince il secondo,
-        # anche se la fonte generica viene prima in ordine alfabetico
+        # generic "banca" vs a two-marker group: the second wins, even though
+        # the generic source comes first alphabetically
         sigs = [("aaa_generic", [["banca"]]), ("zzz_specific", [["banca", "conto zzz"]])]
         src, _ = self._detect(monkeypatch, "banca … conto zzz", sigs)
         assert src == "zzz_specific"
-        # e invertendo l'ordine di scoperta il risultato non cambia
+        # and reversing the discovery order does not change the result
         src, _ = self._detect(monkeypatch, "banca … conto zzz", list(reversed(sigs)))
         assert src == "zzz_specific"
 
     def test_equally_specific_matches_are_ambiguous_not_a_coin_flip(self, monkeypatch):
-        # prima vinceva chi ordinava per primo, in silenzio: il file finiva al
-        # parser sbagliato, che non trovava tabelle e restituiva 0 righe
+        # whoever sorted first used to win, silently: the file went to the
+        # wrong parser, which found no tables and returned 0 rows
         sigs = [("aaa", [["estratto conto"]]), ("bbb", [["estratto conto"]])]
         src, cands = self._detect(monkeypatch, "estratto conto trimestrale", sigs)
         assert src is None

@@ -1,4 +1,4 @@
-"""Helper di connessione al database, condiviso da loader e servizi."""
+"""Database connection helper, shared by the loader and the services."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-# In dev locale punta al Postgres di docker-compose; in K8s (Fase C) la URL
-# arriva dal Secret generato da CNPG.
+# Local dev points at the docker-compose Postgres; on K8s (phase C) the URL
+# comes from the CNPG-generated Secret.
 DEFAULT_URL = "postgresql+psycopg://cashato:cashato@localhost:5432/cashato"
 
 

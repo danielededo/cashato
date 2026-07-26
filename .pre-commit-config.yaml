@@ -1,4 +1,4 @@
-# Hook di qualità eseguiti prima di ogni commit: pre-commit install
+# Quality hooks run before every commit: pre-commit install
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4

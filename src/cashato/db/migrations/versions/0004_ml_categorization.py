@@ -1,4 +1,4 @@
-"""ML categorization: confidence/source/mcc su silver + tabelle label/feedback
+"""ML categorization: confidence/source/mcc on silver + label/feedback tables
 
 Revision ID: 0004_ml_categorization
 Revises: 0003_gold_views
@@ -18,7 +18,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE silver.transactions ADD COLUMN categoria_source TEXT")
     op.execute("ALTER TABLE silver.transactions ADD COLUMN mcc TEXT")
 
-    # Dataset di training: etichette canoniche (regole/LLM/correzioni), per
+    # Training dataset: canonical labels (rules/LLM/corrections), keyed by
     # normalized description. Provider-agnostic.
     op.execute(
         """
@@ -34,7 +34,7 @@ def upgrade() -> None:
         """
     )
 
-    # Correzioni utente (active learning): alimentano i retrain successivi.
+    # User corrections (active learning): they feed the next retrains.
     op.execute(
         """
         CREATE TABLE gold.category_feedback (

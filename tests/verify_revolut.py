@@ -1,14 +1,14 @@
-"""Verifica end-to-end dell'adapter Revolut sul CSV reale (Fase A).
+"""End-to-end verification of the Revolut adapter on the real CSV (phase A).
 
-Non richiede database: controlla che il parsing sia corretto.
+No database required: it checks that the parsing is correct.
 
-Controlli:
-1. numero di righe EUR estratte (plausibilita');
-2. coerenza segni (top-up positivi, merchant negativi);
-3. ricostruzione del saldo: balance[i] == balance[i-1] + money_in_out[i];
-4. dedup: nessuna natural_key duplicata sulle transazioni prodotte da parse().
+Checks:
+1. number of EUR rows extracted (plausibility);
+2. sign consistency (top-ups positive, merchants negative);
+3. balance reconstruction: balance[i] == balance[i-1] + money_in_out[i];
+4. dedup: no duplicate natural_key among the transactions parse() produces.
 
-Uso:  ./.venv/bin/python tests/verify_revolut.py [percorso_csv]
+Usage:  ./.venv/bin/python tests/verify_revolut.py [csv_path]
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-# Rende importabile libs/ senza installazione
 from cashato.parsers import revolut
 
 DEFAULT_CSV = "data/Revolut/consolidated-statement-v2_2023-10-10_2026-07-18_en_4941b1.csv"
@@ -26,54 +25,54 @@ DEFAULT_CSV = "data/Revolut/consolidated-statement-v2_2023-10-10_2026-07-18_en_4
 def main() -> int:
     path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CSV
     if not Path(path).exists():
-        print(f"[ERRORE] file non trovato: {path}")
+        print(f"[ERROR] file not found: {path}")
         return 2
 
     rows = list(revolut.iter_rows(path))
     txs = revolut.parse(path)
 
     print(f"File: {path}")
-    print(f"Righe EUR (movimenti):        {len(rows)}")
-    print(f"Transazioni prodotte (parse): {len(txs)}  (incl. righe commissione)")
+    print(f"EUR rows (movements):         {len(rows)}")
+    print(f"Transactions from parse():    {len(txs)}  (incl. fee rows)")
 
     if not rows:
-        print("[ERRORE] nessuna riga estratta")
+        print("[ERROR] no rows extracted")
         return 1
 
     pos = sum(1 for r in rows if r.money_in_out > 0)
     neg = sum(1 for r in rows if r.money_in_out < 0)
     tot = sum((r.money_in_out for r in rows), Decimal("0"))
-    conti = sorted({r.account for r in rows})
-    print(f"Entrate/uscite (righe):       +{pos} / -{neg}")
-    print(f"Periodo:                      {rows[0].date} -> {rows[-1].date}")
-    print(f"Somma netta movimenti:        {tot} EUR")
-    print(f"Conti EUR distinti:           {conti}")
+    accounts = sorted({r.account for r in rows})
+    print(f"Inflows/outflows (rows):      +{pos} / -{neg}")
+    print(f"Period:                       {rows[0].date} -> {rows[-1].date}")
+    print(f"Net sum of movements:         {tot} EUR")
+    print(f"Distinct EUR accounts:        {accounts}")
 
     # 3. Balance reconstruction, per account (reset at boundaries)
-    errori_saldo = 0
+    balance_errors = 0
     prev: dict[str, Decimal] = {}
     for r in rows:
         if r.balance is None:
             continue
         if r.account in prev:
-            atteso = prev[r.account] + r.money_in_out
-            if abs(atteso - r.balance) > Decimal("0.01"):
-                errori_saldo += 1
-                if errori_saldo <= 5:
+            expected = prev[r.account] + r.money_in_out
+            if abs(expected - r.balance) > Decimal("0.01"):
+                balance_errors += 1
+                if balance_errors <= 5:
                     print(
-                        f"  [saldo] riga {r.line_no} ({r.account}): atteso {atteso}"
+                        f"  [balance] row {r.line_no} ({r.account}): expected {expected}"
                         f" != balance {r.balance} ({r.description!r})"
                     )
         prev[r.account] = r.balance
-    print(f"Discrepanze saldo:            {errori_saldo}")
+    print(f"Balance discrepancies:        {balance_errors}")
 
     # 4. Dedup natural_key
     keys = [t.natural_key for t in txs]
     dup = len(keys) - len(set(keys))
-    print(f"Natural key duplicate:        {dup}")
+    print(f"Duplicate natural keys:       {dup}")
 
-    ok = errori_saldo == 0 and len(rows) > 0
-    print("\nESITO:", "OK" if ok else "DA VERIFICARE")
+    ok = balance_errors == 0 and len(rows) > 0
+    print("\nRESULT:", "OK" if ok else "NEEDS REVIEW")
     return 0 if ok else 1
 
 

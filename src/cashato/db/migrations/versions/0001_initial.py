@@ -1,4 +1,4 @@
-"""schema iniziale: bronze + silver (medallion)
+"""initial schema: bronze + silver (medallion)
 
 Revision ID: 0001_initial
 Revises:
@@ -14,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # --- Schemi (namespace nello stesso DB, non database separati) ---
+    # --- Schemas (namespaces in one DB, not separate databases) ---
     op.execute("CREATE SCHEMA IF NOT EXISTS bronze")
     op.execute("CREATE SCHEMA IF NOT EXISTS silver")
     op.execute("CREATE SCHEMA IF NOT EXISTS gold")
