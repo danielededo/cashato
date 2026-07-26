@@ -88,7 +88,3 @@ export function App() {
     </PrivacyProvider>
   );
 }
-
-    </button>
-  );
-}
