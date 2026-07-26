@@ -1,7 +1,8 @@
 # Grafana — the "G" of LGTM: the query/visualization UI. Mimir is provisioned as
 # a Prometheus-type datasource (Mimir speaks the Prometheus query API under the
-# /prometheus prefix). Stateless (emptyDir): the datasource is re-provisioned
-# from this ConfigMap on every start, so nothing important is lost on restart.
+# /prometheus prefix); datasources re-provision from this ConfigMap on every
+# start. UI-authored dashboards/alerts persist on a PVC (they used to sit on an
+# emptyDir and evaporated on every restart).
 # Analytics / update checks are disabled — no phone-home from a local platform.
 apiVersion: v1
 kind: ConfigMap
@@ -28,6 +29,20 @@ data:
         access: proxy
         url: http://tempo.observability.svc:3200
 ---
+# UI-authored dashboards/alerts live in grafana.db — the one bit of state
+# outside git, so it gets a PVC. RWO + single writer → Recreate, same pattern
+# as Gitea/Mimir/Loki/Tempo/MinIO.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: observability
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,6 +50,8 @@ metadata:
   namespace: observability
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: grafana
@@ -81,7 +98,8 @@ spec:
         - name: datasources
           configMap: { name: grafana-datasources }
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: grafana-storage
 ---
 apiVersion: v1
 kind: Service

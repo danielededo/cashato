@@ -17,5 +17,7 @@ uploads:
   max_file_bytes: 10485760 # 10 MB
   # max files a client should send in one batch (enforced by the frontend)
   max_files_per_batch: 50
-  # accepted file extensions (bank statements are PDF / CSV / XLSX)
-  allowed_extensions: [".pdf", ".csv", ".xlsx", ".xls"]
+  # accepted file extensions (bank statements are PDF / CSV / XLSX).
+  # No ".xls": no parser reads the legacy binary format, so inviting it only
+  # produced uploads that failed later in the worker.
+  allowed_extensions: [".pdf", ".csv", ".xlsx"]

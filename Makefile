@@ -18,11 +18,15 @@ install: ## Install the package + service deps in editable mode
 install-dev: ## Install the development tools only (lint/test)
 	$(PIP) install -e '.[dev]'
 
-db-up: ## Start Postgres (docker-compose)
-	docker compose -f deploy/docker-compose.yml up -d
+# Same container as the README quick-start (the compose file it used to
+# reference was lost in a restructure; a single container needs no compose).
+db-up: ## Start the local dev Postgres (docker)
+	docker start cashato-pg 2>/dev/null || docker run -d --name cashato-pg -p 5432:5432 \
+		-e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato \
+		postgres:17-alpine
 
-db-down: ## Stop Postgres
-	docker compose -f deploy/docker-compose.yml down
+db-down: ## Stop the local dev Postgres
+	docker stop cashato-pg
 
 migrate: ## Apply the Alembic migrations
 	./.venv/bin/alembic upgrade head

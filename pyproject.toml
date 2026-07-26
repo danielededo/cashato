@@ -67,6 +67,8 @@ dev = [
     "types-PyYAML==6.0.12.20240917",
     "types-python-dateutil==2.9.0.20241206",
     "pytest==8.3.4",
+    # demo/generate.py renders the synthetic statement PDFs with it
+    "fpdf2==2.8.2",
 ]
 
 [project.scripts]

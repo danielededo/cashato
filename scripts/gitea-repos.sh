@@ -26,9 +26,20 @@ TFVARS="$ROOT/infra/secret.auto.tfvars"
 
 val() { { grep -i "^$1" "$TFVARS" 2>/dev/null || true; } | sed 's/.*=[[:space:]]*//; s/"//g' | tr -d ' '; }
 USER="$(val git_bridge_username)"; USER="${USER:-cashato}"
-PW="$(val git_bridge_password)"; PW="${PW:-cashato-admin-pw}"
+PW="$(val git_bridge_password)"
+# No fallback: a wrong guessable default silently "working" against a bridge
+# that was provisioned with another password is worse than failing here.
+if [[ -z "$PW" ]]; then
+  echo "ERROR: git_bridge_password not found in $TFVARS" >&2
+  exit 1
+fi
 
 api() { curl -sS -u "$USER:$PW" -H 'Content-Type: application/json' "$@"; }
+
+# Git credentials via a helper, NOT embedded in the remote URL: an URL with
+# the password lands in .git/config, process listings and shell history.
+export _GIT_CRED_USER="$USER" _GIT_CRED_PW="$PW"
+CRED_HELPER='!f() { printf "username=%s\npassword=%s\n" "$_GIT_CRED_USER" "$_GIT_CRED_PW"; }; f'
 
 ensure_repo() { # <name>
   local name="$1" code
@@ -46,10 +57,9 @@ ensure_repo cashato
 ensure_repo cashato-deploy
 
 # Seed cashato-deploy with the source app-of-apps (k8s/apps/).
-host="${GITEA_URL#http://}"; host="${host#https://}"
-authed="http://$USER:$PW@$host/$USER/cashato-deploy.git"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-git clone -q "$authed" "$tmp"
+git -c credential.helper="$CRED_HELPER" clone -q "$GITEA_URL/$USER/cashato-deploy.git" "$tmp"
+git -C "$tmp" config credential.helper "$CRED_HELPER"
 mkdir -p "$tmp/k8s/apps"
 cp "$ROOT"/k8s/apps/*.yaml "$tmp/k8s/apps/"
 cd "$tmp"

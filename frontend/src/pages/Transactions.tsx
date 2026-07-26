@@ -57,8 +57,11 @@ export function Transactions() {
 
   useEffect(() => {
     setOffset(0);
-  }, [deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo]);
+  }, [deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, sort]);
 
+  // Sorting is a QUERY param, not a client-side shuffle: re-sorting one loaded
+  // page under a global-looking header showed "the biggest of the newest 50",
+  // not the biggest overall. The server orders the whole filtered set.
   const query = useMemo<TransactionFilters>(
     () => ({
       lang,
@@ -69,29 +72,17 @@ export function Transactions() {
       include_transfers: includeTransfers,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
+      sort: sort.key,
+      order: sort.dir,
       limit: PAGE,
       offset,
     }),
-    [lang, deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, offset],
+    [lang, deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, sort, offset],
   );
 
   const state = useAsync(() => api.transactions(query), [query]);
 
-  // sort the loaded page (toSorted keeps the source array immutable)
-  const rows = useMemo(() => {
-    const list = state.data?.transactions;
-    if (!list) return [];
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...list].sort((a, b) => {
-      switch (sort.key) {
-        case "amount": return (a.amount - b.amount) * dir;
-        case "description": return a.description.localeCompare(b.description) * dir;
-        case "category": return (a.category ?? "").localeCompare(b.category ?? "") * dir;
-        case "account": return a.account.localeCompare(b.account) * dir;
-        default: return a.value_date.localeCompare(b.value_date) * dir;
-      }
-    });
-  }, [state.data, sort]);
+  const rows = state.data?.transactions ?? [];
 
   function applyDatePreset(key: DatePreset) {
     setDatePreset(key);
@@ -120,7 +111,13 @@ export function Transactions() {
     try {
       await api.feedback(row.natural_key, code, "frontend");
     } catch (e) {
-      setOverrides((o) => ({ ...o, [row.natural_key]: row.category ?? "" }));
+      // Roll back by DELETING the key: writing "" would corrupt the select of
+      // a null-category row (Review.tsx does the same).
+      setOverrides((o) => {
+        const next = { ...o };
+        delete next[row.natural_key];
+        return next;
+      });
       alert(`Feedback failed: ${e instanceof Error ? e.message : e}`);
     }
   }

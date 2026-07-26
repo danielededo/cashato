@@ -527,6 +527,16 @@ def categories_monthly(lang: str = _LANG):
     }
 
 
+# Sortable columns of gold.v_transactions, keyed by the public param value.
+_SORT_COLS = {
+    "date": "value_date",
+    "amount": "amount",
+    "description": "description",
+    "category": "category",
+    "account": "account",
+}
+
+
 @api.get("/transactions", response_model=TransactionsResponse, summary="List transactions")
 def transactions(
     lang: str = _LANG,
@@ -546,12 +556,23 @@ def transactions(
     min_confidence: float | None = Query(default=None, description="Category confidence >= (0..1)"),
     max_confidence: float | None = Query(default=None, description="Category confidence <= (0..1)"),
     include_transfers: bool = Query(default=True, description="Include internal-transfer legs"),
+    sort: str = Query(default="date", description=f"Sort column: one of {sorted(_SORT_COLS)}"),
+    order: str = Query(default="desc", description="'asc' or 'desc'"),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
-    """Filterable, paginated list of transactions (read-only gold projection)."""
+    """Filterable, paginated list of transactions (read-only gold projection).
+
+    Sorting happens HERE, not in the client: a page is 50-500 rows of a much
+    larger set, so re-sorting the loaded page under a column header would show
+    "the biggest of the newest page", not the biggest overall.
+    """
     if sign not in (None, "income", "expense"):
         raise HTTPException(status_code=422, detail="sign must be 'income' or 'expense'")
+    if sort not in _SORT_COLS:
+        raise HTTPException(status_code=422, detail=f"sort must be one of {sorted(_SORT_COLS)}")
+    if order not in ("asc", "desc"):
+        raise HTTPException(status_code=422, detail="order must be 'asc' or 'desc'")
     conds: list[str] = []
     params: dict = {}
     if account:
@@ -597,9 +618,11 @@ def transactions(
 
     total = _rows(f"SELECT count(*) AS n FROM gold.v_transactions {where}", params)[0]["n"]
     page_params = {**params, "limit": limit, "offset": offset}
+    # Column and direction come from the whitelists above, never from raw input.
+    order_by = f"{_SORT_COLS[sort]} {order.upper()}, id DESC"
     rows = _rows(
         f"SELECT * FROM gold.v_transactions {where} "
-        "ORDER BY value_date DESC, id DESC LIMIT :limit OFFSET :offset",
+        f"ORDER BY {order_by} LIMIT :limit OFFSET :offset",
         page_params,
     )
     return {

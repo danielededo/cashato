@@ -152,6 +152,8 @@ export interface TransactionFilters {
   min_confidence?: number;
   max_confidence?: number;
   include_transfers?: boolean;
+  sort?: "date" | "amount" | "description" | "category" | "account";
+  order?: "asc" | "desc";
   limit?: number;
   offset?: number;
 }
