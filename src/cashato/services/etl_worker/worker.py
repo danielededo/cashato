@@ -92,7 +92,7 @@ def _process(key: str, filename: str | None, source_override: str | None, force:
             # a re-upload), but an admin reprocess exists precisely to re-parse
             # files already marked 'parsed'. Safe either way — silver dedups on
             # natural_key, so a re-parse inserts nothing it already has.
-            inserted = load.load(Path(dest), source, force=force)
+            inserted = load.load(Path(dest), source, force=force, filename=filename)
         ROWS.inc(inserted)
         JOBS.labels(status="ok").inc()
         log.info("ingested", extra={"fields": {"key": key, "source": source, "inserted": inserted}})

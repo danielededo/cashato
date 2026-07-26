@@ -247,6 +247,13 @@ def _parse_trimestrale(path: str | Path) -> list[Transaction]:
                     if amt is None:
                         current = None
                         continue
+                    if amt[0] == 0:
+                        # Year-end rate-summary lines ("TASSO CREDITORE 0%")
+                        # carry dates and a 0,00 amount and slipped in as
+                        # movements with description "0%". A zero amount is
+                        # never a movement: no income, no expense, no transfer.
+                        current = None
+                        continue
                     current = _Tx(
                         booking_date=dates[0],
                         value_date=dates[1],
@@ -352,22 +359,44 @@ def _parse_xlsx(path: str | Path) -> list[Transaction]:
     return assign_occurrence_keys(txs)
 
 
+# A wrapped description line sits at most this far from its own anchor row;
+# page-leading lines farther than this from the page's FIRST anchor are the
+# cross-page tail of the previous movement. Measured on the real export:
+# within-block pitch is ~7pt (~15 with a category line interleaved), the gap
+# between blocks is >=18pt.
+_OPERAZIONI_WRAP_MAX_DIST = 20.0
+
+
 def _parse_operazioni_pdf(path: str | Path) -> list[Transaction]:
-    """'Lista movimenti' 13-month PDF export (signed IMPORTO column)."""
+    """'Lista movimenti' 13-month PDF export (signed IMPORTO column).
+
+    Each movement is a block CENTERED on its anchor row (the one carrying date
+    and amount): the description starts on the line(s) ABOVE the anchor,
+    continues inline, and wraps below — e.g. "Bonifico istantaneo da voi" ↑ /
+    "disposto a favore di Mario" inline / "Rossi" ↓. Appending only the lines
+    after the anchor (the old logic) therefore stitched the HEAD of every
+    description onto the PREVIOUS movement — a rent transfer inherited the
+    next row's "Paypal *…" text and was categorized as a subscription.
+
+    Assembly: every description/category line is assigned to the NEAREST anchor
+    on the page (by vertical distance); lines above a page's first anchor whose
+    gap exceeds the wrap pitch belong to the previous page's last movement.
+    Sorting the assigned lines by ``top`` restores natural reading order.
+    """
     raw: list[dict] = []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
-            cur: dict | None = None
-            for _top, ws in _group_lines(page.extract_words(keep_blank_chars=False)):
+            anchors: list[tuple[float, dict]] = []
+            body: list[tuple[float, list[dict]]] = []  # non-anchor lines, in order
+            for top, ws in _group_lines(page.extract_words(keep_blank_chars=False)):
                 joined = " ".join(w["text"] for w in ws)
                 if "IMPORTO" in joined and "CATEGORIA" in joined:
-                    cur = None
                     continue
                 dtok = [w for w in ws if w["x0"] < 120 and _DATE_RE.match(_clean(w["text"]))]
                 imp = [
                     w
                     for w in ws
-                    if w["x0"] >= 500
+                    if w["x0"] >= 480
                     and _AMOUNT_SIGNED.fullmatch(_clean(w["text"]).replace("€", "").strip())
                 ]
                 if dtok and imp:
@@ -379,13 +408,41 @@ def _parse_operazioni_pdf(path: str | Path) -> list[Transaction]:
                     cur = {
                         "d": _parse_date(_clean(dtok[0]["text"])),
                         "imp": amount,
-                        "desc": [w["text"] for w in ws if 120 <= w["x0"] < 300],
-                        "cat": [w["text"] for w in ws if 390 <= w["x0"] < 500],
+                        # (top, tokens) so above/inline/below merge in reading order
+                        "desc": [(top, [w["text"] for w in ws if 120 <= w["x0"] < 335])],
+                        "cat": [(top, [w["text"] for w in ws if 390 <= w["x0"] < 480])],
                     }
+                    anchors.append((top, cur))
                     raw.append(cur)
-                elif cur is not None:
-                    cur["desc"].extend(w["text"] for w in ws if 120 <= w["x0"] < 300)
-                    cur["cat"].extend(w["text"] for w in ws if 390 <= w["x0"] < 500)
+                else:
+                    body.append((top, ws))
+
+            for top, ws in body:
+                desc = [w["text"] for w in ws if 120 <= w["x0"] < 335]
+                cat = [w["text"] for w in ws if 390 <= w["x0"] < 480]
+                if not desc and not cat:
+                    continue
+                target: dict | None = None
+                if anchors:
+                    nearest = min(anchors, key=lambda a: abs(a[0] - top))
+                    first_top = anchors[0][0]
+                    if top < first_top and (first_top - top) > _OPERAZIONI_WRAP_MAX_DIST:
+                        # Too far above the page's first anchor to be its wrap:
+                        # tail of the previous page's last movement — or, on the
+                        # first page, front-matter to DROP (not glue to row one).
+                        if len(raw) > len(anchors):
+                            target = raw[-len(anchors) - 1]
+                    else:
+                        target = nearest[1]
+                elif raw:
+                    target = raw[-1]  # page with no anchors: pure continuation
+                if target is not None:
+                    target["desc"].append((top, desc))
+                    target["cat"].append((top, cat))
+
+    for t in raw:
+        t["desc"] = [tok for _top, toks in sorted(t["desc"]) for tok in toks]
+        t["cat"] = [tok for _top, toks in sorted(t["cat"]) for tok in toks]
 
     txs: list[Transaction] = []
     for t in raw:

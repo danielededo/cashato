@@ -151,10 +151,14 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def load(path: Path, source: str, force: bool = False) -> int:
+def load(path: Path, source: str, force: bool = False, filename: str | None = None) -> int:
+    """``filename`` is the ORIGINAL name for the registry: the etl-worker parses
+    a downloaded temp copy, and registering ``path.name`` made every reprocess
+    overwrite the real names in /files with ``tmpXXXX.pdf``."""
     if source not in ADAPTERS:
         raise SystemExit(f"unsupported source: {source} (available: {list(ADAPTERS)})")
 
+    filename = filename or path.name
     digest = sha256_of(path)
     engine = get_engine()
 
@@ -182,7 +186,7 @@ def load(path: Path, source: str, force: bool = False) -> int:
             ),
             {
                 "source": source,
-                "filename": path.name,
+                "filename": filename,
                 "sha256": digest,
                 "size": path.stat().st_size,
             },
