@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, FastAPI, Form, HTTPException, UploadFile
+from fastapi import APIRouter, FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
@@ -90,6 +90,29 @@ app = FastAPI(
     license_info={"name": "MIT"},
     lifespan=lifespan,
 )
+
+# Multipart framing overhead allowed on top of the file cap before the declared
+# body size is rejected outright.
+_MAX_BODY_BYTES = _MAX_FILE_BYTES + (1 << 20)
+
+
+@app.middleware("http")
+async def reject_oversized_body(request: Request, call_next):
+    """Refuse an oversized upload BEFORE the body is read off the wire.
+
+    Starlette parses the whole multipart body into a SpooledTemporaryFile (disk
+    past ~1 MB) before an ``UploadFile`` handler ever runs, so the in-handler
+    cap alone would let a huge POST land on the pod's ephemeral storage first.
+    Content-Length is present on any well-formed client upload; a chunked
+    request falls through to the handler cap, which stays authoritative.
+    """
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > _MAX_BODY_BYTES:
+        return JSONResponse(
+            {"detail": f"request body too large (> {_MAX_BODY_BYTES} bytes)"},
+            status_code=413,
+        )
+    return await call_next(request)
 
 
 # --- response models ---
@@ -224,8 +247,10 @@ async def create_upload(
 ):
     """Store the file and enqueue an ingestion job (processed asynchronously).
 
-    Validates the extension and enforces a per-file size cap server-side (413),
-    streaming the body so an oversized upload cannot exhaust memory.
+    Validates the extension and enforces the per-file size cap (413). By the
+    time this runs Starlette has already spooled the multipart body to a temp
+    file — the middleware above rejects oversized declared lengths before
+    that; this cap is the authoritative backstop (e.g. chunked uploads).
     """
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in _ALLOWED_EXT:
