@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The wordmark, shrunk: a bold "c" with the accent-colored dot. Colors
+       track the BROWSER theme (the tab is outside the app's data-theme). -->
+  <style>
+    .c { fill: #24292e; }
+    @media (prefers-color-scheme: dark) { .c { fill: #d8d9da; } }
+  </style>
+  <text x="3" y="25" class="c"
+        font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="26" font-weight="700">c</text>
+  <circle cx="24.5" cy="22.5" r="3.5" fill="#5794f2"/>
+</svg>
