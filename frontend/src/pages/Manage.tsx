@@ -146,9 +146,13 @@ function AccountsPanel() {
         const described = a.bank_name !== null || a.product !== null;
         return (
           <div key={a.account_id} className="acct-row">
+            {/* Display name first: the immutable parser id (hashed into
+                natural_key) is reference data, not the row's identity. */}
             <div className="acct-id">
-              <span className="mono">{a.account_id}</span>
+              <span>{a.display_name}</span>
               <span className="dim">
+                <span className="mono">{a.account_id}</span>
+                {" · "}
                 {a.transactions} {t("acc.movements")}
                 {a.is_joint ? " · Joint" : ""}
                 {described ? "" : ` · ${t("acc.noMeta")}`}
