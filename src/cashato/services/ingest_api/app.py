@@ -241,8 +241,9 @@ async def create_upload(
     file: UploadFile,
     source: str | None = Form(
         default=None,
-        description=f"Optional explicit source override. One of: {SOURCE_NAMES}. "
-        f"If omitted, the worker detects it by content.",
+        description=f"Technical escape hatch: force the source instead of detecting it "
+        f"by content. One of: {SOURCE_NAMES}. For ambiguous statements or parser "
+        f"development; the UI never sends it.",
     ),
 ):
     """Store the file and enqueue an ingestion job (processed asynchronously).
@@ -258,9 +259,16 @@ async def create_upload(
             status_code=415,
             detail=f"unsupported file type {suffix!r}. Allowed: {sorted(_ALLOWED_EXT)}",
         )
+    # A typo'd override used to be silently ignored (the worker fell back to
+    # detection and answered 202): reject it here, where the caller can see it.
+    if source is not None and source not in SOURCE_NAMES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown source {source!r}. Valid: {sorted(SOURCE_NAMES)}",
+        )
     # Stream to a local temp file (enforcing the size cap), then hand it off to
     # object storage and drop the temp. The job carries only the object KEY.
-    key = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    key = f"{uuid.uuid4().hex}_{file.filename}"
     size = 0
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         try:

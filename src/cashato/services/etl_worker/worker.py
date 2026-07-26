@@ -65,7 +65,12 @@ def _process(key: str, filename: str | None, source_override: str | None, force:
     os.close(fd)
     try:
         objstore.fget(key, dest)
-        source = source_override if source_override in load.ADAPTERS else detect_source(dest)
+        # ingest-api 422s unknown overrides, so this guard only fires for jobs
+        # queued before that gate existed — loudly, not as a silent fallback.
+        if source_override and source_override not in load.ADAPTERS:
+            log.warning("unknown source override %r ignored; detecting", source_override)
+            source_override = None
+        source = source_override or detect_source(dest)
         if not source:
             # Two different declines: nothing matched, or several sources matched
             # equally and guessing would be a coin flip. Record which, because the

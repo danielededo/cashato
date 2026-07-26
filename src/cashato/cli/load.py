@@ -51,8 +51,9 @@ def record_unsupported(
     if ambiguous:
         reason = (
             f"Ambiguous statement: its content matches {' and '.join(sorted(ambiguous))} "
-            f"equally well, so the source was not guessed. Re-upload choosing the "
-            f"source explicitly."
+            f"equally well, so the source was not guessed. Force it by re-uploading "
+            f"with an explicit `source` (POST /api/v1/uploads), or make the parsers' "
+            f"DETECTION markers more specific."
         )
     elif bank:
         reason = f"Statement appears to be from {bank}, which has no adapter yet."
@@ -209,8 +210,8 @@ def load(path: Path, source: str, force: bool = False) -> int:
         reason = (
             f"Parsed as '{source}' but produced 0 transactions. The file was most "
             f"likely routed to the wrong parser (its content matched '{source}' "
-            f"detection markers); re-upload choosing the source explicitly if it "
-            f"belongs to a supported bank."
+            f"detection markers); if it belongs to a supported bank, re-upload it "
+            f"with an explicit `source` (POST /api/v1/uploads)."
         )
         with engine.begin() as conn:
             conn.execute(

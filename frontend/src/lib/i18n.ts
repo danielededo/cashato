@@ -175,10 +175,6 @@ const UI: Dict = {
   },
 
   // upload
-  "up.override": { it: "Il file non viene riconosciuto? Indica tu la banca", en: "File not recognised? Pick the bank yourself" },
-  "up.override.hint": { it: "Normalmente non serve: la banca si ricava dal contenuto del file, non dal nome.", en: "Normally unnecessary: the bank is worked out from the file's content, not its name." },
-  "up.source": { it: "Fonte", en: "Source" },
-  "up.autodetect": { it: "Rileva automaticamente", en: "Detect automatically" },
   "up.drop": { it: "Trascina uno o più estratti qui, o clicca per scegliere", en: "Drop one or more statements here, or click to choose" },
   "up.uploading": { it: "Caricamento…", en: "Uploading…" },
   "up.progress": { it: "Caricamento {n}/{total}: {name}…", en: "Uploading {n}/{total}: {name}…" },

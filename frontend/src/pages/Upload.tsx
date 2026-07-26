@@ -8,8 +8,7 @@ import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
-  const { sources, acceptAttr, sourceLabel } = useMeta();
-  const [source, setSource] = useState("");
+  const { acceptAttr, sourceLabel } = useMeta();
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -34,7 +33,7 @@ export function Upload() {
     for (const [i, file] of list.entries()) {
       setMsg({ ok: true, text: t("up.progress", { n: i + 1, total: list.length, name: file.name }) });
       try {
-        await api.upload(file, source || undefined);
+        await api.upload(file);
       } catch (e) {
         failed.push(`${file.name}: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -91,22 +90,11 @@ export function Upload() {
 
         {msg ? <div className={`state ${msg.ok ? "" : "error"}`}>{msg.text}</div> : null}
 
-        {/* The source is worked out from the file's CONTENT, so asking up front
-            makes the user do the system's job and advertises the supported list
-            as if it were a limit. Kept only as a recovery path, folded away. */}
-        <details className="override">
-          <summary>{t("up.override")}</summary>
-          <label className="field" style={{ marginTop: 9 }}>
-            {t("up.source")}
-            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">{t("up.autodetect")}</option>
-              {sources.map((s) => (
-                <option key={s} value={s}>{sourceLabel(s)}</option>
-              ))}
-            </select>
-          </label>
-          <p className="hint" style={{ marginTop: 7 }}>{t("up.override.hint")}</p>
-        </details>
+        {/* No bank picker: the source is worked out from the file's CONTENT.
+            Asking up front would make the user do the system's job — and with
+            multi-file upload a single choice could not apply to a mixed batch
+            anyway. The API keeps a validated `source` override as a technical
+            escape hatch (ambiguous files, parser development). */}
       </div>
 
       <div className="panel">

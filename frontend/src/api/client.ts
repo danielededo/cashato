@@ -86,10 +86,9 @@ export const api = {
   renameAccount: (id: string, display_name: string | null) =>
     postJson<AdminResult>(`/admin/accounts/${encodeURIComponent(id)}`, { display_name }, "PATCH"),
 
-  async upload(file: File, source?: string): Promise<UploadAccepted> {
+  async upload(file: File): Promise<UploadAccepted> {
     const form = new FormData();
     form.append("file", file);
-    if (source) form.append("source", source);
     const res = await fetch(`${BASE}/uploads`, { method: "POST", body: form });
     if (!res.ok) throw new ApiError(res.status, await safeText(res));
     return res.json() as Promise<UploadAccepted>;
