@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
-import { invalidateAccounts } from "../lib/accounts";
-import { useAsync } from "../lib/useAsync";
+import { invalidateAccounts, useAccounts } from "../lib/accounts";
 
 type Busy = null | "reprocess" | "reset";
 
@@ -21,6 +20,7 @@ export function Manage() {
       const r = await fn();
       // reset/reprocess change which accounts exist and what they are called
       invalidateAccounts();
+      setConfirm(""); // disarm the destructive button after success
       setMsg({ ok: true, text: r.detail ?? r.status });
     } catch (e) {
       const notDeployed = e instanceof ApiError && (e.status === 404 || e.status === 405);
@@ -115,7 +115,10 @@ python -m cashato.ml.label --limit 2000</code></pre>
  *  and we say so instead of pretending the field is editable. */
 function AccountsPanel() {
   const { t } = useT();
-  const accounts = useAsync(() => api.accounts(), []);
+  // The SHARED accounts cache, not a private fetch: a reset truncates
+  // silver.accounts, and this panel — sitting right above the reset button —
+  // kept listing the wiped accounts with live Rename buttons that 404'd.
+  const { accounts: rows } = useAccounts();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -129,7 +132,6 @@ function AccountsPanel() {
       // Every other page reads names from the shared cache; without this they
       // keep showing the old one while this panel shows the new.
       invalidateAccounts();
-      accounts.reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -137,15 +139,14 @@ function AccountsPanel() {
     }
   }
 
-  const rows = accounts.data?.accounts ?? [];
   return (
     <div className="panel">
       <div className="panel-head">
         <h2>{t("acc.title")}</h2>
         <span className="hint">{t("acc.hint")}</span>
       </div>
-      {accounts.loading && !accounts.data ? <div className="state">{t("common.loading")}</div> : null}
       {err ? <div className="state error">{err}</div> : null}
+      {rows.length === 0 ? <div className="state">{t("acc.none")}</div> : null}
       {rows.map((a) => {
         const value = draft[a.account_id] ?? a.display_name_override ?? "";
         const described = a.bank_name !== null || a.product !== null;
@@ -159,7 +160,7 @@ function AccountsPanel() {
                 <span className="mono">{a.account_id}</span>
                 {" · "}
                 {a.transactions} {t("acc.movements")}
-                {a.is_joint ? " · Joint" : ""}
+                {a.is_joint ? ` · ${t("common.joint")}` : ""}
                 {described ? "" : ` · ${t("acc.noMeta")}`}
               </span>
             </div>

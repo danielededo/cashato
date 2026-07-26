@@ -6,6 +6,8 @@
 // showing `trade_republic` is honest, inventing "Trade Republic" is not.
 
 import { useEffect, useMemo, useState } from "react";
+import { t } from "./i18n";
+import { useLang } from "./lang";
 import { api } from "../api/client";
 import type { Account } from "../api/types";
 import { useAsync } from "./useAsync";
@@ -49,12 +51,10 @@ export interface AccountNaming {
   accountLabel: (id: string | null | undefined) => string;
   /** Compact label for dense places (tables): bank name, plus a Joint marker. */
   accountShort: (id: string | null | undefined) => string;
-  /** Bank behind a source id, when its accounts agree on one. */
-  sourceLabel: (id: string | null | undefined) => string;
-  isJoint: (id: string | null | undefined) => boolean;
 }
 
 export function useAccounts(): AccountNaming {
+  const { lang } = useLang();
   // Re-subscribe on invalidation so every mounted page picks up new names,
   // rather than only the one that triggered the change.
   const [gen, setGen] = useState(generation);
@@ -101,13 +101,8 @@ export function useAccounts(): AccountNaming {
       accountShort: (id) => {
         const a = byId.get(id ?? "");
         if (!a?.bank_name) return raw(id);
-        return a.is_joint ? `${a.bank_name} (Joint)` : a.bank_name;
+        return a.is_joint ? `${a.bank_name} (${t("common.joint", lang)})` : a.bank_name;
       },
-      sourceLabel: (id) => {
-        const banks = banksBySource.get(id ?? "");
-        return banks?.size === 1 ? [...banks][0] : raw(id);
-      },
-      isJoint: (id) => byId.get(id ?? "")?.is_joint === true,
     };
-  }, [accounts]);
+  }, [accounts, lang]);
 }

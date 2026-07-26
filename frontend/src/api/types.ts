@@ -1,13 +1,16 @@
 // TS mirrors of the query-api / ingest-api response models (src/cashato/services/*).
 // `category` is the stable language-neutral code; `category_label` is localized.
 
+// Every money field is `Money` (an exact decimal STRING on the wire — see the
+// note at Money below); convert deliberately with num(). These were `number`
+// while the API sent floats; the API now keeps Decimal end to end.
 export interface CategoryTotal {
   category: string;
   category_label: string;
   n_movements: number;
-  income: number | null;
-  expense: number | null;
-  net: number | null;
+  income: Money | null;
+  expense: Money | null;
+  net: Money | null;
 }
 export interface SummaryResponse {
   lang: string;
@@ -16,10 +19,9 @@ export interface SummaryResponse {
 
 export interface MonthRow {
   month: string; // ISO date (first of month)
-  income: number | null;
-  expense: number | null;
-  net: number | null;
-  net_excl_investments: number | null;
+  income: Money | null;
+  expense: Money | null;
+  net: Money | null;
 }
 export interface MonthlyResponse {
   months: MonthRow[];
@@ -30,7 +32,7 @@ export interface CategoryMonthRow {
   category: string;
   category_label: string;
   n_movements: number;
-  total: number | null;
+  total: Money | null;
 }
 export interface CategoriesMonthlyResponse {
   lang: string;
@@ -42,7 +44,7 @@ export interface TransactionRow {
   value_date: string;
   booking_date: string;
   description: string;
-  amount: number; // signed: negative = outflow
+  amount: Money; // signed: negative = outflow
   currency: string;
   account: string;
   source: string;
@@ -237,7 +239,7 @@ export interface TransactionDetail {
   value_date: string;
   booking_date: string;
   description: string;
-  amount: number;
+  amount: Money;
   currency: string;
   account: string;
   source: string;
@@ -255,8 +257,8 @@ export interface TransactionDetail {
   isin: string | null;
   instrument: string | null;
   asset_class: string | null;
-  quantity: number | null;
-  unit_price: number | null;
+  quantity: Money | null;
+  unit_price: Money | null;
   side: string | null;
 }
 

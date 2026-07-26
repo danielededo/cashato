@@ -8,7 +8,7 @@ import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
-  const { acceptAttr, sourceLabel, maxFilesPerBatch } = useMeta();
+  const { acceptAttr, sourceLabel, maxFileBytes, maxFilesPerBatch } = useMeta();
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -26,7 +26,10 @@ export function Upload() {
   // and one-at-a-time keeps the progress message truthful and the failure
   // attributable to a file.
   async function send(list: File[]) {
-    if (!list.length) return;
+    // Re-entrancy guard: a second drop (the dropzone stays visible) would run
+    // a second loop concurrently — interleaved progress messages and a batch
+    // cap checked per-drop instead of per-flight.
+    if (busy || !list.length) return;
     if (list.length > maxFilesPerBatch) {
       setMsg({ ok: false, text: t("up.tooMany", { n: list.length, max: maxFilesPerBatch }) });
       return;
@@ -78,7 +81,14 @@ export function Upload() {
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
         >
           {busy ? t("up.uploading") : t("up.drop")}
-          <span className="hint">{t("up.hint")}</span>
+          <span className="hint">
+            {/* From /meta, not hardcoded: a settings.yaml edit changes the real
+                limits with no rebuild, and a restated hint would keep lying. */}
+            {t("up.hint", {
+              ext: acceptAttr.replace(/\./g, " ").toUpperCase().trim().split(/\s*,\s*/).join(", ") || "…",
+              max: Math.round(maxFileBytes / (1024 * 1024)) || "…",
+            })}
+          </span>
           <input
             ref={inputRef}
             type="file"

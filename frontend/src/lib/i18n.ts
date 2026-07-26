@@ -24,6 +24,14 @@ const UI: Dict = {
   "nav.upload": { it: "Carica", en: "Upload" },
 
   // common
+  "common.loadingChart": { it: "Carico il grafico…", en: "Loading chart…" },
+  "common.joint": { it: "Cointestato", en: "Joint" },
+  "delta.vsPrev": { it: "vs prec.", en: "vs prev" },
+  "empty.noSpend": { it: "Nessuna spesa nel periodo.", en: "No spending in range." },
+  "empty.noHistory": { it: "Storia insufficiente.", en: "Not enough history." },
+  "empty.noAllocation": { it: "Nessuna allocazione.", en: "No allocation." },
+  "empty.noMovements": { it: "Nessun movimento nel periodo.", en: "No movements in range." },
+  "acc.none": { it: "Nessun conto ancora — carica un estratto.", en: "No accounts yet — upload a statement." },
   "common.loading": { it: "Caricamento…", en: "Loading…" },
   "common.all": { it: "Tutte", en: "All" },
   "common.income": { it: "Entrate", en: "Income" },
@@ -88,6 +96,8 @@ const UI: Dict = {
   "rev.other.foot": { it: "“other” — rivedi sotto", en: "“other” — review below" },
   "rev.queue": { it: "Coda di revisione · non categorizzate", en: "Review queue · uncategorized" },
   "rev.total": { it: "{n} totali “other”", en: "{n} total “other”" },
+  "rev.queue.lowconf": { it: "Coda di revisione · bassa confidenza", en: "Review queue · low confidence" },
+  "rev.total.lowconf": { it: "{n} proposte incerte del modello", en: "{n} uncertain model guesses" },
   "rev.labelled": { it: " · {n} etichettate in questa sessione", en: " · {n} labelled this session" },
   "rev.setCategory": { it: "Assegna categoria", en: "Set category" },
   "rev.choose": { it: "scegli…", en: "choose…" },
@@ -107,7 +117,6 @@ const UI: Dict = {
 
   // investments — two levels: contributions (always knowable) and positions
   // (only where the source discloses the instrument)
-  "inv.title": { it: "Patrimonio", en: "Wealth" },
   "inv.kinds": { it: "Dove va il patrimonio", en: "Where wealth goes" },
   "inv.kinds.hint": { it: "una riga per destinazione con movimenti", en: "one row per destination with movements" },
   "inv.kind": { it: "Destinazione", en: "Destination" },
@@ -138,6 +147,7 @@ const UI: Dict = {
   "inv.instrument": { it: "Strumento", en: "Instrument" },
   "inv.units": { it: "Quote", en: "Units" },
   "inv.investedCol": { it: "Investito", en: "Invested" },
+  "inv.netCol": { it: "Netto investito", en: "Net invested" },
   "inv.avgPrice": { it: "Prezzo medio", en: "Avg cost" },
   "inv.lastPrice": { it: "Ultimo prezzo", en: "Last price" },
   "inv.trades": { it: "Op.", en: "Trades" },
@@ -181,7 +191,7 @@ const UI: Dict = {
   "up.done": { it: "{total} file in coda. Analisi in corso…", en: "{total} files queued. Parsing…" },
   "up.doneErrors": { it: "{ok}/{total} file in coda", en: "{ok}/{total} files queued" },
   "up.tooMany": { it: "{n} file sono troppi: massimo {max} per volta", en: "{n} files is too many: at most {max} per batch" },
-  "up.hint": { it: "PDF, CSV o XLSX — max 10 MiB a file", en: "PDF, CSV or XLSX — max 10 MiB per file" },
+  "up.hint": { it: "{ext} — max {max} MiB a file", en: "{ext} — max {max} MiB per file" },
   "up.recent": { it: "File recenti", en: "Recent files" },
   "up.when": { it: "Quando", en: "When" },
   "up.file": { it: "File", en: "File" },
@@ -193,7 +203,6 @@ const UI: Dict = {
   "up.emptySub": { it: "Trascina il primo estratto qui sopra per iniziare.", en: "Drop your first statement above to start building the ledger." },
 
   // manage
-  "mng.title": { it: "Gestione dati", en: "Manage data" },
   "mng.reprocess": { it: "Rielabora file", en: "Reprocess files" },
   "mng.reprocess.hint": { it: "Rimetti in coda l'ETL sui file archiviati (per sha256), senza ricaricarli.", en: "Re-run the ETL over stored files (by sha256), without re-uploading." },
   "mng.reprocessBtn": { it: "Rielabora", en: "Reprocess" },
@@ -216,8 +225,6 @@ const UI: Dict = {
   "acc.hint": { it: "Nome, banca e intestazione ricavati dagli estratti. Puoi rinominarli.", en: "Name, bank and holding read off the statements. You can rename them." },
   "acc.rename": { it: "Rinomina", en: "Rename" },
   "acc.reset": { it: "Ripristina", en: "Reset" },
-  "acc.derived": { it: "nome ricavato", en: "derived name" },
-  "acc.custom": { it: "rinominato", en: "renamed" },
   "acc.movements": { it: "movimenti", en: "movements" },
   "acc.noMeta": { it: "nessun estratto descrive questo conto", en: "no statement describes this account" },
   "home.subtitle": { it: "Ecco come sono andate le tue finanze.", en: "Here is how your finances are doing." },

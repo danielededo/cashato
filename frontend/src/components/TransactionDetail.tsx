@@ -58,7 +58,7 @@ export function TransactionDetail({
         {d ? (
           <div className="drawer-body">
             <div className="det-amount">
-              <span className={`amt ${d.amount < 0 ? "neg" : "pos"}`}>{money(d.amount)}</span>
+              <span className={`amt ${num(d.amount) < 0 ? "neg" : "pos"}`}>{money(num(d.amount))}</span>
               <span className="dim">{d.currency}</span>
             </div>
             <p className="det-desc">{d.description}</p>
@@ -102,7 +102,7 @@ export function TransactionDetail({
                   <Field label="ISIN" mono>{d.isin ?? "—"}</Field>
                   <Field label={t("inv.units")} mono>{d.quantity ?? "—"}</Field>
                   <Field label={t("det.unitPrice")} mono>
-                    {d.unit_price != null ? money(d.unit_price) : "—"}
+                    {d.unit_price != null ? money(num(d.unit_price)) : "—"}
                   </Field>
                 </div>
               </div>

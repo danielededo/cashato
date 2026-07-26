@@ -4,6 +4,13 @@
 import { memo, useState } from "react";
 import { colorFor } from "../lib/colors";
 import { money } from "../lib/format";
+import { useT } from "../lib/i18n";
+
+/** Localized empty-state line for charts/panels. */
+export function EmptyNote({ k }: { k: string }) {
+  const { t } = useT();
+  return <div className="chart-fallback">{t(k)}</div>;
+}
 
 /* Inline sparkline. Coordinates are rounded to 1dp (rendering-svg-precision). */
 export const Sparkline = memo(function Sparkline({
@@ -49,18 +56,19 @@ export const Delta = memo(function Delta({
   goodWhenUp?: boolean;
   unit?: "%" | "pp";
 }) {
+  const { t } = useT();
   if (previous == null || !Number.isFinite(previous) || previous === 0) {
-    return <span className="delta flat">— vs prev</span>;
+    return <span className="delta flat">— {t("delta.vsPrev")}</span>;
   }
   const change = unit === "pp" ? current - previous : ((current - previous) / Math.abs(previous)) * 100;
   const rounded = Math.round(change * 10) / 10;
-  if (rounded === 0) return <span className="delta flat">±0{unit} vs prev</span>;
+  if (rounded === 0) return <span className="delta flat">±0{unit} {t("delta.vsPrev")}</span>;
   const up = rounded > 0;
   const good = up === goodWhenUp;
   return (
     <span className={`delta ${good ? "up" : "down"}`}>
       {up ? "▲" : "▼"} {Math.abs(rounded)}
-      {unit} vs prev
+      {unit} {t("delta.vsPrev")}
     </span>
   );
 });
@@ -85,7 +93,7 @@ export const RankBars = memo(function RankBars({
   selected?: string | null;
   onSelect?: (category: string) => void;
 }) {
-  if (!items.length) return <div className="chart-fallback">No spending in range.</div>;
+  if (!items.length) return <EmptyNote k="empty.noSpend" />;
   let max = 0;
   for (const it of items) if (it.value > max) max = it.value;
   return (
@@ -96,7 +104,7 @@ export const RankBars = memo(function RankBars({
           className="rank"
           role="button"
           tabIndex={0}
-          aria-selected={selected === it.category}
+          aria-pressed={selected === it.category}
           onClick={() => onSelect?.(it.category)}
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.(it.category)}
         >
@@ -135,7 +143,7 @@ export const Heatmap = memo(function Heatmap({
   valueOf: (category: string, month: string) => number;
   onPick?: (category: string, month: string) => void;
 }) {
-  if (!rows.length || !months.length) return <div className="chart-fallback">Not enough history.</div>;
+  if (!rows.length || !months.length) return <EmptyNote k="empty.noHistory" />;
   let max = 0;
   for (const r of rows) for (const m of months) { const v = valueOf(r.category, m); if (v > max) max = v; }
   const cols = `minmax(96px, max-content) repeat(${months.length}, minmax(26px, 1fr))`;
@@ -159,8 +167,12 @@ export const Heatmap = memo(function Heatmap({
                 <div
                   key={m}
                   className="heat-cell"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${r.label} ${monthLabels[months.indexOf(m)] ?? m}`}
                   title={`${r.label} · ${v ? money(v) : "—"}`}
                   onClick={() => onPick?.(r.category, m)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPick?.(r.category, m)}
                   style={{ background: pct ? `color-mix(in srgb, ${colorFor(r.category)} ${pct}%, var(--panel-2))` : "var(--panel-2)" }}
                 />
               );
@@ -197,7 +209,7 @@ export const Donut = memo(function Donut({
   centerLabel?: string;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  if (!slices.length || total <= 0) return <div className="chart-fallback">No allocation.</div>;
+  if (!slices.length || total <= 0) return <EmptyNote k="empty.noAllocation" />;
 
   const R = 68;
   const STROKE = 22;

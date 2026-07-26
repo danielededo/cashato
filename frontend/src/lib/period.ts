@@ -15,19 +15,6 @@ export function monthsFor(key: PeriodKey): number | null {
   return PERIODS.find((p) => p.key === key)?.months ?? null;
 }
 
-/** Set of ISO months to keep for the given window, from the months present. */
-export function monthsInPeriod(allMonths: Iterable<string>, months: number | null): Set<string> {
-  const uniq = [...new Set(allMonths)].sort();
-  if (months == null || uniq.length <= months) return new Set(uniq);
-  return new Set(uniq.slice(uniq.length - months));
-}
-
-/** Earliest ISO date kept by the window — for seeding a transactions date filter. */
-export function periodStart(allMonths: Iterable<string>, months: number | null): string | undefined {
-  const kept = [...monthsInPeriod(allMonths, months)].sort();
-  return kept[0];
-}
-
 /** Current window plus the equal-length window immediately before it (for "vs
  *  previous period" comparison). previous is empty when there isn't enough history
  *  or when the window is "all". */

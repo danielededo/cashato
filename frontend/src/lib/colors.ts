@@ -16,7 +16,7 @@ const PRIMARY: Record<string, number> = {
   rent: 8,
 };
 
-export const OTHER_COLOR = "var(--cat-other)";
+const OTHER_COLOR = "var(--cat-other)";
 
 export function colorFor(code: string | null | undefined): string {
   const slot = code ? PRIMARY[code] : undefined;
@@ -32,26 +32,3 @@ export function seriesColor(i: number): string {
 // Two-series semantic colors for income vs expense (status-like, fixed).
 export const INCOME_COLOR = "var(--income)";
 export const EXPENSE_COLOR = "var(--expense)";
-
-// Top-N ranking helper: keep the N largest by |value|, fold the rest into "other".
-export function topNWithOther<T extends { category: string; category_label: string }>(
-  rows: T[],
-  value: (r: T) => number,
-  n = 7,
-): Array<{ category: string; label: string; value: number }> {
-  const sorted = [...rows].sort((a, b) => Math.abs(value(b)) - Math.abs(value(a)));
-  const head = sorted.slice(0, n).map((r) => ({
-    category: r.category,
-    label: r.category_label,
-    value: Math.abs(value(r)),
-  }));
-  const tail = sorted.slice(n);
-  if (tail.length) {
-    head.push({
-      category: "other",
-      label: "Other",
-      value: tail.reduce((s, r) => s + Math.abs(value(r)), 0),
-    });
-  }
-  return head;
-}

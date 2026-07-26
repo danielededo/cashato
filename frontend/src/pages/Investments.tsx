@@ -33,13 +33,13 @@ import { useLang } from "../lib/lang";
 import { useAsync } from "../lib/useAsync";
 
 const StackedArea = lazy(() => import("../components/charts").then((m) => ({ default: m.StackedArea })));
-const chartFallback = <div className="chart-fallback">Loading chart…</div>;
 
 const KNOWN = "known";
 const UNKNOWN = "unknown";
 
 export function Investments() {
   const { t } = useT();
+  const chartFallback = <div className="chart-fallback">{t("common.loadingChart")}</div>;
   const { lang } = useLang();
   // Cumulative by default: this page is about accumulated wealth, and an area
   // chart reads as a running total. Monthly stays available because it answers
@@ -169,8 +169,9 @@ export function Investments() {
                 <thead>
                   <tr>
                     <th>{t("inv.kind")}</th>
-                    <th className="num">{t("inv.investedCol")}</th>
+                    <th className="num">{t("inv.invested")}</th>
                     <th className="num">{t("inv.returns")}</th>
+                    <th className="num">{t("inv.netCol")}</th>
                     <th className="num">{t("common.movements")}</th>
                     <th>{t("inv.detailLevel")}</th>
                   </tr>
@@ -184,8 +185,9 @@ export function Investments() {
                           {k.category_label}
                         </span>
                       </td>
-                      <td className="num mono">{money(num(k.net_invested))}</td>
+                      <td className="num mono">{money(num(k.contributed))}</td>
                       <td className="num mono dim">{money(num(k.returned))}</td>
+                      <td className="num mono">{money(num(k.net_invested))}</td>
                       <td className="num mono dim">{k.n_movements}</td>
                       <td className="dim">
                         {k.has_instruments ? t("inv.withInstruments") : t("inv.amountOnly")}
@@ -258,8 +260,8 @@ export function Investments() {
                     </tr>
                   </thead>
                   <tbody>
-                    {d.holdings.map((h) => (
-                      <tr key={h.isin ?? h.instrument}>
+                    {d.holdings.map((h, i) => (
+                      <tr key={h.isin ?? h.instrument ?? String(i)}>
                         <td className="desc" title={h.instrument ?? ""}>{h.instrument ?? "—"}</td>
                         <td className="mono dim">{h.isin ?? "—"}</td>
                         <td className="num mono">{num(h.units).toFixed(4)}</td>

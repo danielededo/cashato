@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Delta, Heatmap, RankBars, Sparkline, type HeatRow, type RankItem } from "../components/primitives";
 import { HeaderPortal } from "../lib/headerSlot";
-import { isoDate, money } from "../lib/format";
+import { isoDate, money, num } from "../lib/format";
 import { monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { useLang } from "../lib/lang";
@@ -13,7 +13,6 @@ import { useAsync } from "../lib/useAsync";
 
 const StackedArea = lazy(() => import("../components/charts").then((m) => ({ default: m.StackedArea })));
 const MonthlyBars = lazy(() => import("../components/charts").then((m) => ({ default: m.MonthlyBars })));
-const chartFallback = <div className="chart-fallback">Loading chart…</div>;
 
 const TOP_RANK = 8;
 const TOP_STACK = 6;
@@ -53,7 +52,8 @@ export function Dashboard() {
       const sInc: number[] = [], sExp: number[] = [], sNet: number[] = [];
       for (const m of win) {
         const r = byMonth.get(m);
-        const i = r?.income ?? 0, e = r?.expense ?? 0, n = r?.net ?? i + e;
+        // num() is the deliberate string->number boundary (Money on the wire).
+        const i = num(r?.income), e = num(r?.expense), n = r?.net != null ? num(r.net) : i + e;
         income += i; expense += e; net += n;
         sInc.push(i); sExp.push(Math.abs(e)); sNet.push(n);
       }
@@ -72,7 +72,7 @@ export function Dashboard() {
       const inCur = cur.has(r.month), inPrev = prev.has(r.month);
       if (inCur) { movCur += r.n_movements; movByMonth.set(r.month, (movByMonth.get(r.month) ?? 0) + r.n_movements); }
       if (inPrev) movPrev += r.n_movements;
-      const t = r.total ?? 0;
+      const t = num(r.total);
       if (t >= 0) continue;
       const mag = -t;
       if (inCur) {
@@ -98,7 +98,7 @@ export function Dashboard() {
     const heatRows: HeatRow[] = ranked.slice(0, TOP_RANK).map(([category, v]) => ({ category, label: v.label }));
     const barsData = current.map((m) => {
       const r = byMonth.get(m);
-      return { month: monthShort(m), Income: Math.round(r?.income ?? 0), Expense: Math.round(Math.abs(r?.expense ?? 0)) };
+      return { month: monthShort(m), Income: Math.round(num(r?.income)), Expense: Math.round(Math.abs(num(r?.expense))) };
     });
 
     const expAbs = Math.abs(c.expense);
@@ -119,6 +119,7 @@ export function Dashboard() {
   const error = monthly.error ?? catMonthly.error;
   const pv = (x: number) => (compare && d?.hasPrev ? x : null);
 
+  const chartFallback = <div className="chart-fallback">{t("common.loadingChart")}</div>;
   const drillCategory = (category: string) => navigate(`/transactions?category=${category}&sign=expense`);
   const drillCell = (category: string, month: string) =>
     navigate(`/transactions?category=${category}&sign=expense&date_from=${month}&date_to=${endOfMonth(month)}`);
@@ -135,7 +136,7 @@ export function Dashboard() {
         <div className="segmented" role="group" aria-label="Period">
           {PERIODS.map((pp) => (
             <button key={pp.key} aria-pressed={period === pp.key} onClick={() => setPeriod(pp.key)}>
-              {pp.key === "all" ? "All" : pp.label}
+              {pp.key === "all" ? t("common.all") : pp.label}
             </button>
           ))}
         </div>

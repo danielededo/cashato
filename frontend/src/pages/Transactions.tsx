@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
 import { colorFor } from "../lib/colors";
-import { dateLabel, isoDate, money } from "../lib/format";
+import { dateLabel, isoDate, money, num } from "../lib/format";
 import { TransactionDetail } from "../components/TransactionDetail";
 import { useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
@@ -58,6 +58,21 @@ export function Transactions() {
   useEffect(() => {
     setOffset(0);
   }, [deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, sort]);
+
+  // URL params are read at mount AND on every later change: a nav click to the
+  // same route (or a drill-down while already here) clears/changes the query
+  // string without remounting, and the filters must follow or the address bar
+  // and the list contradict each other.
+  useEffect(() => {
+    setSearch(params.get("q") ?? "");
+    setSign((params.get("sign") as Sign) ?? "");
+    setSource(params.get("source") ?? "");
+    setCategory(params.get("category") ?? "");
+    setDateFrom(params.get("date_from") ?? "");
+    setDateTo(params.get("date_to") ?? "");
+    setShowAdvanced(Boolean(params.get("category") || params.get("date_from")));
+    setDatePreset(params.get("date_from") ? "custom" : "all");
+  }, [params]);
 
   // Sorting is a QUERY param, not a client-side shuffle: re-sorting one loaded
   // page under a global-looking header showed "the biggest of the newest 50",
@@ -221,11 +236,27 @@ export function Transactions() {
             <table>
               <thead>
                 <tr>
-                  <th className="sortable" onClick={() => toggleSort("date")}>{t("common.date")}{caret("date")}</th>
-                  <th className="sortable" onClick={() => toggleSort("description")}>{t("common.description")}{caret("description")}</th>
-                  <th className="sortable" onClick={() => toggleSort("category")}>{t("common.category")}{caret("category")}</th>
-                  <th className="num sortable" onClick={() => toggleSort("amount")}>{t("common.amount")}{caret("amount")}</th>
-                  <th className="sortable" onClick={() => toggleSort("account")}>{t("common.account")}{caret("account")}</th>
+                  {(
+                    [
+                      ["date", "common.date", ""],
+                      ["description", "common.description", ""],
+                      ["category", "common.category", ""],
+                      ["amount", "common.amount", "num "],
+                      ["account", "common.account", ""],
+                    ] as [SortKey, string, string][]
+                  ).map(([key, tkey, extra]) => (
+                    <th
+                      key={key}
+                      className={`${extra}sortable`}
+                      role="button"
+                      tabIndex={0}
+                      aria-sort={sort.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                      onClick={() => toggleSort(key)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleSort(key)}
+                    >
+                      {t(tkey)}{caret(key)}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -254,7 +285,7 @@ export function Transactions() {
                           </select>
                         </span>
                       </td>
-                      <td className="num"><span className={`amt ${tx.amount < 0 ? "neg" : "pos"}`}>{money(tx.amount)}</span></td>
+                      <td className="num"><span className={`amt ${num(tx.amount) < 0 ? "neg" : "pos"}`}>{money(num(tx.amount))}</span></td>
                       <td className="dim" title={accountLabel(tx.account)}>{accountShort(tx.account)}</td>
                     </tr>
                   );

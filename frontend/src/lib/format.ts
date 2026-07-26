@@ -19,12 +19,6 @@ export function moneyShort(n: number | null | undefined): string {
   return eur0.format(n);
 }
 
-export function monthLabel(iso: string): string {
-  // "2024-03-01" -> "Mar 2024"
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-}
-
 /** Short month for dense axes: "Mar '24". */
 export function monthShort(iso: string): string {
   const d = new Date(iso);

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { TransactionRow } from "../api/types";
 import { colorFor } from "../lib/colors";
-import { dateLabel, money } from "../lib/format";
+import { dateLabel, money, num } from "../lib/format";
+import { useAccounts } from "../lib/accounts";
 import { useT } from "../lib/i18n";
 import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
@@ -26,6 +27,7 @@ const LOWCONF_MAX = 0.7;
 export function Review() {
   const { t, lang } = useT();
   const { categoryCodes, catLabel } = useMeta();
+  const { accountLabel, accountShort } = useAccounts();
   const [mode, setMode] = useState<"other" | "lowconf">("other");
   const sample = useAsync(() => api.transactions({ limit: SAMPLE, include_transfers: false, lang }), [lang]);
   const queue = useAsync(
@@ -114,10 +116,10 @@ export function Review() {
 
       <div className="panel">
         <div className="panel-head">
-          <h2>{t("rev.queue")}</h2>
+          <h2>{t(mode === "lowconf" ? "rev.queue.lowconf" : "rev.queue")}</h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span className="hint">
-              {queue.data ? t("rev.total", { n: queue.data.total }) : "…"}
+              {queue.data ? t(mode === "lowconf" ? "rev.total.lowconf" : "rev.total", { n: queue.data.total }) : "…"}
               {done ? t("rev.labelled", { n: done }) : ""}
             </span>
             <div className="segmented" role="group" aria-label="Review mode">
@@ -150,14 +152,18 @@ export function Review() {
                 <tr key={tx.natural_key}>
                   <td className="mono dim">{dateLabel(tx.value_date)}</td>
                   <td className="desc" title={tx.description}>{tx.description}</td>
-                  <td className="num"><span className={`amt ${tx.amount < 0 ? "neg" : "pos"}`}>{money(tx.amount)}</span></td>
-                  <td className="dim">{tx.account}</td>
+                  <td className="num"><span className={`amt ${num(tx.amount) < 0 ? "neg" : "pos"}`}>{money(num(tx.amount))}</span></td>
+                  <td className="dim" title={accountLabel(tx.account)}>{accountShort(tx.account)}</td>
                   <td>
                     <span className="cat-cell">
                       <span className="swatch" style={{ background: colorFor(tx.category) }} />
+                      {/* In lowconf mode the user is judging the model's guess —
+                          it must be VISIBLE, and demoting it to `other` must be
+                          possible (in the uncategorized queue `other` is noise). */}
+                      {mode === "lowconf" ? <span className="dim">{catLabel(tx.category)}</span> : null}
                       <select className="cat" defaultValue="" onChange={(e) => e.target.value && relabel(tx, e.target.value)}>
                         <option value="" disabled>{t("rev.choose")}</option>
-                        {categoryCodes.filter((c) => c !== "other").map((c) => (
+                        {categoryCodes.filter((c) => mode === "lowconf" || c !== "other").map((c) => (
                           <option key={c} value={c}>{catLabel(c)}</option>
                         ))}
                       </select>

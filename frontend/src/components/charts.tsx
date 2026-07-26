@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { colorFor, EXPENSE_COLOR, INCOME_COLOR } from "../lib/colors";
 import { money, moneyShort } from "../lib/format";
+import { EmptyNote } from "./primitives";
 
 const axisTick = { fill: "var(--muted)", fontSize: 11, fontFamily: "var(--f-mono)" };
 const tooltipStyle = {
@@ -38,7 +39,7 @@ export type Row = { month: string } & Record<string, number | string>;
 
 /* Spending over time — stacked area by top categories. */
 export const StackedArea = memo(function StackedArea({ data, series }: { data: Row[]; series: SeriesDef[] }) {
-  if (!data.length || !series.length) return <div className="chart-fallback">Not enough history.</div>;
+  if (!data.length || !series.length) return <EmptyNote k="empty.noHistory" />;
   return (
     <ResponsiveContainer width="100%" height={288}>
       <AreaChart data={data} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
@@ -78,7 +79,7 @@ export const MonthlyBars = memo(function MonthlyBars({
 }: {
   data: { month: string; Income: number; Expense: number }[];
 }) {
-  if (!data.length) return <div className="chart-fallback">No movements in range.</div>;
+  if (!data.length) return <EmptyNote k="empty.noMovements" />;
   return (
     <ResponsiveContainer width="100%" height={288}>
       <BarChart data={data} barGap={2}>
