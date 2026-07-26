@@ -130,7 +130,7 @@ async def ensure_consumer(js, subject: str, durable: str, *, log):
     return sub
 
 
-async def consume_one(sub, handler, *, log, tracer, span_name: str) -> bool:
+async def consume_one(sub, handler, *, log, tracer, span_name: str, on_giving_up=None) -> bool:
     """Pull at most one message and settle it explicitly. Returns True if one ran.
 
     Settlement rules, all deliberate:
@@ -179,6 +179,18 @@ async def consume_one(sub, handler, *, log, tracer, span_name: str) -> bool:
                         "job failed permanently, giving up",
                         extra={"fields": {"error": str(exc), "delivered": delivered}},
                     )
+                    if on_giving_up is not None:
+                        # Best-effort: let the owner leave a visible trace (e.g.
+                        # mark the file failed) — a termed job used to leave the
+                        # upload as 'pending' forever, indistinguishable from a
+                        # queued one.
+                        try:
+                            await on_giving_up(data, exc)
+                        except Exception as hook_exc:  # noqa: BLE001
+                            log.error(
+                                "giving-up hook failed",
+                                extra={"fields": {"error": str(hook_exc)}},
+                            )
                     await m.term()
                 else:
                     log.warning(

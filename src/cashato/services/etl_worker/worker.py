@@ -22,7 +22,7 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import text
 
 from cashato import objstore
-from cashato.cli import load  # (reusable loader: parse -> bronze/silver + fast-path)
+from cashato.cli import link_transfers, load  # reusable loader + transfer relink
 from cashato.db.db import get_engine
 from cashato.messaging import (
     SUBJECT_FEEDBACK,
@@ -178,8 +178,27 @@ async def main() -> None:
 
     async def handle_ingest_and_notify(data: dict) -> None:
         inserted = await _handle_ingest(data)
-        # New rows landed -> ask the categorizer to run the model over them.
         if inserted:
+            # The gold spend views exclude transfer-tagged legs, so the tagging
+            # must follow EVERY batch of new rows — as a manual CLI it simply
+            # never ran, and each upload counted both legs of its transfers as
+            # income+expense until someone shelled into a pod.
+            try:
+                pairs, moved, _net = await asyncio.to_thread(link_transfers.relink_all)
+            except Exception as exc:  # noqa: BLE001
+                # Rows ARE loaded; a failed relink degrades the views but must
+                # not fail (and re-run) the whole ingest.
+                log.error("transfer relink failed", extra={"fields": {"error": str(exc)}})
+            else:
+                log.info(
+                    "transfers relinked",
+                    extra={"fields": {"pairs": pairs, "volume": str(moved)}},
+                )
+        # Ask the categorizer to run the model. Also on force jobs with zero
+        # inserts: a reprocess after a model retrain dedups everything
+        # (inserted == 0), and the nudge was the only thing that would apply
+        # the new model to existing rows.
+        if inserted or data.get("force"):
             try:
                 # Propagate the current trace context so the categorizer's run
                 # links back to this ingest (one end-to-end trace).
@@ -193,9 +212,41 @@ async def main() -> None:
             else:
                 log.info("recategorize requested", extra={"fields": {"inserted": inserted}})
 
+    async def mark_ingest_given_up(data: dict, exc: Exception) -> None:
+        """Leave a visible trace when an ingest job exhausts its retry budget.
+
+        Without this the file sat as 'pending' forever in /files (or, if the
+        failure hit before registration, vanished entirely) — the message is
+        gone from the WorkQueue, so nothing else will ever update it.
+        """
+        filename = data.get("filename") or data.get("key")
+
+        def _mark() -> int:
+            with get_engine().begin() as conn:
+                return conn.execute(
+                    text(
+                        "UPDATE bronze.raw_files SET status = 'failed', "
+                        "error = :e WHERE filename = :f AND status = 'pending'"
+                    ),
+                    {"e": f"gave up after retries: {str(exc)[:500]}", "f": filename},
+                ).rowcount
+
+        updated = await asyncio.to_thread(_mark)
+        if not updated:
+            log.error(
+                "gave up on a job with no pending raw_files row — the upload "
+                "left no trace; a /admin/reprocess will re-enqueue it",
+                extra={"fields": {"filename": filename}},
+            )
+
     while True:
         await consume_one(
-            ingest_sub, handle_ingest_and_notify, log=log, tracer=tracer, span_name="etl.ingest"
+            ingest_sub,
+            handle_ingest_and_notify,
+            log=log,
+            tracer=tracer,
+            span_name="etl.ingest",
+            on_giving_up=mark_ingest_given_up,
         )
         await consume_one(
             feedback_sub, _handle_feedback, log=log, tracer=tracer, span_name="etl.feedback"
