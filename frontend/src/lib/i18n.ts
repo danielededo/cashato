@@ -184,7 +184,7 @@ const UI: Dict = {
   "up.progress": { it: "Caricamento {n}/{total}: {name}…", en: "Uploading {n}/{total}: {name}…" },
   "up.done": { it: "{total} file in coda. Analisi in corso…", en: "{total} files queued. Parsing…" },
   "up.doneErrors": { it: "{ok}/{total} file in coda", en: "{ok}/{total} files queued" },
-  "up.hint": { it: "Revolut · Trade Republic · Intesa Sanpaolo — PDF, CSV o XLSX", en: "Revolut · Trade Republic · Intesa Sanpaolo — PDF, CSV or XLSX" },
+  "up.hint": { it: "PDF, CSV o XLSX — max 10 MiB a file", en: "PDF, CSV or XLSX — max 10 MiB per file" },
   "up.recent": { it: "File recenti", en: "Recent files" },
   "up.when": { it: "Quando", en: "When" },
   "up.file": { it: "File", en: "File" },
