@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Sign, TransactionFilters, TransactionRow } from "../api/types";
@@ -260,10 +260,20 @@ export function Transactions() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((tx) => {
+                {rows.map((tx, i) => {
+                  // Consumer-style day grouping — only meaningful when the list
+                  // is date-ordered; any other sort renders flat.
+                  const dayHead =
+                    sort.key === "date" && (i === 0 || rows[i - 1].value_date !== tx.value_date) ? (
+                      <tr className="day-row">
+                        <td colSpan={6}>{dateLabel(tx.value_date)}</td>
+                      </tr>
+                    ) : null;
                   const cat = overrides[tx.natural_key] ?? tx.category ?? "";
                   return (
-                    <tr key={tx.natural_key}>
+                    <Fragment key={tx.natural_key}>
+                    {dayHead}
+                    <tr>
                       <td className="mono dim">{dateLabel(tx.value_date)}</td>
                       {/* The row also holds a category <select>, so the whole
                           row cannot be the click target — the description is. */}
@@ -288,6 +298,7 @@ export function Transactions() {
                       <td className="num"><span className={`amt ${num(tx.amount) < 0 ? "neg" : "pos"}`}>{money(num(tx.amount))}</span></td>
                       <td className="dim" title={accountLabel(tx.account)}>{accountShort(tx.account)}</td>
                     </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>

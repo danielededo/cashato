@@ -118,20 +118,21 @@ export function Investments() {
 
       {d ? (
         <>
-          <div className="kpis kpis-4">
-            <div className="kpi">
-              {/* Gross, so that the two tiles beside it add up to this one. Net
-                  is the footnote: three figures where two do not sum to the
-                  first is an invitation to misread them. */}
-              <div className="k">{t("inv.invested")}</div>
-              <div className="v">{money(num(d.total_contributed))}</div>
-              <div className="foot">
-                <span className="dim">{t("inv.net", { v: money(num(d.total_invested)) })}</span>
-                <span className="spark" style={{ color: "var(--series-1)" }}>
-                  <Sparkline values={d.spark} />
-                </span>
-              </div>
+          {/* Hero: gross contributed, so the known/unknown tiles below add up
+              to it; net of returns is the subtitle — three figures where two
+              do not sum to the first is an invitation to misread them. */}
+          <section className="hero">
+            <div className="eyebrow">{t("inv.invested")}</div>
+            <div className="figure">
+              {money(num(d.total_contributed))}
+              <span className="spark" style={{ color: "var(--series-1)" }}>
+                <Sparkline values={d.spark} width={140} height={34} />
+              </span>
             </div>
+            <div className="sub">{t("inv.net", { v: money(num(d.total_invested)) })}</div>
+          </section>
+
+          <div className="kpis kpis-4">
             <div className="kpi">
               <div className="k">{t("inv.known")}</div>
               <div className="v">{money(num(d.total_in_known_instruments))}</div>

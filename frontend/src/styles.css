@@ -262,6 +262,8 @@ tbody td { padding: 9px 10px; border-bottom: 1px solid var(--rule); white-space:
 tbody tr { transition: background 0.1s; }
 tbody tr:hover { background: var(--panel-2); }
 td.num, th.num { text-align: right; }
+.day-row td { padding: 12px 10px 4px; font-family: var(--f-display); font-size: 12px; font-weight: 600; color: var(--text-secondary); border-bottom: none; background: transparent; }
+.day-row + tr td { border-top: 1px solid var(--rule); }
 .amt { font-family: var(--f-mono); font-weight: 500; font-variant-numeric: tabular-nums; font-size: 12.5px; }
 .amt.neg { color: var(--expense); }
 .amt.pos { color: var(--income); }

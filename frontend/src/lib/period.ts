@@ -3,6 +3,7 @@
 // "last 6 months" means the 6 most recent months that actually have data.
 
 export const PERIODS = [
+  { key: "1m", label: "1M", months: 1 },
   { key: "3m", label: "3M", months: 3 },
   { key: "6m", label: "6M", months: 6 },
   { key: "12m", label: "12M", months: 12 },
