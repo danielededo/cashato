@@ -8,7 +8,8 @@ income/expense.
 Matching (safe, with guard): equal absolute amount, opposite sign, different
 account, ``|value_date diff| <= window``; a candidate is accepted only if it is
 **same-day** OR at least one leg's description contains a transfer hint. Greedy
-1:1 assignment (closest date, then largest amount) so each leg is paired once.
+1:1 assignment (closest date, then largest amount, then natural keys) so each
+leg is paired once and the result is independent of input order.
 The ``transfer_group`` id is a deterministic hash of the two legs' natural keys
 (idempotent across re-runs).
 """
@@ -73,8 +74,9 @@ def find_pairs(
                 continue
             candidates.append((gap, -abs(o.amount), o, i))
 
-    # closest date first, then largest amount
-    candidates.sort(key=lambda c: (c[0], c[1]))
+    # closest date first, then largest amount; natural keys break residual ties
+    # so the pairing does not depend on the caller's row order (idempotency).
+    candidates.sort(key=lambda c: (c[0], c[1], c[2].natural_key, c[3].natural_key))
     used: set[int] = set()
     pairs: list[tuple[int, int, str]] = []
     for _gap, _amt, o, i in candidates:

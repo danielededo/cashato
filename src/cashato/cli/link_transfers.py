@@ -34,7 +34,7 @@ def main() -> int:
         rows = conn.execute(
             text(
                 "SELECT id, natural_key, value_date, amount, account, description "
-                "FROM silver.transactions"
+                "FROM silver.transactions ORDER BY id"
             )
         ).all()
         legs = [

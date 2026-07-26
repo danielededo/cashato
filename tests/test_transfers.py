@@ -57,3 +57,20 @@ def test_one_to_one_assignment():
 def test_group_id_deterministic():
     legs = [_leg(1, "intesa", "-1000.00"), _leg(2, "trade_republic", "1000.00")]
     assert find_pairs(legs)[0][2] == find_pairs(legs)[0][2]
+
+
+def test_pairing_independent_of_input_order():
+    # Two identical same-day A->B transfers: every candidate ties on (gap,
+    # amount), so before the natural-key tie-break the pairing followed the
+    # caller's row order and transfer_group ids churned between runs.
+    from itertools import permutations
+
+    legs = [
+        _leg(1, "intesa", "-500.00"),
+        _leg(2, "intesa", "-500.00"),
+        _leg(3, "revolut_eur", "500.00"),
+        _leg(4, "revolut_eur", "500.00"),
+    ]
+    expected = sorted(find_pairs(legs))
+    for perm in permutations(legs):
+        assert sorted(find_pairs(list(perm))) == expected
