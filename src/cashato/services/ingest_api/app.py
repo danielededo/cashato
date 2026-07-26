@@ -30,7 +30,7 @@ from sqlalchemy import text
 from cashato import objstore
 from cashato.config import setting
 from cashato.db.db import get_engine
-from cashato.messaging import SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream
+from cashato.messaging import STREAM, SUBJECT_FEEDBACK, SUBJECT_INGEST, connect_jetstream
 from cashato.obs import (
     inject_trace_headers,
     setup_logging,
@@ -195,6 +195,12 @@ class ResetRequest(BaseModel):
         default="data",
         description="'data' wipes transactions+files but KEEPS learned labels; "
         "'all' also wipes gold.training_labels + gold.category_feedback.",
+    )
+    keep_files: bool = Field(
+        default=False,
+        description="Truncate the DB but KEEP the stored statements: with a "
+        "follow-up /admin/reprocess this rebuilds silver from the retained "
+        "files (e.g. after a parser fix), instead of losing them.",
     )
 
 
@@ -469,24 +475,42 @@ async def reprocess():
     summary="Delete ingested data (destructive)",
 )
 async def reset(req: ResetRequest):
-    """Truncate the ingested data and drop the stored files. Destructive.
+    """Truncate the ingested data; by default also drop the stored files.
 
     ``scope=data`` keeps the active-learning memory (``gold.training_labels`` +
-    ``gold.category_feedback``); ``scope=all`` wipes those too. Also clears the
-    object bucket so a later reprocess does not repopulate.
+    ``gold.category_feedback``); ``scope=all`` wipes those too. ``keep_files``
+    keeps the bucket so ``/admin/reprocess`` can rebuild from it.
+
+    True atomicity across queue, bucket and DB does not exist, so the ORDER
+    picks the least harmful failure: the job queue is purged first (a queued
+    ingest would re-insert rows right after the truncate), then the bucket —
+    a failure there aborts with the DB untouched — and the truncate runs last,
+    so a retry always converges. A job already DELIVERED to the worker can
+    still land after the reset: avoid resetting while an ingest is running.
     """
+    purge = await app.state.js.purge_stream(STREAM, subject=SUBJECT_INGEST)
+    removed = 0 if req.keep_files else objstore.clear()
     tables = _RESET_TABLES[req.scope]
     engine = get_engine()
     with engine.begin() as conn:
         for tbl in tables:
             conn.execute(text(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE"))
-    removed = objstore.clear()
     _log.warning(
-        "data reset", extra={"fields": {"scope": req.scope, "tables": tables, "files_removed": removed}}
+        "data reset",
+        extra={
+            "fields": {
+                "scope": req.scope,
+                "tables": tables,
+                "files_removed": removed,
+                "files_kept": req.keep_files,
+                "queue_purged": purge,
+            }
+        },
     )
+    kept = "kept" if req.keep_files else f"removed {removed}"
     return AdminResult(
         status="ok",
-        detail=f"reset (scope={req.scope}): cleared {len(tables)} table(s) and {removed} stored file(s)",
+        detail=f"reset (scope={req.scope}): cleared {len(tables)} table(s); stored files: {kept}",
         count=removed,
     )
 

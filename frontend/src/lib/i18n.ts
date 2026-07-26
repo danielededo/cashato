@@ -202,6 +202,7 @@ const UI: Dict = {
   "mng.reset.hint": { it: "Operazione distruttiva. Scrivi RESET per confermare.", en: "Destructive. Type RESET to confirm." },
   "mng.reset.keep": { it: "Tieni le etichette apprese (consigliato)", en: "Keep learned labels (recommended)" },
   "mng.reset.all": { it: "Cancella tutto, training incluso", en: "Wipe everything, training included" },
+  "mng.reset.keepFiles": { it: "Conserva i file caricati (per ricostruire con \"Riprocessa\")", en: "Keep the uploaded files (rebuild later with \"Reprocess\")" },
   "mng.resetBtn": { it: "Cancella dati", en: "Reset data" },
   "mng.notDeployed": { it: "Endpoint non ancora disponibile (serve deploy del backend).", en: "Endpoint not available yet (needs a backend deploy)." },
 

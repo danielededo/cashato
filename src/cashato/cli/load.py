@@ -291,6 +291,29 @@ def load(path: Path, source: str, force: bool = False) -> int:
                     },
                 )
 
+        # Re-apply stored user corrections: a manual category is ground truth
+        # and must survive a rebuild (reset keep_files + reprocess) or a
+        # re-import — gold.category_feedback is the durable memory, keyed by
+        # the same natural_key the rows are deduped on. Latest feedback wins.
+        reapplied = conn.execute(
+            text(
+                """
+                UPDATE silver.transactions t
+                SET category = f.category, category_source = 'manual',
+                    category_confidence = 1.0
+                FROM (
+                    SELECT DISTINCT ON (natural_key) natural_key, category
+                    FROM gold.category_feedback ORDER BY natural_key, id DESC
+                ) f
+                WHERE t.natural_key = f.natural_key
+                  AND t.natural_key = ANY(:keys)
+                  AND (t.category IS DISTINCT FROM f.category
+                       OR t.category_source IS DISTINCT FROM 'manual')
+                """
+            ),
+            {"keys": [t.natural_key for t in txs]},
+        ).rowcount
+
         conn.execute(
             text(
                 "UPDATE bronze.raw_files SET status = 'parsed', rows_total = :n, "
@@ -308,7 +331,7 @@ def load(path: Path, source: str, force: bool = False) -> int:
     print(f"Source: {source} | file_id={file_id}")
     print(
         f"Parsed transactions: {len(txs)} | newly inserted: {inserted} | "
-        f"duplicates skipped: {len(txs) - inserted}"
+        f"duplicates skipped: {len(txs) - inserted} | corrections re-applied: {reapplied}"
     )
     return inserted
 

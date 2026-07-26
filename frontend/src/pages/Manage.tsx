@@ -11,6 +11,7 @@ export function Manage() {
   const [busy, setBusy] = useState<Busy>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [scope, setScope] = useState<"data" | "all">("data");
+  const [keepFiles, setKeepFiles] = useState(false);
   const [confirm, setConfirm] = useState("");
 
   async function run(kind: Exclude<Busy, null>, fn: () => Promise<{ status: string; detail?: string }>) {
@@ -76,6 +77,10 @@ python -m cashato.ml.label --limit 2000</code></pre>
             <input type="radio" name="scope" checked={scope === "all"} onChange={() => setScope("all")} />
             {t("mng.reset.all")}
           </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+            <input type="checkbox" checked={keepFiles} onChange={(e) => setKeepFiles(e.target.checked)} />
+            {t("mng.reset.keepFiles")}
+          </label>
           <div className="toolbar">
             <input
               className="input"
@@ -88,7 +93,7 @@ python -m cashato.ml.label --limit 2000</code></pre>
               className="btn"
               style={{ borderColor: "var(--expense)", color: "var(--expense)" }}
               disabled={busy !== null || confirm !== "RESET"}
-              onClick={() => run("reset", () => api.resetData(scope))}
+              onClick={() => run("reset", () => api.resetData(scope, keepFiles))}
             >
               {busy === "reset" ? "…" : t("mng.resetBtn")}
             </button>
