@@ -41,3 +41,6 @@ infra/*.auto.tfvars
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# setuptools debris from a non-editable pip install
+build/
