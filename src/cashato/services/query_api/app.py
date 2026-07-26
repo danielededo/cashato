@@ -195,7 +195,7 @@ class MetaResponse(BaseModel):
     """The vocabulary the UI needs, from the same place the pipeline reads it.
 
     Exists so no client has to restate the list of sources or categories. Those
-    lists live in the adapter registry and in `categorie.yaml`; a copy in the
+    lists live in the adapter registry and in `categories.yaml`; a copy in the
     frontend drifts the moment either changes — which it did, within a day of
     the categories growing.
     """
@@ -205,6 +205,7 @@ class MetaResponse(BaseModel):
     languages: list[str]
     allowed_extensions: list[str]
     max_file_bytes: int
+    max_files_per_batch: int
 
 
 class TransferLeg(BaseModel):
@@ -363,7 +364,7 @@ def meta():
     """What the client needs to build its selectors, from the single source of truth.
 
     Sources come from the adapter registry (dropping in a parser module adds one
-    with no further wiring); categories and their labels from `categorie.yaml`;
+    with no further wiring); categories and their labels from `categories.yaml`;
     upload limits from `settings.yaml`. All three are runtime config or code
     discovery, so a client that reads this can never be out of step with what
     the pipeline actually accepts.
@@ -392,6 +393,7 @@ def meta():
         "languages": _CAT.languages,
         "allowed_extensions": setting("uploads.allowed_extensions", [".pdf", ".csv", ".xlsx"]),
         "max_file_bytes": int(setting("uploads.max_file_bytes", 10 * 1024 * 1024)),
+        "max_files_per_batch": int(setting("uploads.max_files_per_batch", 50)),
     }
 
 

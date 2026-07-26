@@ -1,7 +1,7 @@
 // The vocabulary, fetched rather than restated.
 //
 // Sources and category codes live in the adapter registry and in
-// `categorie.yaml`. A copy here drifts the moment either changes — and it did:
+// `categories.yaml`. A copy here drifts the moment either changes — and it did:
 // four categories were added server-side and the frontend list silently kept
 // offering the old fifteen, so the new ones could not be assigned at all and
 // rendered as raw codes when they appeared. `GET /api/v1/meta` is the same
@@ -38,6 +38,7 @@ export interface Meta {
   catLabel: (code: string | null | undefined) => string;
   acceptAttr: string;
   maxFileBytes: number;
+  maxFilesPerBatch: number;
   loaded: boolean;
 }
 
@@ -67,6 +68,7 @@ export function useMeta(): Meta {
     catLabel,
     acceptAttr: (data?.allowed_extensions ?? []).join(","),
     maxFileBytes: data?.max_file_bytes ?? 0,
+    maxFilesPerBatch: data?.max_files_per_batch ?? 50,
     loaded: data != null,
   };
 }

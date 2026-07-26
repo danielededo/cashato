@@ -17,7 +17,7 @@ configMapGenerator:
   - name: cashato-config
     files:
       - ../../../../config/settings.yaml
-      - ../../../../config/categorie.yaml
+      - ../../../../config/categories.yaml
       - ../../../../config/mcc.yaml
 generatorOptions:
   disableNameSuffixHash: true

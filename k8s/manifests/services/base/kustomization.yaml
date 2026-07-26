@@ -14,7 +14,7 @@ resources:
   - query-api.yaml
   - httproutes.yaml
 
-# Runtime config (settings/categorie/mcc) as a ConfigMap — no longer baked into
+# Runtime config (settings/categories/mcc) as a ConfigMap — no longer baked into
 # the image, so editing a rule/threshold no longer requires a rebuild. Stable name
 # (no hash suffix) so the same object can be referenced across namespaces/apps;
 # a config change is applied by Argo, then `kubectl rollout restart` to pick it up.
@@ -24,7 +24,7 @@ configMapGenerator:
   - name: cashato-config
     files:
       - ../../../../config/settings.yaml
-      - ../../../../config/categorie.yaml
+      - ../../../../config/categories.yaml
       - ../../../../config/mcc.yaml
       - ../../../../config/banks.yaml
 generatorOptions:

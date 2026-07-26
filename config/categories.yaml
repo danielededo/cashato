@@ -109,7 +109,11 @@ rules:
   - {pattern: "\\b(?:affitt|locazion)|\\brent\\b", category: rent}
   - {pattern: "\\b(?:enel|hera|acea|iren|plenitude|luce|acqua|tari|vodafone|windtre|fastweb|iliad|utilit|bollett)|\\b(?:eni|a2a|gas|tim)\\b", category: bills}
   - {pattern: "\\b(?:netflix|spotify|disney|youtube|icloud|google one|dropbox|adobe|abbonament|subscription)|\\bprime\\b", category: subscriptions}
-  - {pattern: "\\b(?:trenitalia|italo|atac|uber|freenow|benzin|carburant|ryanair|easyjet|terravision|autostrad|telepass|parcheggi|taxi|transport|trasport)", category: transport}
+  # Travel BEFORE transport: airlines/booking would otherwise never be reached
+  # if a description also carried a generic transport word.
+  - {pattern: "\\b(?:booking|airbnb|hotel|hostel|ryanair|easyjet|wizzair|vueling|expedia|crocier|aeroport|airport|viagg|flight)|\\b(?:volo|voli)\\b", category: travel}
+  - {pattern: "\\b(?:trenitalia|italo|atac|uber|freenow|benzin|carburant|terravision|autostrad|telepass|parcheggi|taxi|transport|trasport)", category: transport}
+  - {pattern: "\\b(?:cinema|multisala|teatr|concert|ticketone|eventim|museo|musei|stadio|palestr|piscina|bowling)", category: leisure}
   - {pattern: "\\b(?:ristorant|pizzeri|pizza|osteria|trattoria|caffe|mcdonald|burger|kebab|sushi|glovo|deliveroo|just ?eat|restaurant|dining)|\\bbar\\b", category: dining}
   - {pattern: "\\b(?:esselunga|coop|conad|carrefour|lidl|eurospin|penny|supermercat|grocer|market|aliment)|\\bpam\\b", category: groceries}
   - {pattern: "\\b(?:farmac|pharmac|dottor|medic|ottic|health|salute|cura della persona)", category: health}

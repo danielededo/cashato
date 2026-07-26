@@ -55,12 +55,12 @@ is `hash(account, value_date, amount, occurrence_index)` — format-independent
 ## Categorization (provider-agnostic, multilingual)
 
 The stored category is always a language-neutral **code** (e.g. `dining`);
-per-language labels live in `config/categorie.yaml` (add a language = add a key,
+per-language labels live in `config/categories.yaml` (add a language = add a key,
 no code change). Resolver chain (order = priority):
 
 1. **MCC** (`config/mcc.yaml`, ISO 18245) — when the source exposes the code;
 2. **ML model** (embedding kNN, if trained) above a confidence threshold;
-3. **Rules** (bilingual regex, `config/categorie.yaml`) — thin safety net;
+3. **Rules** (bilingual regex, `config/categories.yaml`) — thin safety net;
 4. `other` fallback.
 
 > Open-source choice: we do **not** depend on providers' native categories
@@ -160,7 +160,7 @@ src/cashato/      the installable package (pip install -e .)
   db/             db.py (engine) · migrations/ (Alembic)
   services/       ingest_api · etl_worker · query_api · categorizer   (launched via python -m / uvicorn)
   cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
-config/           settings.yaml · categorie.yaml · mcc.yaml   (runtime `cashato-config` ConfigMap; not baked)
+config/           settings.yaml · categories.yaml · mcc.yaml   (runtime `cashato-config` ConfigMap; not baked)
 pyproject.toml    package metadata + deps (base + svc/migrate/train/predict/dev extras)
 docker/           Dockerfile.{svc,migrate,frontend,train,predict,mlflow}
 infra/            OpenTofu (kind + operators)   k8s/   GitOps manifests (Argo CD)

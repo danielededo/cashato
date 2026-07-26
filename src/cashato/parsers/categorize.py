@@ -1,7 +1,7 @@
 """Centralized, multilingual, provider-agnostic categorization engine.
 
 The stored category is always a language-neutral **code**; per-language labels
-live in ``config/categorie.yaml`` (single i18n source of truth).
+live in ``config/categories.yaml`` (single i18n source of truth).
 
 Resolver chain (order = priority), over **universal signals** present in any bank
 export -- NOT provider taxonomies:
@@ -27,7 +27,7 @@ from cashato.config import CONFIG_DIR, setting
 
 from .base import normalize_desc
 
-_CONFIG_PATH = CONFIG_DIR / "categorie.yaml"
+_CONFIG_PATH = CONFIG_DIR / "categories.yaml"
 _MCC_PATH = CONFIG_DIR / "mcc.yaml"
 _FALLBACK_THRESHOLD = 0.6  # when settings.yaml has no categorization.model_threshold
 

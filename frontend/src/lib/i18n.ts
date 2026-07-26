@@ -9,7 +9,7 @@ import type { Lang } from "../api/types";
 import { useLang } from "./lang";
 
 // Category labels are NOT duplicated here: they come from the backend via
-// `useMeta()` (see lib/meta.ts), which reads the same categorie.yaml the
+// `useMeta()` (see lib/meta.ts), which reads the same categories.yaml the
 // pipeline does. Only UI chrome lives in this file.
 
 type Dict = Record<string, { it: string; en: string }>;
@@ -180,6 +180,7 @@ const UI: Dict = {
   "up.progress": { it: "Caricamento {n}/{total}: {name}…", en: "Uploading {n}/{total}: {name}…" },
   "up.done": { it: "{total} file in coda. Analisi in corso…", en: "{total} files queued. Parsing…" },
   "up.doneErrors": { it: "{ok}/{total} file in coda", en: "{ok}/{total} files queued" },
+  "up.tooMany": { it: "{n} file sono troppi: massimo {max} per volta", en: "{n} files is too many: at most {max} per batch" },
   "up.hint": { it: "PDF, CSV o XLSX — max 10 MiB a file", en: "PDF, CSV or XLSX — max 10 MiB per file" },
   "up.recent": { it: "File recenti", en: "Recent files" },
   "up.when": { it: "Quando", en: "When" },

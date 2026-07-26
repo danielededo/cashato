@@ -60,7 +60,7 @@ Migrations: Alembic (`src/cashato/db/migrations`), currently through **0013**.
 | `currency`           | str (ISO)  | e.g. `EUR` |
 | `account`            | str        | account/source id (e.g. `revolut_personal_eur`) |
 | `source`             | str        | `revolut` \| `trade_republic` \| `intesa` |
-| `category`           | str \| null| language-neutral **code** (labels live in `categorie.yaml`) |
+| `category`           | str \| null| language-neutral **code** (labels live in `categories.yaml`) |
 | `category_source`    | str        | `mcc` \| `model` \| `rule` \| `manual` \| `default` |
 | `category_confidence`| real       | provenance/confidence of the category |
 | `native_category`    | str \| null| provider's own category — bootstrap-only, **never** used at runtime |
@@ -116,11 +116,11 @@ Resolver chain (order = priority) over **universal** signals:
 2. **Embedding model** — `EmbeddingKNN` (`src/cashato/ml/model.py`): multilingual
    sentence-transformers + kNN; used if `confidence ≥ threshold`. Feature text =
    `normalize_desc` only (no regex cleaning). This does the bulk of the work.
-3. **Rules** — thin bilingual keyword safety net (`config/categorie.yaml`).
+3. **Rules** — thin bilingual keyword safety net (`config/categories.yaml`).
 4. Default `other`.
 
 `category` is a language-neutral **code**; per-language labels live in
-`config/categorie.yaml` (add a language = add a key, no code change). Native
+`config/categories.yaml` (add a language = add a key, no code change). Native
 categories are at most an opt-in training-bootstrap signal, off by default.
 
 **ML flow (offline, local):** Ollama (host, GPU) labels the long tail →
@@ -178,7 +178,7 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 - **Parametrized** (runtime `config/*.yaml`, mounted as the `cashato-config`
   ConfigMap — NOT baked into images, loaded via `CASHATO_CONFIG_DIR`):
   `config/settings.yaml` (thresholds, embed model, transfer window, upload caps),
-  `config/categorie.yaml`, `config/mcc.yaml`, `config/banks.yaml` (ABI -> bank
+  `config/categories.yaml`, `config/mcc.yaml`, `config/banks.yaml` (ABI -> bank
   name; most statements never name their own bank but all carry an IBAN).
   Editing one deploys via Argo with no image rebuild. Infra endpoints/secrets
   stay env/Secret. (There is no

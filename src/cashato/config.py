@@ -1,6 +1,6 @@
 """Central configuration loader (leaf module: no adapter/model imports).
 
-Reads tunable settings from ``settings.yaml``; ``categorie.yaml`` / ``mcc.yaml``
+Reads tunable settings from ``settings.yaml``; ``categories.yaml`` / ``mcc.yaml``
 are read by the categorizer. The source registry + content-detection signatures
 now live WITH the parsers (``cashato.parsers.registry``), not here.
 

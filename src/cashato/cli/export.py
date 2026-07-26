@@ -2,7 +2,7 @@
 
 Writes a date-ordered CSV with categories **localized** in the chosen language
 (categories in the DB are language-neutral codes; the translation from
-config/categorie.yaml is applied here). Adding a language = add labels in the
+config/categories.yaml is applied here). Adding a language = add labels in the
 config file, no code change.
 
 Usage:

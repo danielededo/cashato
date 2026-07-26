@@ -1,4 +1,5 @@
-# Tunable settings (data, not logic). In phase C this becomes a ConfigMap.
+# Tunable settings (data, not logic). Mounted as the cashato-config ConfigMap
+# (kustomize name-hash: editing this rolls the pods, no image rebuild).
 # Infra endpoints (DATABASE_URL, NATS_URL) stay as env vars / Secrets.
 
 categorization:
@@ -15,7 +16,8 @@ transfers:
 uploads:
   # per-file size cap (bytes); enforced server-side by ingest-api (413 if over)
   max_file_bytes: 10485760 # 10 MB
-  # max files a client should send in one batch (enforced by the frontend)
+  # max files per multi-upload batch (exposed via /meta, enforced by the
+  # Upload page before anything is sent)
   max_files_per_batch: 50
   # accepted file extensions (bank statements are PDF / CSV / XLSX).
   # No ".xls": no parser reads the legacy binary format, so inviting it only

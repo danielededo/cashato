@@ -37,7 +37,7 @@ Before opening a PR: `make lint && make test` must pass.
   in string literals that must match real (Italian) document text (detection
   markers, skip regexes, native seed keys).
 - **Categories = language-neutral codes**; per-language labels live in
-  `config/categorie.yaml` (add a language = add a key, no code change).
+  `config/categories.yaml` (add a language = add a key, no code change).
 - **Provider-agnostic**: do not add runtime dependencies on providers' native
   taxonomies; use universal signals (MCC, text) + ML.
 
@@ -86,4 +86,4 @@ extension deliberately simple — config + one module, no plugin machinery.
 ## Add a language to the categories
 
 Add the language key (e.g. `es:`) to the entries under `categories:` in
-`config/categorie.yaml`. No code change.
+`config/categories.yaml`. No code change.

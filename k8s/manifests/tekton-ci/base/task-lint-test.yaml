@@ -18,7 +18,7 @@ spec:
         - name: PIP_DISABLE_PIP_VERSION_CHECK
           value: "1"
         # Config lives at the repo root in the cloned workspace (not baked); the
-        # unit tests load categorie/mcc/settings from here.
+        # unit tests load categories/mcc/settings from here.
         - name: CASHATO_CONFIG_DIR
           value: config
       script: |

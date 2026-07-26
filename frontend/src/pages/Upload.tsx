@@ -8,7 +8,7 @@ import { useAsync } from "../lib/useAsync";
 
 export function Upload() {
   const { t } = useT();
-  const { acceptAttr, sourceLabel } = useMeta();
+  const { acceptAttr, sourceLabel, maxFilesPerBatch } = useMeta();
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -27,6 +27,10 @@ export function Upload() {
   // attributable to a file.
   async function send(list: File[]) {
     if (!list.length) return;
+    if (list.length > maxFilesPerBatch) {
+      setMsg({ ok: false, text: t("up.tooMany", { n: list.length, max: maxFilesPerBatch }) });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     const failed: string[] = [];
