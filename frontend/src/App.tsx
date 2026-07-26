@@ -24,7 +24,8 @@ const THEME_KEY = "cashato.theme.v1";
 type Theme = "dark" | "light";
 
 function readTheme(): Theme {
-  return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  // Light-first (consumer-fintech look); dark stays one toggle away.
+  return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
 }
 
 export function App() {

@@ -176,10 +176,18 @@ export function Dashboard() {
 
       {d ? (
         <>
-          <div className="kpis">
-            <Kpi label={t("kpi.net")} value={money(d.c.net)} cls={d.c.net >= 0 ? "pos" : "neg"} spark={d.c.sNet} color="var(--series-1)">
+          {/* The page's one headline (hero-number pattern): net for the
+              period, colored by sign, with the vs-previous delta beside it. */}
+          <section className="hero">
+            <div className="eyebrow">{t("kpi.net")}</div>
+            <div className={`figure ${d.c.net >= 0 ? "pos" : "neg"}`}>
+              {money(d.c.net)}
               <Delta current={d.c.net} previous={pv(d.p.net)} goodWhenUp />
-            </Kpi>
+            </div>
+            <div className="sub">{t("dash.hero.sub", { n: d.movCur })}</div>
+          </section>
+
+          <div className="kpis kpis-4">
             <Kpi label={t("kpi.income")} value={money(d.c.income)} spark={d.c.sInc} color="var(--income)">
               <Delta current={d.c.income} previous={pv(d.p.income)} goodWhenUp />
             </Kpi>
@@ -191,9 +199,6 @@ export function Dashboard() {
             </Kpi>
             <Kpi label={t("kpi.avg")} value={money(d.avg)} spark={d.c.sExp} color="var(--series-4)">
               <Delta current={d.avg} previous={pv(d.avgPrev)} goodWhenUp={false} />
-            </Kpi>
-            <Kpi label={t("kpi.movements")} value={String(d.movCur)} spark={d.movSpark} color="var(--series-6)">
-              <Delta current={d.movCur} previous={pv(d.movPrev)} goodWhenUp />
             </Kpi>
           </div>
 

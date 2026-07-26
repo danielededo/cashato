@@ -55,6 +55,7 @@ const UI: Dict = {
     en: "Compare each metric to the equal-length period immediately before",
   },
   "dash.reconciling": { it: "Riconciliazione…", en: "Reconciling…" },
+  "dash.hero.sub": { it: "{n} movimenti nel periodo", en: "{n} movements in the period" },
   "kpi.net": { it: "Flusso netto", en: "Net flow" },
   "kpi.income": { it: "Entrate", en: "Income" },
   "kpi.expense": { it: "Uscite", en: "Expense" },
