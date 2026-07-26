@@ -524,7 +524,11 @@ async def reset(req: ResetRequest):
     engine = get_engine()
     with engine.begin() as conn:
         for tbl in tables:
-            conn.execute(text(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE"))
+            # No RESTART IDENTITY: it requires OWNING the sequences, which the
+            # least-privilege API role rightly does not — and the surrogate ids
+            # carry no meaning (natural_key is the real identity), so where the
+            # sequence resumes from is irrelevant.
+            conn.execute(text(f"TRUNCATE TABLE {tbl} CASCADE"))
     _log.warning(
         "data reset",
         extra={
