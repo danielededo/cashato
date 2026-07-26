@@ -29,7 +29,7 @@ from .base import normalize_desc
 
 _CONFIG_PATH = CONFIG_DIR / "categorie.yaml"
 _MCC_PATH = CONFIG_DIR / "mcc.yaml"
-_FALLBACK_THRESHOLD = 0.6  # when settings.yaml has no categorization.model_threshold
+_DEFAULT_THRESHOLD = float(setting("categorization.model_threshold", 0.6))
 
 
 @dataclass
@@ -57,7 +57,7 @@ class Categorizer:
         config: dict,
         mcc_map: dict | None = None,
         model=None,
-        model_threshold: float | None = None,
+        model_threshold: float = _DEFAULT_THRESHOLD,
     ):
         self.default: str = config.get("default", "other")
         self.categories: dict[str, dict[str, str]] = config.get("categories", {})
@@ -84,14 +84,7 @@ class Categorizer:
             for src, m in config.get("seeds", {}).items()
         }
         self.model = model
-        # Read at CONSTRUCTION, not import: binding the setting at import time
-        # froze the threshold at whatever settings.yaml said when the module
-        # was first loaded, so a per-call reload of the config never saw edits.
-        self.model_threshold = (
-            float(setting("categorization.model_threshold", _FALLBACK_THRESHOLD))
-            if model_threshold is None
-            else model_threshold
-        )
+        self.model_threshold = model_threshold
 
     @classmethod
     def load(
@@ -99,7 +92,7 @@ class Categorizer:
         config_path: str | Path = _CONFIG_PATH,
         mcc_path: str | Path = _MCC_PATH,
         model=None,
-        model_threshold: float | None = None,
+        model_threshold: float = _DEFAULT_THRESHOLD,
     ) -> Categorizer:
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)

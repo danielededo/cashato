@@ -58,9 +58,26 @@ class TestParseMoney:
     def test_unicode_minus(self):
         assert parse_money("−5,00", thousands_sep=".", decimal_sep=",") == Decimal("-5.00")
 
+    def test_minus_after_currency_symbol(self):
+        # Review #17: the sign was read BEFORE stripping the currency, so a
+        # minus sitting after the symbol was silently dropped (+5.00).
+        assert parse_money("€-5.00") == Decimal("-5.00")
+        assert parse_money("EUR -5,00", thousands_sep=".", decimal_sep=",") == Decimal("-5.00")
+        assert parse_money("€−5.00") == Decimal("-5.00")
+        assert parse_money("5.00-") == Decimal("-5.00")
+
+    def test_accounting_parentheses(self):
+        assert parse_money("(5.00)") == Decimal("-5.00")
+        assert parse_money("(€1,281.64)") == Decimal("-1281.64")
+
     def test_invalid_raises(self):
         with pytest.raises(MoneyParseError):
             parse_money("N/A")
+
+    def test_interior_minus_fails_loud(self):
+        # Garbage like "5-0" must error, not silently drop the sign.
+        with pytest.raises(MoneyParseError):
+            parse_money("5-0")
 
 
 class TestNormalizeDesc:

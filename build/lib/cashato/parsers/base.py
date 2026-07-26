@@ -61,15 +61,10 @@ def parse_money(
     # Normalize the sign (unicode minus -> ascii)
     s = s.replace("−", "-")
 
-    # Accounting negatives: (5.00)
-    paren = s.startswith("(") and s.endswith(")")
-    # Drop everything except digits, separators and '-' BEFORE reading the
-    # sign, so a minus sitting after a currency symbol ("€-5.00", "EUR -5,00")
-    # is leading again once the symbol is gone. A minus left INSIDE the digits
-    # is garbage and now fails parsing instead of being silently dropped.
-    s = re.sub(r"[^0-9\-" + re.escape(thousands_sep + decimal_sep) + r"]", "", s)
-    negative = paren or s.startswith("-") or s.endswith("-")
-    s = s.strip("-")
+    # Determine the sign: leading or trailing '-'
+    negative = s.startswith("-") or s.endswith("-")
+    # Drop everything except digits and the known separators
+    s = re.sub(r"[^0-9" + re.escape(thousands_sep + decimal_sep) + r"]", "", s)
     # Remove thousands separators, normalize the decimal to '.'
     if thousands_sep:
         s = s.replace(thousands_sep, "")

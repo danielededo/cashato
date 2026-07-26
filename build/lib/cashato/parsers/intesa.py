@@ -317,13 +317,7 @@ def _parse_xlsx(path: str | Path) -> list[Transaction]:
         val = r[hdr["Importo"]]
         if val is None or str(val).strip() == "":
             continue
-        # openpyxl yields floats for numeric cells (Transaction quantizes to
-        # 2 dp), but a TEXT-formatted cell keeps the Italian string
-        # ("1.234,56"), which Decimal() cannot read.
-        if isinstance(val, str):
-            amount = parse_money(val, thousands_sep=".", decimal_sep=",")
-        else:
-            amount = Decimal(str(val))
+        amount = Decimal(str(val))
         currency = str(r[hdr["Valuta"]]).strip().upper() if hdr.get("Valuta") is not None else "EUR"
         if currency != CURRENCY:
             continue

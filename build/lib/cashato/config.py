@@ -7,12 +7,6 @@ now live WITH the parsers (``cashato.parsers.registry``), not here.
 The config directory is resolved from ``CASHATO_CONFIG_DIR`` — a read-only mounted
 ConfigMap in the cluster; defaults to ``./config`` for local dev. Model artifacts
 likewise resolve from ``CASHATO_MODEL_DIR`` (default ``./models``).
-
-Values are cached for the life of the process (``@cache``). That is safe in the
-cluster because the ConfigMap is generated with a kustomize name hash: editing
-``config/*.yaml`` produces a NEW ConfigMap name, Argo rewrites the Deployments,
-and the pods roll — a process never outlives its config version. Anywhere else
-(local scripts, notebooks) an edit needs a process restart to be seen.
 """
 
 from __future__ import annotations
@@ -51,15 +45,8 @@ def bank_names() -> dict[str, str]:
 
 
 def setting(path: str, default: Any = None) -> Any:
-    """Read a dotted setting from settings.yaml, e.g. ``setting('categorization.model_threshold')``.
-
-    A missing settings.yaml means "all defaults", not a crash — same contract
-    as ``bank_names()``.
-    """
-    try:
-        node: Any = _load("settings.yaml")
-    except FileNotFoundError:
-        return default
+    """Read a dotted setting from settings.yaml, e.g. ``setting('categorization.model_threshold')``."""
+    node: Any = _load("settings.yaml")
     for key in path.split("."):
         if not isinstance(node, dict) or key not in node:
             return default
