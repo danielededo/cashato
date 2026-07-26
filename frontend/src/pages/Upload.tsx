@@ -23,29 +23,39 @@ export function Upload() {
     return () => clearInterval(id);
   }, [reload]);
 
-  async function send(file: File) {
+  // Sequential on purpose: uploads are quick, the worker is the bottleneck,
+  // and one-at-a-time keeps the progress message truthful and the failure
+  // attributable to a file.
+  async function send(list: File[]) {
+    if (!list.length) return;
     setBusy(true);
     setMsg(null);
-    try {
-      const r = await api.upload(file, source || undefined);
-      setMsg({ ok: true, text: `Queued ${r.filename}${r.source ? ` as ${sourceLabel(r.source)}` : ""}. Parsing…` });
-      // An ingested statement can describe an account we did not know about.
-      setTimeout(() => {
-        invalidateAccounts();
-        reload();
-      }, 800);
-    } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setBusy(false);
+    const failed: string[] = [];
+    for (const [i, file] of list.entries()) {
+      setMsg({ ok: true, text: t("up.progress", { n: i + 1, total: list.length, name: file.name }) });
+      try {
+        await api.upload(file, source || undefined);
+      } catch (e) {
+        failed.push(`${file.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
+    setMsg(
+      failed.length
+        ? { ok: false, text: t("up.doneErrors", { ok: list.length - failed.length, total: list.length }) + " — " + failed.join("; ") }
+        : { ok: true, text: t("up.done", { total: list.length }) },
+    );
+    // An ingested statement can describe an account we did not know about.
+    setTimeout(() => {
+      invalidateAccounts();
+      reload();
+    }, 800);
+    setBusy(false);
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) void send(f);
+    void send(Array.from(e.dataTransfer.files ?? []));
   }
 
   return (
@@ -70,10 +80,11 @@ export function Upload() {
             ref={inputRef}
             type="file"
             accept={acceptAttr}
+            multiple
             hidden
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void send(f);
+              void send(Array.from(e.target.files ?? []));
+              e.target.value = ""; // allow re-picking the same files
             }}
           />
         </div>
