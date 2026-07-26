@@ -1,6 +1,5 @@
-# Mints a PipelineRun of cashato-ci per accepted webhook — the Triggers equivalent
-# of pipelinerun-example.yaml, parametrized by the pushed commit SHA. Same
-# workspaces as the manual run: an ephemeral shared PVC + the two Gitea cred
+# Mints a PipelineRun of cashato-ci per accepted webhook, parametrized by the
+# pushed commit SHA. Workspaces: an ephemeral shared PVC + the two Gitea cred
 # SealedSecrets. repo-url/registry are left to the Pipeline defaults (in-cluster).
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate

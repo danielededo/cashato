@@ -69,11 +69,12 @@ The CI builds **2 images** backing **6 workloads** across 2 namespaces:
 
 ## Running a build
 
-Normally automatic (push to `main`). To start one by hand (e.g. to rebuild HEAD):
+Normally automatic (push to `main`). To rebuild HEAD by hand, redeliver the
+last push from Gitea (repo → Settings → Webhooks → recent deliveries → Redeliver):
+it replays the exact payload through the same interceptors.
 
 ```sh
-kubectl -n cashato-ci create -f base/pipelinerun-example.yaml   # `create`, not `apply` (generateName)
-kubectl -n cashato-ci get pipelinerun -w                        # or the Tekton Dashboard
+kubectl -n cashato-ci get pipelinerun -w   # or the Tekton Dashboard
 ```
 
 The `TektonConfig` pruner keeps the last 20 runs.
@@ -94,5 +95,4 @@ The `TektonConfig` pruner keeps the last 20 runs.
 | `base/pipeline.yaml` | the `cashato-ci` Pipeline (DAG above) |
 | `base/triggerbinding.yaml` · `triggertemplate.yaml` · `eventlistener.yaml` | Tekton Triggers (build-on-push) |
 | `base/webhook-job.yaml` | Argo Sync-hook that ensures the Gitea webhook |
-| `base/pipelinerun-example.yaml` | reference PipelineRun (NOT synced — manual trigger) |
 | `overlays/kind/` | environment overlay |

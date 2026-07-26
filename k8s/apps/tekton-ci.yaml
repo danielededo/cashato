@@ -2,8 +2,8 @@
 # operator + components (tekton app, wave 6) exist, so the Pipeline/Task CRDs are
 # present. Installs the cashato-ci namespace, ServiceAccount, the Gitea creds
 # (SealedSecrets: git basic-auth + registry dockerconfig), the lint/test Task and
-# the CI Pipeline. PipelineRuns are runtime objects, created on demand (see
-# k8s/manifests/tekton-ci/base/pipelinerun-example.yaml) until Triggers land (C7c-d).
+# the CI Pipeline. PipelineRuns are runtime objects, minted per push by the
+# Tekton Triggers (C7c-d: EventListener + Gitea webhook).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
