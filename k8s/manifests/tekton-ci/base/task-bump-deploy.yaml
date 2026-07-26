@@ -6,7 +6,13 @@
 # The pin points at the REGISTRY-qualified ref (gitea-http.gitea.svc:3000/cashato/
 # <img>:<sha>) that the nodes' containerd mirror resolves — NOT the local kind-loaded
 # `cashato/<img>:dev`. A targeted regex edit preserves the file's comments/indent.
-# Runs on cashato/migrate:dev (already node-local, has Python) + apt-installs git.
+#
+# The step itself runs on a registry-qualified, MANUALLY pinned migrate:<sha>
+# (python3 + git baked in): CI pins only the services/data/frontend apps, never
+# its own control plane, so this ref moves by hand — bump it to a fresh CI SHA
+# when Dockerfile.migrate changes materially. Same pin in webhook-job.yaml.
+# Never `:dev`: that tag exists only where scripts/build-images.sh kind-loaded
+# it, so a rebuilt cluster or kubelet image GC turns it into ErrImagePull.
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -24,11 +30,10 @@ spec:
     - name: basic-auth   # git HTTP creds (.gitconfig + .git-credentials)
   steps:
     - name: bump-and-push
-      image: cashato/migrate:dev
+      image: gitea-http.gitea.svc:3000/cashato/migrate:ff3ae15b93a905023082e4a77d3a3cf15dab9b73
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
-        apt-get update -qq && apt-get install -y -qq git >/dev/null
 
         # Writable HOME with the Gitea creds (credential.helper=store reads
         # ~/.git-credentials; the token in it matches the Gitea host → push works).

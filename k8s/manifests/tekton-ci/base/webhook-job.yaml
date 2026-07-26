@@ -5,9 +5,11 @@
 # provider (would depend cross-tool on the Argo-created EventListener Service and
 # duplicate the HMAC secret). Everything stays in-cluster and tracked.
 #
-# Runs a pure-stdlib Python (urllib+json) on cashato/migrate:dev (already node-local,
-# has Python) — no curl/jq, no extra image. Idempotent: deletes any hook already
-# pointing at our sink, then creates a fresh one.
+# Runs a pure-stdlib Python (urllib+json) on the registry-qualified migrate image
+# — no curl/jq, no extra image. MANUALLY pinned (CI never bumps its own control
+# plane; same pin in task-bump-deploy.yaml — keep the two together). Never `:dev`:
+# node-local only, so a rebuilt cluster or kubelet image GC = ErrImagePull.
+# Idempotent: deletes any hook already pointing at our sink, then creates a fresh one.
 #
 # Reuses the SAME token as the EventListener (gitea-webhook-secret/secretToken) for
 # the HMAC — single source, no duplication. Gitea admin creds come from gitea-admin.
@@ -28,7 +30,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: ensure-webhook
-          image: cashato/migrate:dev
+          image: gitea-http.gitea.svc:3000/cashato/migrate:ff3ae15b93a905023082e4a77d3a3cf15dab9b73
           imagePullPolicy: IfNotPresent
           command:
             - python
