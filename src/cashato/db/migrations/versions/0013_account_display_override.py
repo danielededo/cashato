@@ -63,7 +63,11 @@ def upgrade() -> None:
     op.execute("ALTER TABLE silver.accounts ADD COLUMN display_name_override TEXT")
     op.execute("DROP VIEW IF EXISTS gold.v_accounts")
     op.execute(_VIEW)
-    op.execute("GRANT SELECT ON gold.v_accounts TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_accounts TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:

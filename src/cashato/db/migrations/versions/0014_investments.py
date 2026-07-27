@@ -166,7 +166,11 @@ def upgrade() -> None:
     )
 
     for v in ("v_holdings", "v_investment_month", *_SPEND_VIEWS):
-        op.execute(f"GRANT SELECT ON gold.{v} TO query_reader")
+        op.execute(f"""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.{v} TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:

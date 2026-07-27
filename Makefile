@@ -13,7 +13,7 @@ venv: ## Create the virtualenv
 	python3 -m venv .venv
 
 install: ## Install the package + service deps in editable mode
-	$(PIP) install -e '.[svc,dev]'
+	$(PIP) install -e '.[svc,migrate,dev]'
 
 install-dev: ## Install the development tools only (lint/test)
 	$(PIP) install -e '.[dev]'

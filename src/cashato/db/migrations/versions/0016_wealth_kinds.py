@@ -65,7 +65,11 @@ def upgrade() -> None:
         GROUP BY 1, 2
         """
     )
-    op.execute("GRANT SELECT ON gold.v_investment_month TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_investment_month TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:
@@ -94,4 +98,8 @@ def downgrade() -> None:
         GROUP BY 1
         """
     )
-    op.execute("GRANT SELECT ON gold.v_investment_month TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_investment_month TO query_reader;
+    END IF;
+END $$""")

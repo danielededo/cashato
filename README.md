@@ -4,7 +4,8 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169E1?logo=postgresql&logoColor=white)
 ![NATS](https://img.shields.io/badge/NATS_JetStream-27AAE1?logo=natsdotio&logoColor=white)
-![React](https://img.shields.io/badge/React_+_TypeScript-3178C6?logo=react&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes_(kind)-326CE5?logo=kubernetes&logoColor=white)
 ![OpenTofu](https://img.shields.io/badge/OpenTofu-FFDA18?logo=opentofu&logoColor=black)
 ![Argo CD](https://img.shields.io/badge/Argo_CD-EF7B4D?logo=argo&logoColor=white)
@@ -65,7 +66,7 @@ gold** (enforced by its DB role, not just convention).
 
 ```bash
 python3 -m venv .venv
-./.venv/bin/pip install -e '.[svc,dev]'              # installs the cashato package + deps
+./.venv/bin/pip install -e '.[svc,migrate,dev]'      # installs the cashato package + deps
 docker run -d --name cashato-pg -p 5432:5432 \
   -e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato \
   postgres:17-alpine                                 # local Postgres for the data core
@@ -74,6 +75,16 @@ docker run -d --name cashato-pg -p 5432:5432 \
 
 The DB URL is configurable via `DATABASE_URL` (default
 `postgresql+psycopg://cashato:cashato@localhost:5432/cashato`).
+
+**No statements at hand?** The repo ships a fully synthetic demo dataset
+(persona *Mario Bianchi* — see [`demo/`](demo/README.md)) covering every
+supported format:
+
+```bash
+./.venv/bin/cashato-load --source revolut demo/revolut_consolidated_statement.csv
+./.venv/bin/cashato-load --source intesa  demo/intesa_estratto_conto_2025_Q1.pdf
+./.venv/bin/cashato-export --lang en --out output/transactions_en.csv
+```
 
 ## Data ingestion
 
@@ -116,7 +127,7 @@ flowchart LR
     U["user correction"] -. "always wins, never overwritten" .-> E["category<br/>(source: manual)"]
 ```
 
-> Open-source choice: we do **not** depend on providers' native categories
+> Design choice: we do **not** depend on providers' native categories
 > (taxonomies differ/are inconsistent/often absent). Canonical labels are ours
 > (rules + local-LLM labeling + user corrections).
 
@@ -187,7 +198,7 @@ A retrain promotes the challenger to `@champion` only if it beats the incumbent
 on the holdout — a bad retrain never regresses serving (see
 [`scripts/`](scripts/README.md)).
 
-### ⚠️ External / manual steps (tracked for reproducibility)
+### External / manual steps (tracked for reproducibility)
 
 **1. Install Ollama** (local LLM):
 

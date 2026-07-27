@@ -59,7 +59,11 @@ def upgrade() -> None:
         LEFT JOIN silver.trades   tr ON tr.natural_key = t.natural_key
         """
     )
-    op.execute("GRANT SELECT ON gold.v_transaction_detail TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_transaction_detail TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:

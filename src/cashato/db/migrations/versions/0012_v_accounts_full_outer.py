@@ -67,7 +67,11 @@ def upgrade() -> None:
     # CREATE OR REPLACE cannot change a view's column set; drop first.
     op.execute("DROP VIEW IF EXISTS gold.v_accounts")
     op.execute(_VIEW)
-    op.execute("GRANT SELECT ON gold.v_accounts TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_accounts TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:

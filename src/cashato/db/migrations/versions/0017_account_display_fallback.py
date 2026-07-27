@@ -67,7 +67,11 @@ FULL OUTER JOIN seen s ON s.account_id = a.account_id
 
 def upgrade() -> None:
     op.execute(_VIEW)
-    op.execute("GRANT SELECT ON gold.v_accounts TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_accounts TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:

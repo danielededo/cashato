@@ -73,7 +73,11 @@ def upgrade() -> None:
                  a.holding_modality, a.currency, a.iban
         """
     )
-    op.execute("GRANT SELECT ON gold.v_accounts TO query_reader")
+    op.execute("""DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'query_reader') THEN
+        GRANT SELECT ON gold.v_accounts TO query_reader;
+    END IF;
+END $$""")
 
 
 def downgrade() -> None:
