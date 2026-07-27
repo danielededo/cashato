@@ -1,16 +1,18 @@
 # CI pipeline — DAG:
 #
-#   fetch-source ─▶ lint-test ─┬─▶ build-push-svc      (image: cashato/svc)
-#                              └─▶ build-push-migrate  (image: cashato/migrate)
+#   fetch-source ─▶ lint-test ─┬─▶ build-push-svc      (image: cashato/svc)      ─┐
+#                              ├─▶ build-push-migrate  (image: cashato/migrate)  ─┼─▶ bump-deploy
+#                              └─▶ build-push-frontend (image: cashato/frontend) ─┘
 #
 #   clone (git-clone) -> ruff/mypy/pytest (cashato-lint-test) -> buildah build+push
-#   of the two light images to Gitea's OCI registry, tagged by commit SHA. The two
-#   builds run in parallel once tests pass (both runAfter: [lint-test]).
+#   of the three light images to Gitea's OCI registry, tagged by commit SHA. The
+#   builds run in parallel once tests pass (all runAfter: [lint-test]).
 #
 # ── which services each built image feeds (build -> consumers) ───────────────────
-#   build-push-svc     -> cashato/svc     -> ns cashato:      ingest-api, etl-worker,
-#                                                             query-api, categorizer
-#   build-push-migrate -> cashato/migrate -> ns cashato-data: migration-job, grant-job
+#   build-push-svc      -> cashato/svc      -> ns cashato:      ingest-api, etl-worker,
+#                                                               query-api, categorizer
+#   build-push-migrate  -> cashato/migrate  -> ns cashato-data: migration-job, grant-job
+#   build-push-frontend -> cashato/frontend -> ns cashato:      frontend (nginx)
 #   (see k8s/manifests/tekton-ci/README.md for the full dependency map.)
 #
 # The git-clone and buildah Tasks are resolved at runtime from the Tekton catalog

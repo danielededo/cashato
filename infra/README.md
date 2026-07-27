@@ -6,6 +6,22 @@ operator/Helm chart. This layer is **state-backed** and applied with a
 `k8s/` (Kustomize) and are delivered by **Argo CD** in GitOps pull.
 That boundary is deliberate: OpenTofu owns the platform, Argo CD owns the apps.
 
+```mermaid
+flowchart TB
+    subgraph tofu["OpenTofu (push, this directory)"]
+        KIND["kind cluster + containerd mirror"]
+        OPS["Cilium · Gitea · CNPG · NATS · Envoy GW ·<br/>Sealed Secrets · cert-manager · KServe · metrics-server"]
+        ARGO["Argo CD + root app-of-apps"]
+    end
+    subgraph gitops["Argo CD (pull, k8s/)"]
+        APPS["data · services · frontend · mlflow · serving ·<br/>training · observability · tekton · tekton-ci · …"]
+    end
+    KIND --> OPS --> ARGO -->|"watches cashato-deploy"| APPS
+```
+
+The **only** hand-off point is the root app-of-apps: OpenTofu seeds it once,
+then everything below it is git-driven.
+
 ## Layout
 
 Support files (no layer ordering):

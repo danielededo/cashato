@@ -1,11 +1,57 @@
 # cashato — bank transaction data platform
 
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169E1?logo=postgresql&logoColor=white)
+![NATS](https://img.shields.io/badge/NATS_JetStream-27AAE1?logo=natsdotio&logoColor=white)
+![React](https://img.shields.io/badge/React_+_TypeScript-3178C6?logo=react&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes_(kind)-326CE5?logo=kubernetes&logoColor=white)
+![OpenTofu](https://img.shields.io/badge/OpenTofu-FFDA18?logo=opentofu&logoColor=black)
+![Argo CD](https://img.shields.io/badge/Argo_CD-EF7B4D?logo=argo&logoColor=white)
+![Tekton](https://img.shields.io/badge/Tekton_CI-FD495C?logo=tekton&logoColor=white)
+![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white)
+![Grafana](https://img.shields.io/badge/LGTM_stack-F46800?logo=grafana&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 Normalizes transactions from multiple banks (Revolut, Trade Republic, Intesa
 Sanpaolo), in heterogeneous formats (CSV/PDF/XLSX), into **one common schema**,
 **deduplicates** them across formats/sources, detects **internal transfers**
 between your own accounts, and **categorizes** them in a provider-agnostic,
 multilingual (IT/EN) way. All processing is **local** — no bank data leaves the
-machine.
+machine. Money is **`Decimal` end to end**, never `float` — including on the
+wire, where amounts travel as JSON strings.
+
+## How it flows
+
+```mermaid
+flowchart LR
+    subgraph client["Browser"]
+        SPA["React SPA"]
+    end
+    subgraph cluster["kind cluster"]
+        GW["Envoy Gateway"]
+        IN["ingest-api"]
+        Q["query-api"]
+        W["etl-worker"]
+        C["categorizer<br/>(KServe model)"]
+        NATS[("NATS<br/>JetStream")]
+        subgraph pg["PostgreSQL (medallion)"]
+            B[("bronze<br/>raw files")]
+            S[("silver<br/>transactions")]
+            G[("gold<br/>views")]
+        end
+    end
+    SPA -->|"upload / feedback"| GW --> IN
+    SPA -->|"analytics"| GW --> Q
+    IN -->|"ingest.jobs"| NATS --> W
+    IN --> B
+    W -->|"detect → parse → dedup"| S
+    W -->|"recategorize event"| NATS --> C --> S
+    S --> G --> Q
+```
+
+Every write goes through `ingest-api` + NATS; `query-api` is **read-only over
+gold** (enforced by its DB role, not just convention).
 
 ## Prerequisites
 
@@ -39,7 +85,7 @@ parser module declares its own `DETECTION` markers), no filename guessing.
 |--------|-------------------|
 | Revolut | consolidated CSV · PDF statement |
 | Trade Republic | PDF statement · CSV transaction export |
-| Intesa Sanpaolo | 21 quarterly PDF statements · 13-month PDF/XLSX export |
+| Intesa Sanpaolo | quarterly PDF statements · 13-month PDF/XLSX export |
 
 ```bash
 ./.venv/bin/cashato-load --source revolut        "data/Revolut/consolidated-....csv"
@@ -56,12 +102,19 @@ is `hash(account, value_date, amount, occurrence_index)` — format-independent
 
 The stored category is always a language-neutral **code** (e.g. `dining`);
 per-language labels live in `config/categories.yaml` (add a language = add a key,
-no code change). Resolver chain (order = priority):
+no code change). The resolver walks universal signals in priority order:
 
-1. **MCC** (`config/mcc.yaml`, ISO 18245) — when the source exposes the code;
-2. **ML model** (embedding kNN, if trained) above a confidence threshold;
-3. **Rules** (bilingual regex, `config/categories.yaml`) — thin safety net;
-4. `other` fallback.
+```mermaid
+flowchart LR
+    T["transaction"] --> MCC{"MCC code?<br/>(ISO 18245)"}
+    MCC -- "yes" --> A["category<br/>(source: mcc)"]
+    MCC -- "no" --> ML{"embedding kNN<br/>confidence ≥ threshold?"}
+    ML -- "yes" --> B["category<br/>(source: model)"]
+    ML -- "no" --> R{"keyword rule?"}
+    R -- "yes" --> C["category<br/>(source: rule)"]
+    R -- "no" --> D["other<br/>(source: default)"]
+    U["user correction"] -. "always wins, never overwritten" .-> E["category<br/>(source: manual)"]
+```
 
 > Open-source choice: we do **not** depend on providers' native categories
 > (taxonomies differ/are inconsistent/often absent). Canonical labels are ours
@@ -70,10 +123,11 @@ no code change). Resolver chain (order = priority):
 ## Internal transfers
 
 Money moved between your own accounts creates two legs (−X on account A, +X on
-account B) that are **not spending**. `link_transfers.py` detects the pairs
+account B) that are **not spending**. The transfer linker detects the pairs
 (equal opposite amount, different account, close dates, with a same-day/hint
 guard) and tags both legs with a shared `transfer_group`; the GOLD spend views
-exclude them.
+exclude them. The etl-worker relinks automatically after every ingest; the CLI
+exists for the local data-core workflow:
 
 ```bash
 ./.venv/bin/cashato-link-transfers        # run after loading
@@ -86,17 +140,25 @@ exclude them.
 ./.venv/bin/cashato-export --lang en --out output/transactions_en.csv
 ```
 
-## Services
+## Services & frontend
 
 `ingest-api` (upload → NATS) → `etl-worker` (detect → parse → persist) →
 `query-api` (spend aggregates) + `categorizer` (ML categorization off an event).
 OpenAPI at `/docs` · `/redoc` · `/openapi.json`; probes at `/healthz` · `/readyz`;
 business API under `/api/v1`.
 
-The full stack runs on the local **kind** cluster (IaC) — see `infra/`
-(OpenTofu) and `k8s/` (GitOps via Argo CD). CI/CD is **Tekton + Argo CD**: a push
-to `main` lints/tests, builds+pushes SHA-tagged images to Gitea's registry, and a
-separate `cashato-deploy` config repo pins the tags so Argo auto-deploys the build.
+The **React SPA** (`frontend/`) is the daily driver: dashboard with period
+filters, day-grouped transactions with server-side totals, wealth page
+(contributions vs known instruments), category review with one-click manual
+correction (feeds active learning), file upload, account management, IT/EN,
+light/dark, and a privacy mode that blurs every monetary figure.
+
+The full stack runs on the local **kind** cluster (IaC) — see
+[`infra/`](infra/README.md) (OpenTofu) and [`k8s/`](k8s/README.md) (GitOps via
+Argo CD). CI/CD is **Tekton + Argo CD**: a push to `main` lints/tests,
+builds+pushes SHA-tagged images to Gitea's registry, and a separate
+`cashato-deploy` config repo pins the tags so Argo auto-deploys the build
+(details: [`k8s/manifests/tekton-ci/`](k8s/manifests/tekton-ci/README.md)).
 Once deployed, the services are reached through the Envoy Gateway:
 
 ```bash
@@ -110,6 +172,20 @@ Rules cover part of the transactions; the **long tail** (unseen merchants, e.g.
 "Metro de Madrid") needs world knowledge. A local **LLM** generates canonical
 labels; a lightweight **embedding kNN** classifier (multilingual
 sentence-transformers) is trained on them (fast, no LLM at inference).
+
+```mermaid
+flowchart LR
+    O["Ollama (host, GPU)<br/>labels the long tail"] --> TL[("gold.training_labels")]
+    FB[("gold.category_feedback<br/>user corrections")] --> TR
+    TL --> TR["train<br/>EmbeddingKNN"]
+    TR --> MR["MLflow registry<br/>@champion"]
+    MR --> KS["KServe predictor"]
+    KS --> CG["categorizer service"]
+```
+
+A retrain promotes the challenger to `@champion` only if it beats the incumbent
+on the holdout — a bad retrain never regresses serving (see
+[`scripts/`](scripts/README.md)).
 
 ### ⚠️ External / manual steps (tracked for reproducibility)
 
@@ -160,13 +236,22 @@ src/cashato/      the installable package (pip install -e .)
   db/             db.py (engine) · migrations/ (Alembic)
   services/       ingest_api · etl_worker · query_api · categorizer   (launched via python -m / uvicorn)
   cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
-config/           settings.yaml · categories.yaml · mcc.yaml   (runtime `cashato-config` ConfigMap; not baked)
-pyproject.toml    package metadata + deps (base + svc/migrate/train/predict/dev extras)
+frontend/         React + Vite + TS SPA, served by nginx behind the gateway
+config/           settings.yaml · categories.yaml · mcc.yaml · banks.yaml   (runtime ConfigMap; not baked into images)
 docker/           Dockerfile.{svc,migrate,frontend,train,predict,mlflow}
-infra/            OpenTofu (kind + operators)   k8s/   GitOps manifests (Argo CD)
-scripts/          secret-zero.sh · seal-secrets.sh · build-images.sh    tests/  unit + verification
-data/  output/  models/   (git-ignored)
+infra/            OpenTofu (kind + operators)      k8s/   GitOps manifests (Argo CD)
+demo/             synthetic statements (Mario Bianchi) — fixtures + regression pins
+scripts/          secret-zero.sh · seal-secrets.sh · build-images.sh · gitea-repos.sh
+tests/            unit tests + manual verification scripts
+data/  output/  models/   (git-ignored: real statements, exports, model artifacts)
 ```
+
+Each subsystem has its own README:
+[`frontend/`](frontend/README.md) · [`config/`](config/README.md) ·
+[`docker/`](docker/README.md) · [`infra/`](infra/README.md) ·
+[`k8s/`](k8s/README.md) · [`demo/`](demo/README.md) ·
+[`scripts/`](scripts/README.md) · [`tests/`](tests/README.md).
+Architecture and conventions in depth: [`CLAUDE.md`](CLAUDE.md).
 
 ## License
 

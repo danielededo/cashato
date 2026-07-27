@@ -50,12 +50,14 @@ The design is built so adding a bank touches **one adapter module**, nothing els
    - `parse(path) -> list[Transaction]` — the adapter;
    - `DETECTION: list[list[str]]` — content marker groups used to auto-detect the
      file (a file matches if, for ANY group, ALL its markers are in the head text).
-     **Markers must identify YOUR bank, not banking in general.** Detection is
-     first-match-wins in alphabetical registry order, so a generic marker like
-     `estratto conto` or `data contabile` silently steals other banks' documents,
-     and the misroute is invisible: the wrong parser simply finds no table. Prefer
-     the bank's own name, a product name, or a string unique to its export
-     (`demo/DETECTION_COLLISIONS.md` is the worked example);
+     **Markers must identify YOUR bank, not banking in general.** Every source
+     is scored and the most specific match wins; a tie is reported as ambiguous
+     rather than resolved by accident. A generic marker like `estratto conto`
+     or `data contabile` still steals other banks' documents whenever nothing
+     more specific matches, and the misroute is invisible: the wrong parser
+     simply finds no table. Prefer the bank's own name, a product name, or a
+     string unique to its export (`demo/DETECTION_COLLISIONS.md` is the worked
+     example);
    - `CURRENCY` — e.g. `"EUR"`.
 
    and, optionally, the account holder (shown as the greeting on the home page):
