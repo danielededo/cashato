@@ -154,6 +154,28 @@ class TransfersResponse(BaseModel):
     transfers: list[TransferPair]
 
 
+class ReconciliationInterval(BaseModel):
+    """One span between two consecutive statement-declared balances of an
+    account. ``discrepancy`` = parsed movements minus the balance delta the
+    statement promises: 0 means the parser accounted for every cent."""
+
+    account: str
+    from_date: date
+    to_date: date
+    from_balance: Decimal
+    to_balance: Decimal
+    expected_delta: Decimal = Field(description="to_balance - from_balance")
+    actual_delta: Decimal = Field(description="Sum of parsed movements in (from_date, to_date]")
+    discrepancy: Decimal = Field(description="actual_delta - expected_delta; 0 = reconciled")
+    n_movements: int
+
+
+class ReconciliationResponse(BaseModel):
+    n_intervals: int
+    n_mismatched: int
+    intervals: list[ReconciliationInterval]
+
+
 class Account(BaseModel):
     """An account as the statements describe it. The id is opaque and stable (it
     is hashed into ``natural_key``); everything else is display metadata read off
@@ -673,6 +695,26 @@ def transfers():
         "n_pairs": len(rows),
         "total_volume": sum((r["amount"] for r in rows), Decimal(0)),
         "transfers": rows,
+    }
+
+
+@api.get(
+    "/reconciliation",
+    response_model=ReconciliationResponse,
+    summary="Parsed movements vs the statements' own balances",
+)
+def reconciliation(mismatched_only: bool = False):
+    """Every interval between two consecutive statement-declared balances,
+    with the balance delta the statement promises vs the sum of the movements
+    actually parsed. A non-zero discrepancy localizes a data problem to one
+    account and date range (a parser dropping rows, a missing file, or an
+    Intesa value date crossing the quarter boundary)."""
+    rows = _rows("SELECT * FROM gold.v_reconciliation ORDER BY account, from_date")
+    mismatched = [r for r in rows if r["discrepancy"] != 0]
+    return {
+        "n_intervals": len(rows),
+        "n_mismatched": len(mismatched),
+        "intervals": mismatched if mismatched_only else rows,
     }
 
 

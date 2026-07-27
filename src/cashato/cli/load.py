@@ -24,6 +24,7 @@ from cashato.parsers.categorize import Categorizer
 from cashato.parsers.registry import (  # (auto-discovered)
     ACCOUNT_EXTRACTORS,
     ADAPTERS,
+    BALANCE_EXTRACTORS,
     HOLDER_EXTRACTORS,
 )
 
@@ -125,6 +126,49 @@ def _upsert_accounts(conn, path: Path, source: str) -> int:
             },
         )
     return len(accounts)
+
+
+def _upsert_balances(conn, path: Path, source: str, file_id: int) -> int:
+    """Record the balances the statement itself declares (see BalanceAnchor).
+
+    Never fatal: anchors are verification metadata, not movements — a layout the
+    extractor cannot read must not fail an otherwise good ingestion. Upsert on
+    (account, date): a later file covering the same date more completely (e.g.
+    an export cut mid-day, re-exported after) corrects the anchor in place.
+    """
+    extract = BALANCE_EXTRACTORS.get(source)
+    if extract is None:
+        return 0
+    try:
+        anchors = extract(path)
+    except Exception:  # noqa: BLE001 - verification metadata, never blocks ingestion
+        return 0
+
+    for a in anchors:
+        conn.execute(
+            text(
+                """
+                INSERT INTO silver.balances
+                    (account, balance_date, balance, currency, source, file_id)
+                VALUES (:account, :date, :balance, :currency, :source, :file_id)
+                ON CONFLICT (account, balance_date) DO UPDATE SET
+                    balance = EXCLUDED.balance,
+                    currency = EXCLUDED.currency,
+                    source = EXCLUDED.source,
+                    file_id = EXCLUDED.file_id,
+                    updated_at = now()
+                """
+            ),
+            {
+                "account": a.account,
+                "date": a.balance_date,
+                "balance": a.balance,
+                "currency": a.currency,
+                "source": source,
+                "file_id": file_id,
+            },
+        )
+    return len(anchors)
 
 
 def _account_holder(path: Path, source: str) -> str | None:
@@ -231,6 +275,7 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
     # 3. Load into silver (dedup on natural_key) and finalize the file status.
     with engine.begin() as conn:
         _upsert_accounts(conn, path, source)
+        _upsert_balances(conn, path, source, file_id)
         inserted = 0
         enriched = 0  # existing rows whose description was upgraded
         for t in txs:

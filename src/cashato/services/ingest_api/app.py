@@ -63,10 +63,16 @@ _TAGS = [
 # Tables cleared by a reset. "data" keeps the learned labels (active-learning
 # memory); "all" also wipes them for a true from-scratch restart.
 _RESET_TABLES = {
-    "data": ["silver.transactions", "silver.accounts", "bronze.raw_files"],
+    "data": [
+        "silver.transactions",
+        "silver.accounts",
+        "silver.balances",
+        "bronze.raw_files",
+    ],
     "all": [
         "silver.transactions",
         "silver.accounts",
+        "silver.balances",
         "bronze.raw_files",
         "gold.training_labels",
         "gold.category_feedback",

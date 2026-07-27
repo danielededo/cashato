@@ -29,6 +29,7 @@ import pdfplumber
 from .base import (
     FAMILY_FIRST,
     AccountInfo,
+    BalanceAnchor,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
@@ -184,6 +185,53 @@ def extract_accounts(path: str | Path) -> list[AccountInfo]:
         AccountInfo(
             account_id=ACCOUNT, product=product, currency=CURRENCY, iban=find_iban(head)
         )
+    ]
+
+
+# "Saldo iniziale al 31.12.2025 ... +3.434,25 €" / "Saldo finale al 31.03.2026
+# ... +2.101,22 €". "Iniziale al" names the LAST day of the previous quarter, so
+# both anchor as end-of-that-date balances. The amount is SIGNED and sits in the
+# right-hand columns; the same statement also restates the closing balance
+# unsigned in the competenze recap at x~270, which the x-gate excludes.
+_SALDO_RE = re.compile(r"^saldo\s+(?:iniziale|finale)\s+al\s+(\d{2}\.\d{2}\.\d{4})", re.IGNORECASE)
+_SALDO_AMOUNT_X0 = 430
+_SALDO_SIGNED = re.compile(r"[+-]?\d{1,3}(?:\.\d{3})*,\d{2}|[+-]?\d+,\d{2}")
+
+
+def extract_balances(path: str | Path) -> list[BalanceAnchor]:
+    """Opening/closing balance anchors from the quarterly statement.
+
+    The 13-month exports (PDF and XLSX) are movement listings with no balances,
+    so they contribute nothing. The quarterly repeats each balance (summary page,
+    table row, closing recap) — the first well-formed occurrence per date wins,
+    and consecutive quarters share their boundary anchor (finale Q1 == iniziale
+    Q2), which the loader's upsert collapses.
+    """
+    if not str(path).lower().endswith(".pdf"):
+        return []
+    anchors: dict[date, Decimal] = {}
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            for _top, ws in _group_lines(page.extract_words(keep_blank_chars=False)):
+                joined = _clean(" ".join(w["text"] for w in ws))
+                m = _SALDO_RE.match(joined)
+                if not m:
+                    continue
+                # The amount fragments into several tokens (the control-char
+                # thousands separator splits words): concatenate the right-hand
+                # run and require one well-formed signed IT amount.
+                raw = "".join(
+                    _clean(w["text"]) for w in ws if w["x0"] >= _SALDO_AMOUNT_X0
+                ).replace("€", "").strip()
+                if not _SALDO_SIGNED.fullmatch(raw):
+                    continue
+                anchors.setdefault(
+                    _parse_date(m.group(1)),
+                    parse_money(raw, thousands_sep=".", decimal_sep=","),
+                )
+    return [
+        BalanceAnchor(account=ACCOUNT, balance_date=d, balance=v, currency=CURRENCY)
+        for d, v in anchors.items()
     ]
 
 

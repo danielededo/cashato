@@ -29,8 +29,20 @@ Schemas within a single database (not separate DBs):
   same file is a no-op.
 - **gold** — read-only views for the query API: `v_category_totals`,
   `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
-  `v_transactions` (projection of silver so the read API stays gold-only). Plus
-  ML tables `training_labels`, `category_feedback` (active learning).
+  `v_transactions` (projection of silver so the read API stays gold-only),
+  `v_balances`, `v_reconciliation`. Plus ML tables `training_labels`,
+  `category_feedback` (active learning).
+
+Silver also holds `balances` — the balances the statements themselves declare
+(Revolut/Trade Republic per-row running balance → end-of-day anchors; Intesa
+quarterly opening/closing lines), upserted on `(account, balance_date)` with
+"balance after every movement with `value_date <=` that date" semantics.
+`gold.v_reconciliation` compares each inter-anchor balance delta against the
+sum of parsed movements: a non-zero discrepancy localizes lost/invented rows
+(or an Intesa value date crossing the quarter boundary) to one account and
+date range. Revolut note: the statement's `Fees` column is informational — the
+fee is already inside `Money in/out` (the balance chain proves it), so no
+separate fee transaction is ever emitted.
 
 Migrations: Alembic (`src/cashato/db/migrations`).
 
@@ -143,7 +155,8 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 - **query-api** — read-only over gold: `GET /summary`, `/monthly`,
   `/categories/monthly`, `/transactions` (filterable/paginated, with
   filtered-set totals), `/transfers`, `/accounts` (bank/product/joint, composed
-  display name). `?lang=it|en` for category labels. The gateway routes ALL of
+  display name), `/reconciliation` (parsed movements vs statement-declared
+  balances, `?mismatched_only=true`). `?lang=it|en` for category labels. The gateway routes ALL of
   `/api/v1` here and enumerates only ingest-api's write paths — enumerating
   both would let a forgotten endpoint fall through to the SPA and answer 200
   with HTML instead of 404.
@@ -156,8 +169,10 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `src/cashato/parsers/<name>.py` exposing `parse(path) -> list[Transaction]` +
   `DETECTION: list[list[str]]` (content-detection marker groups) + `CURRENCY`,
   and optionally `extract_holder(path)` + `NAME_ORDER` (account holder off the
-  document header; `base.addressee_from_words` does the work) and
-  `extract_accounts(path)` (bank, product, joint/individual, IBAN). The registry
+  document header; `base.addressee_from_words` does the work),
+  `extract_accounts(path)` (bank, product, joint/individual, IBAN) and
+  `extract_balances(path)` (statement-declared balance anchors feeding
+  reconciliation). The registry
   (`registry.py`) auto-discovers it by scanning the package (module name ==
   source id). No config entry needed — detection is parser-coupled, so it lives
   with the parser. See CONTRIBUTING.

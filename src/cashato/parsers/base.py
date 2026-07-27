@@ -137,6 +137,29 @@ class AccountInfo:
     iban: str | None = None
 
 
+@dataclass
+class BalanceAnchor:
+    """A balance the statement itself declares, anchored to a date.
+
+    Semantics: the account balance AFTER every movement with
+    ``value_date <= balance_date``. Anchors are what reconciliation checks the
+    transactions against — between two consecutive anchors the sum of the
+    movements must equal the balance delta; when it does not, a parser lost or
+    invented rows (or two files disagree). The statement's own numbers are the
+    only ground truth we have for that.
+    """
+
+    account: str
+    balance_date: date
+    balance: Decimal
+    currency: str = "EUR"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.balance, Decimal):
+            raise TypeError(f"balance must be Decimal, got {type(self.balance).__name__}")
+        self.balance = self.balance.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def find_iban(text: str) -> str | None:
     """First Italian IBAN in ``text`` (statements print it spaced or unspaced)."""
     for m in _IBAN_FIND_RE.finditer(text or ""):
