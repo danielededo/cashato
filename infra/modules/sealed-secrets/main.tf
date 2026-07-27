@@ -1,4 +1,4 @@
-# Sealed Secrets controller (platform, C5). Holds the cluster's private key and
+# Sealed Secrets controller (platform). Holds the cluster's private key and
 # decrypts SealedSecret CRs into real Secrets in-cluster. This is what lets the
 # app's DB-role passwords live in git ENCRYPTED (committed) and never in plaintext.
 #

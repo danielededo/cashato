@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Central place to swap the image (kind-loaded now; Harbor tag in C7).
+# Central place to swap the image (kind-loaded; out of CI scope, so no SHA pinning).
 images:
   - name: cashato/train
     newTag: dev

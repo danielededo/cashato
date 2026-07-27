@@ -1,4 +1,4 @@
-# cert-manager (platform, C6b). Provides the webhook-serving certificates that
+# cert-manager (platform). Provides the webhook-serving certificates that
 # KServe's admission webhooks require; installed as a dependency of KServe (not
 # used by the app services). crds.enabled bundles the cert-manager CRDs with the
 # chart (v1.21 key; the old installCRDs flag is deprecated).

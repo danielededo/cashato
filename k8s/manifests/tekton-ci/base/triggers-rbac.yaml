@@ -1,4 +1,4 @@
-# RBAC for the EventListener (C7c-d). The EventListener sink runs under this
+# RBAC for the EventListener. The EventListener sink runs under this
 # dedicated ServiceAccount (NOT the pipeline SA cashato-ci): it must create
 # PipelineRuns and read trigger resources in this namespace, plus read the
 # cluster-scoped ClusterInterceptors/ClusterTriggerBindings. The two ClusterRoles

@@ -1,4 +1,4 @@
-# Ensures the Gitea repo webhook that drives build-on-push (C7c-d) — the GitOps
+# Ensures the Gitea repo webhook that drives build-on-push — the GitOps
 # way, mirroring db-grants: an Argo **Sync hook** (deleted+recreated each sync via
 # BeforeHookCreation), so re-running always reconciles the desired webhook. Chosen
 # over a host script (needs a port-forward, out of GitOps) and over the Tofu gitea

@@ -1,4 +1,4 @@
-# Child Application: Tekton (C7c — CI engine). sync-wave 6 — after everything
+# Child Application: Tekton (CI engine). sync-wave 6 — after everything
 # else (observability is 5); Tekton is independent of the app stack. Installs the
 # Tekton Operator from its pinned release YAML + a TektonConfig CR that reconciles
 # into Pipelines + Triggers + Dashboard + pruner. The operator creates its own

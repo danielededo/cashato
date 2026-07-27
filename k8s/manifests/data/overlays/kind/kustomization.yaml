@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Central place to swap the image (kind-loaded now; Harbor tag in C7).
+# Central place to swap the image; CI pins a Gitea-registry SHA tag over this.
 images:
   - name: cashato/migrate
     newTag: dev

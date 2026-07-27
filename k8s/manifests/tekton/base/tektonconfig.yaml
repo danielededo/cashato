@@ -2,7 +2,7 @@
 # components. This is the operator(Tofu-less→Argo here) / CR(Argo) split's CR half.
 #
 # profile: all  -> Pipelines + Triggers + Dashboard (+ Chains). Triggers is needed
-#   for the Gitea webhook (C7c-d), the Dashboard for visibility, Pipelines for CI.
+#   for the Gitea webhook, the Dashboard for visibility, Pipelines for CI.
 # targetNamespace: components install into tekton-pipelines (the conventional ns).
 # pruner: auto-delete old TaskRuns/PipelineRuns so a busy CI doesn't pile up
 #   objects on kind — the operator runs this on a schedule (something the raw

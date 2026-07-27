@@ -1,4 +1,4 @@
-# Phase C platform IaC — provider requirements (pinned).
+# Platform IaC — provider requirements (pinned).
 # OpenTofu manages day-0: the kind cluster + all operators/Helm charts + Argo CD.
 terraform {
   required_version = ">= 1.9.0"

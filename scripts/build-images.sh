@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Build the bootstrap container images and load them into the kind cluster.
-# This is the manual image path used until CI (Tekton) + a registry (Harbor)
-# take over in C7 — after which only the image reference in the manifests
-# changes, not this workflow.
+# This is the manual image path; CI (Tekton) builds and pushes the svc/migrate
+# images on every push to main.
 #
 # Images:
 #   cashato/svc:dev     — the 3 services (ingest-api, etl-worker, query-api)

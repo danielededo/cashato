@@ -1,5 +1,5 @@
 # CloudNativePG Postgres cluster for cashato. Single instance (personal scale,
-# local kind). wal_level=logical is set now so phase D (Debezium/CDC) needs no
+# local kind). wal_level=logical is set now so adding CDC (Debezium) later needs no
 # cluster recreation. The DB `cashato` is owned by cashato_migrator, which the
 # Alembic migration Job connects as to run all DDL.
 apiVersion: postgresql.cnpg.io/v1
@@ -23,7 +23,7 @@ spec:
       database: cashato
       owner: cashato_migrator
 
-  # Least-privilege app roles (C5). CNPG creates/reconciles the LOGIN roles and
+  # Least-privilege app roles. CNPG creates/reconciles the LOGIN roles and
   # sets their password from the referenced Secret (decrypted by Sealed Secrets).
   # Schema GRANTs are applied separately by the db-grants Job (CNPG manages the
   # role object + password, not per-schema privileges). Services connect as these
@@ -40,7 +40,7 @@ spec:
         login: true
         passwordSecret:
           name: query-reader-db
-      - name: mlflow # owns the mlflow database (MLflow backend store, C6)
+      - name: mlflow # owns the mlflow database (MLflow backend store)
         ensure: present
         login: true
         passwordSecret:

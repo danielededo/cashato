@@ -1,8 +1,7 @@
 # Grafana — the "G" of LGTM: the query/visualization UI. Mimir is provisioned as
 # a Prometheus-type datasource (Mimir speaks the Prometheus query API under the
 # /prometheus prefix); datasources re-provision from this ConfigMap on every
-# start. UI-authored dashboards/alerts persist on a PVC (they used to sit on an
-# emptyDir and evaporated on every restart).
+# start. UI-authored dashboards/alerts persist on a PVC.
 # Analytics / update checks are disabled — no phone-home from a local platform.
 apiVersion: v1
 kind: ConfigMap

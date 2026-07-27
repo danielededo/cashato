@@ -6,8 +6,8 @@ FROM python:3.12-slim
 
 # git is for the CI control plane, not the migrator: the bump-deploy Task runs
 # on this image and pushes the SHA pins to cashato-deploy. Baked in so the Task
-# has no runtime apt-get — that needed the network AND root, and this image
-# dropped root (USER 1000) when the containers were hardened.
+# has no runtime apt-get — that needed the network AND root; this image runs
+# as USER 1000.
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*

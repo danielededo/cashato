@@ -1,5 +1,5 @@
 # Application namespace for the services (split from cashato-data, which holds the
-# DB). NetworkPolicies (C5e) allow only cashato -> cashato-data:5432 and
+# DB). NetworkPolicies allow only cashato -> cashato-data:5432 and
 # cashato -> nats:4222, explicitly cross-namespace.
 apiVersion: v1
 kind: Namespace

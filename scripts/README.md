@@ -29,9 +29,9 @@ the controller decrypts them in-cluster.
 
 | Script | What it does | When to run |
 |--------|--------------|-------------|
-| `build-images.sh` | Build all five `cashato/*:dev` images from `docker/` and `kind load` them. | Bootstrap / fast local iteration. In steady state the **CI (Tekton) builds+deploys `svc`+`migrate` by SHA** on every push (C7c); this script is still the path for the heavy `train`/`predict`/`mlflow` images (out of CI scope) and for a from-scratch `:dev` load. |
+| `build-images.sh` | Build all five `cashato/*:dev` images from `docker/` and `kind load` them. | Bootstrap / fast local iteration. In steady state the **CI (Tekton) builds+deploys `svc`+`migrate` by SHA** on every push; this script is still the path for the heavy `train`/`predict`/`mlflow` images (out of CI scope) and for a from-scratch `:dev` load. |
 
-## MLOps — retraining (C6)
+## MLOps — retraining
 
 The categorization model lives in the **MLflow registry** (`cashato-categorizer`,
 alias `@champion` = what serving uses), not as a loose file. Retraining is
@@ -52,10 +52,9 @@ if-better`) — a bad retrain never regresses serving.
 `role-passwords.env`. It is gitignored — **back it up out-of-band**; losing it
 means re-sealing every secret.
 
-## Still to be captured as scripts (tracked TODO)
+## Manual procedures (not scripted)
 
-These manual procedures are documented in the memory/rebuild recipe and will move
-here as we formalize them:
+These remain manual:
 
 - **cluster rebuild** (kind delete → state reset → `tofu apply` → `build-images.sh`
   → `gitea-repos.sh` → `git push` → CI re-pins the SHA images).

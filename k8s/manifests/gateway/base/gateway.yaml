@@ -1,7 +1,6 @@
 # The north-south entrypoint. A single HTTP listener on :80 for now; TLS can
-# be added later. HTTPRoutes arrive in C5 (they need the service backends),
-# attaching from the cashato namespace — hence allowedRoutes.namespaces.from:
-# All (revisit with a Selector in C5 if desired).
+# be added later. The services' HTTPRoutes attach from the cashato namespace —
+# hence allowedRoutes.namespaces.from: All (revisit with a Selector if desired).
 #
 # hostname pins the listener to the ONLY name this platform is reached by.
 # Without it the gateway answered any Host header, which is what DNS

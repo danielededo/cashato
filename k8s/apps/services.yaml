@@ -16,7 +16,7 @@ spec:
     repoURL: http://gitea-http.gitea.svc:3000/cashato/cashato.git
     targetRevision: main
     path: k8s/manifests/services/overlays/kind
-    # Image tag pinned by CI (C7c-e): the bump-deploy pipeline step rewrites this
+    # Image tag pinned by CI: the bump-deploy pipeline step rewrites this
     # line in the cashato-deploy copy to cashato/svc:<commit-sha>. `:dev` is the
     # seed default (used on a fresh cluster / local kind-load until the first build).
     kustomize:

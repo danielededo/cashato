@@ -40,7 +40,7 @@ gitea:
       DISABLE_REGISTRATION: true
     webhook:
       # Allow webhook delivery to private/internal hosts. Gitea DENIES private
-      # targets by default (SSRF guard), which blocks the C7c-d build-on-push
+      # targets by default (SSRF guard), which blocks the build-on-push
       # webhook whose sink is the in-cluster EventListener Service
       # (el-cashato-ci.cashato-ci.svc → a 10.96/12 ClusterIP). `private` re-allows
       # RFC1918 ranges (covers the service CIDR) without opening external hosts.
@@ -68,7 +68,7 @@ gitea:
 
 # Dedicated NodePort Service exposing Gitea's HTTP port (3000) — which also serves
 # the built-in OCI registry (/v2/) — to the kind NODES so containerd can pull
-# images from it (C7c-b node-pull wiring). We do NOT flip gitea-http to NodePort:
+# images from it (node-pull wiring). We do NOT flip gitea-http to NodePort:
 # that Service is HEADLESS (clusterIP: None) and headless + NodePort is invalid.
 # A separate Service is additive and leaves the git bridge (Argo's in-cluster
 # ClusterIP path) untouched.

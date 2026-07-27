@@ -72,7 +72,7 @@ seal minio-creds mlflow "$minio_user" "$minio_password" "$MLFLOW_DIR/sealedsecre
 seal ml-reader-db cashato-data ml_reader "$ml_reader" "$DATA/sealedsecret-ml-reader.yaml"
 seal ml-reader-db cashato-ml   ml_reader "$ml_reader" "$TRAINING_DIR/sealedsecret-ml-reader.yaml"
 
-# Observability (C7a): Mimir uses the MinIO creds for its S3 (blocks) backend;
+# Observability: Mimir uses the MinIO creds for its S3 (blocks) backend;
 # Grafana's admin login comes from grafana-admin (username "admin" + password).
 seal minio-creds   observability "$minio_user" "$minio_password" "$OBS_DIR/sealedsecret-minio.yaml"
 seal grafana-admin observability admin         "$grafana_admin"  "$OBS_DIR/sealedsecret-grafana-admin.yaml"

@@ -1,4 +1,4 @@
-# Child Application: ML training/registry workloads (C6 / MLOps).
+# Child Application: ML training/registry workloads (MLOps).
 # sync-wave 3 — after MLflow (wave 2) and the data layer it reads from. Contains
 # the one-off model-import Job (register-champion) and the suspended retrain
 # CronJob. CreateNamespace=false: the namespace is a manifest (namespace.yaml).

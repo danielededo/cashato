@@ -1,4 +1,4 @@
-# Layer 6 — NATS + JetStream (C4, platform). The messaging backbone for the
+# Layer 6 — NATS + JetStream (platform). The messaging backbone for the
 # services. The stream (CASHATO) and its WorkQueue retention are created by the
 # app at runtime (src/cashato/messaging.py), not here.
 module "nats" {

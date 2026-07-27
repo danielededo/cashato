@@ -1,4 +1,4 @@
-# Child Application: model serving (C6c). The KServe InferenceService for the
+# Child Application: model serving. The KServe InferenceService for the
 # custom predictor. sync-wave 4 — after training (wave 3) has imported the
 # @champion the predictor pulls at startup.
 apiVersion: argoproj.io/v1alpha1

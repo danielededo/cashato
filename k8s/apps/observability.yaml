@@ -1,4 +1,4 @@
-# Child Application: LGTM observability (C7a — metrics slice: Mimir + Grafana +
+# Child Application: LGTM observability (metrics slice: Mimir + Grafana +
 # Alloy). sync-wave 5 — after MinIO (wave 1, Mimir's S3 backend) and the services
 # it scrapes (wave 2). Alloy tolerates targets that don't exist yet (it retries),
 # so ordering is a nicety, not a hard dependency.

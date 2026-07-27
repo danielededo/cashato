@@ -1,4 +1,4 @@
-# MLflow tracking server + model registry (C6). Backend store = the mlflow DB on
+# MLflow tracking server + model registry. Backend store = the mlflow DB on
 # CNPG; artifact store = the mlflow bucket on MinIO, proxied by MLflow itself
 # (--serve-artifacts), so clients (train.py, the predictor) need only the tracking
 # URL, not S3 creds. An initContainer creates the bucket idempotently with mc.

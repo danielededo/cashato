@@ -1,4 +1,4 @@
-# Tekton (CI engine, C7c) via Argo. Tekton publishes no versioned Helm chart, so
+# Tekton (CI engine) via Argo. Tekton publishes no versioned Helm chart, so
 # — like the observability stack — the operator's version-pinned release YAML is
 # referenced as a remote kustomize resource (immutable URL = reproducible; a
 # version bump is a one-line change). Argo's repo-server fetches and applies it,

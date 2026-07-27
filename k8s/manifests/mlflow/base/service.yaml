@@ -1,5 +1,5 @@
 # Tracking/registry endpoint: mlflow.mlflow.svc:5000. Used by ml/train.py
-# (MLFLOW_TRACKING_URI) and by the C6c predictor to pull the registered model.
+# (MLFLOW_TRACKING_URI) and by the KServe predictor to pull the registered model.
 apiVersion: v1
 kind: Service
 metadata:

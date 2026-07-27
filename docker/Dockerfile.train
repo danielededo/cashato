@@ -1,4 +1,4 @@
-# Training / registry image (C6 / MLOps). Heavy ML stack — deliberately separate
+# Training / registry image (MLOps). Heavy ML stack — deliberately separate
 # from the light service image. Runs the retrain CronJob/Job
 # (python -m cashato.ml.train) and the one-off import (python -m cashato.ml.register_model).
 #

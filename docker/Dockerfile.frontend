@@ -1,4 +1,4 @@
-# Frontend SPA (phase E) — multi-stage: build the React/Vite bundle, then serve it
+# Frontend SPA — multi-stage: build the React/Vite bundle, then serve it
 # as static files with hardened, non-root nginx. The gateway path-splits (`/api/v1`
 # → APIs, `/` → here), so nginx only serves files + the SPA fallback — it does NOT
 # proxy the API. Build context = repo root (see .dockerignore); frontend source is

@@ -1,8 +1,8 @@
-# KServe (platform, C6b) — model serving. Installed in **RawDeployment mode**: no
+# KServe (platform) — model serving. Installed in **RawDeployment mode**: no
 # Knative, no Istio — InferenceServices become plain Kubernetes Deployments +
-# Services, much lighter on kind. Our custom EmbeddingKNN predictor (C6c) is
+# Services, much lighter on kind. Our custom EmbeddingKNN predictor is
 # served as an InferenceService (an app manifest via Argo), reached in-cluster by
-# the categorizer (C6d); ingress creation is disabled since we don't front it with
+# the categorizer; ingress creation is disabled since we don't front it with
 # a K8s Ingress (access is cluster-internal via the predictor Service).
 #
 # Two OCI charts: kserve-crd (the CRDs) must land before kserve (the controller).

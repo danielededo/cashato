@@ -1,4 +1,4 @@
-# Frontend SPA (phase E) — the built React bundle served by hardened, non-root
+# Frontend SPA — the built React bundle served by hardened, non-root
 # nginx. Reached only through the Envoy Gateway (`/` route); it serves static files
 # + the SPA fallback and does NOT proxy the API (the gateway path-splits /api/v1).
 apiVersion: apps/v1

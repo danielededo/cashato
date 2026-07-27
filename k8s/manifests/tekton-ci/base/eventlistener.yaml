@@ -1,4 +1,4 @@
-# The webhook sink (C7c-d). Creating this spins up a Deployment + Service named
+# The webhook sink. Creating this spins up a Deployment + Service named
 # `el-cashato-ci` (port 8080). Both sender (Gitea) and receiver live IN the cluster,
 # so Gitea POSTs to el-cashato-ci.cashato-ci.svc:8080 over cluster DNS — no ingress,
 # no Gateway, no public exposure (a real advantage of the in-cluster Gitea bridge).

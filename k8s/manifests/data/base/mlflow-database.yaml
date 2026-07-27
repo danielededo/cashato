@@ -1,4 +1,4 @@
-# Declarative creation of the MLflow backend-store database (C6), owned by the
+# Declarative creation of the MLflow backend-store database, owned by the
 # mlflow role. CNPG's Database CRD manages it — no manual createdb. MLflow creates
 # its own tables inside this database, so no cross-schema grants are needed.
 apiVersion: postgresql.cnpg.io/v1

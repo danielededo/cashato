@@ -1,6 +1,6 @@
 # CloudNativePG operator (platform). Installs the CRDs and watches all
 # namespaces; the Postgres `Cluster` itself is an app manifest delivered by
-# Argo CD into the cashato-data namespace (C3).
+# Argo CD into the cashato-data namespace.
 resource "helm_release" "cnpg" {
   name             = "cnpg"
   repository       = "https://cloudnative-pg.github.io/charts"

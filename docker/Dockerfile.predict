@@ -1,4 +1,4 @@
-# KServe custom-predictor image (C6c). Heavy ML stack (torch + sentence-
+# KServe custom-predictor image. Heavy ML stack (torch + sentence-
 # transformers) + the kserve SDK. Serves our EmbeddingKNN via cashato.ml.predictor.
 # The model itself is NOT baked in — it is pulled from the MLflow @champion alias
 # at startup, so a new champion is served by restarting the pod (no rebuild).

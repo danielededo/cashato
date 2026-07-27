@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Ensure the two Gitea repos exist and seed the config repo (C7c-e).
+# Ensure the two Gitea repos exist and seed the config repo.
 #
 #   cashato         — the SOURCE repo (code + manifests). Humans push here; the CI
-#                     clones it. (This finally scripts a step that used to be a
-#                     manual rebuild-recipe action.)
+#                     clones it.
 #   cashato-deploy  — the CONFIG/deploy repo Argo watches. Holds a copy of the
 #                     app-of-apps (k8s/apps/); the CI's bump-deploy step pins the
 #                     services/data image tags here. Seeded from the source's

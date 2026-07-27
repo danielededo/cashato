@@ -1,4 +1,4 @@
-# Namespace for ML batch workloads (C6): the model-import Job and the retrain
+# Namespace for ML batch workloads: the model-import Job and the retrain
 # CronJob. Kept separate from the app namespace (cashato) — these are offline
 # batch jobs, not request-serving services — and left without the strict Cilium
 # egress policy (like cashato-data/mlflow/minio) so they can reach CNPG + MLflow.

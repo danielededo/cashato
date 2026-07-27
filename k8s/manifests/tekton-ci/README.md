@@ -1,4 +1,4 @@
-# Tekton CI/CD (`cashato-ci`) — C7c
+# Tekton CI/CD (`cashato-ci`)
 
 Continuous integration **and delivery** for the cashato monorepo. On every push to
 `main` a Gitea webhook hits an in-cluster Tekton EventListener, which starts a
@@ -27,7 +27,7 @@ The two builds run **in parallel** once `lint-test` passes; `bump-deploy` runs a
 both, so a lint/test failure blocks all publishing and any lone build failure blocks
 the deploy.
 
-## Build-on-push (C7c-d) — Triggers + Gitea webhook
+## Build-on-push — Triggers + Gitea webhook
 
 An **EventListener** (`el-cashato-ci.cashato-ci.svc:8080`) receives the webhook.
 Interceptors: `github` (HMAC-SHA256 via `X-Hub-Signature-256` — Gitea sends
@@ -36,7 +36,7 @@ changed file under `src/**`, `docker/**`, or `pyproject.toml`). So docs/k8s/infr
 config-only pushes don't rebuild. Both sender (Gitea) and sink live in the cluster →
 no public exposure. The webhook is created by an Argo Sync-hook Job (`webhook-job.yaml`).
 
-## Auto-deploy (C7c-e) — the `cashato-deploy` config repo
+## Auto-deploy — the `cashato-deploy` config repo
 
 `bump-deploy` writes to a **separate** `cashato-deploy` repo (Argo watches it), never
 to the source repo — so the source history stays human-only. It sets
@@ -48,7 +48,7 @@ gitea-http.gitea.svc:3000/cashato/svc:<commit-sha>
 gitea-http.gitea.svc:3000/cashato/migrate:<commit-sha>
 ```
 
-That ref is what the nodes' containerd mirror resolves for pulls (C7c-b), so a pushed
+That ref is what the nodes' containerd mirror resolves for pulls, so a pushed
 image is immediately deployable. Registry is plain-HTTP (`TLSVERIFY=false`); buildah
 uses `STORAGE_DRIVER=vfs` to build unprivileged on kind. `cashato-deploy` has no
 webhook and the source `k8s/apps/` change doesn't match the path-filter → no loop.

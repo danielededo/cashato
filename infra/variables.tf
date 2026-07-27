@@ -34,7 +34,7 @@ variable "git_bridge_repo" {
 }
 
 variable "git_deploy_repo" {
-  description = "Config/deploy repository name in Gitea — the app-of-apps Argo watches; CI pins image tags here (C7c-e)."
+  description = "Config/deploy repository name in Gitea — the app-of-apps Argo watches; CI pins image tags here."
   type        = string
   default     = "cashato-deploy"
 }

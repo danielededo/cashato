@@ -3,6 +3,6 @@ kind: Kustomization
 
 # The InferenceService carries its own namespace (cashato-ml). The predictor image
 # tag is hardcoded here (kustomize's images transformer doesn't rewrite fields in
-# CRDs); swap to a Harbor tag in C7.
+# CRDs); point it at a registry-qualified tag here if the image moves off kind-load.
 resources:
   - inferenceservice.yaml

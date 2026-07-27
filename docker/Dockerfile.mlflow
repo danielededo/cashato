@@ -1,4 +1,4 @@
-# MLflow tracking server + model registry (C6). The official mlflow image lacks
+# MLflow tracking server + model registry. The official mlflow image lacks
 # the Postgres driver and S3 client, so add them: psycopg2 for the CNPG backend
 # store, boto3 for the MinIO (S3) artifact store. The server command is set in the
 # Deployment.

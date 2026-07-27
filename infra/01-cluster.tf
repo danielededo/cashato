@@ -1,7 +1,7 @@
 # Layer 0 — the kind cluster itself.
 # Default CNI is disabled so Cilium (layer 1) takes over. kube-proxy is also
 # disabled (kube_proxy_mode = "none") so Cilium runs in full kubeProxyReplacement
-# mode — required for L2 announcements / LoadBalancer IPAM (C4). Cilium owns all
+# mode — required for L2 announcements / LoadBalancer IPAM. Cilium owns all
 # service routing; no kube-proxy iptables to conflict with.
 resource "kind_cluster" "default" {
   name           = var.cluster_name
@@ -12,7 +12,7 @@ resource "kind_cluster" "default" {
     kind        = "Cluster"
     api_version = "kind.x-k8s.io/v1alpha4"
 
-    # C7c-b node-pull wiring: teach every node's containerd to pull images tagged
+    # Node-pull wiring: teach every node's containerd to pull images tagged
     # `gitea-http.gitea.svc:3000/...` from Gitea's built-in OCI registry. The nodes
     # cannot resolve that in-cluster DNS name themselves, so the mirror KEY (the
     # name in the image ref) is redirected to the registry's NodePort, reachable
@@ -40,7 +40,7 @@ resource "kind_cluster" "default" {
       kube_proxy_mode     = "none"
     }
 
-    # Control-plane also fronts host ports 80/443 so Envoy Gateway (C3) can be
+    # Control-plane also fronts host ports 80/443 so Envoy Gateway can be
     # reached from the host once its Service is wired up.
     node {
       role = "control-plane"

@@ -27,7 +27,7 @@ resource "helm_release" "cilium" {
       name  = "hubble.ui.enabled"
       value = "true"
     },
-    # kubeProxyReplacement (C4): kube-proxy is disabled in the kind config, so
+    # kubeProxyReplacement: kube-proxy is disabled in the kind config, so
     # Cilium handles all service routing. Without kube-proxy, agents must dial the
     # API server directly — hence k8sServiceHost/Port.
     {
@@ -42,7 +42,7 @@ resource "helm_release" "cilium" {
       name  = "k8sServicePort"
       value = tostring(var.k8s_service_port)
     },
-    # L2 announcements (C4): answer ARP for LoadBalancer IPs so the Envoy Gateway
+    # L2 announcements: answer ARP for LoadBalancer IPs so the Envoy Gateway
     # service is reachable on the local (docker) network. Uses leader election →
     # bump the client rate limit above the defaults (10/20).
     {

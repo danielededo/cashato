@@ -1,4 +1,4 @@
-# KServe InferenceService for the categorization model (C6c). Custom predictor
+# KServe InferenceService for the categorization model. Custom predictor
 # (our EmbeddingKNN via ml/predictor.py) — a plain container named kserve-container
 # (required by KServe). RawDeployment (cluster default) → a normal Deployment +
 # Service, no Knative. The pod pulls the @champion model from MLflow at startup, so

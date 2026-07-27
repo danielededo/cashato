@@ -43,8 +43,7 @@ else
   chmod 600 "$PW"
 fi
 
-# Ensure newer role passwords exist even on an env created before they were added
-# (idempotent append; never rewrites an existing line).
+# Idempotent append: never rewrites an existing line.
 if ! grep -q '^ml_reader=' "$PW"; then
   echo "[gen]  ml_reader password (appended)"
   echo "ml_reader=$(openssl rand -hex 24)" >> "$PW"

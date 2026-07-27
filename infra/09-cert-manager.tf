@@ -1,4 +1,4 @@
-# Layer 9 — cert-manager (C6b, platform). Prerequisite for KServe: its admission
+# Layer 9 — cert-manager (platform). Prerequisite for KServe: its admission
 # webhooks need TLS certs, which cert-manager issues. Kept as its own layer so it
 # is reusable if other components later want certs.
 module "cert_manager" {

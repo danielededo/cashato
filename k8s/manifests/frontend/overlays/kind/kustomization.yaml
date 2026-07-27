@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-# CI pins this to the SHA registry ref via the cashato-deploy config repo (C7c-e);
+# CI pins this to the SHA registry ref via the cashato-deploy config repo;
 # `dev` is the seed default (local kind-load).
 images:
   - name: cashato/frontend

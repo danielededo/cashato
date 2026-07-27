@@ -1,4 +1,4 @@
-# Retrain CronJob (C6 / MLOps). SUSPENDED by default: it only makes sense once the
+# Retrain CronJob (MLOps). SUSPENDED by default: it only makes sense once the
 # training dataset exists in CNPG (ingest data via the API, and/or label with
 # ml/label_llm.py) and does no good on every tick. Unsuspend for scheduled
 # retraining, or trigger on demand:

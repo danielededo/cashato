@@ -1,6 +1,6 @@
 # Child Application: the north-south Gateway (GatewayClass + Gateway).
 # sync-wave 1 — after the data layer (wave 0), before the services (wave 2) that
-# will attach HTTPRoutes to this Gateway in C5.
+# attach their HTTPRoutes to this Gateway.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

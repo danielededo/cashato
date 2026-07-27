@@ -1,4 +1,4 @@
-# C7c-e: after the images are built+pushed, pin the services/data Argo apps in the
+# After the images are built+pushed, pin the services/data Argo apps in the
 # cashato-deploy config repo to the freshly built commit-SHA image refs, then push.
 # This is the ONLY writer of cashato-deploy; the source repo is never touched by CI
 # (keeps its history human-only). No webhook on cashato-deploy → no build loop.

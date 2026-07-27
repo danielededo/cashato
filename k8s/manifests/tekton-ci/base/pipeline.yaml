@@ -1,4 +1,4 @@
-# CI pipeline (C7c-c) — DAG:
+# CI pipeline — DAG:
 #
 #   fetch-source ─▶ lint-test ─┬─▶ build-push-svc      (image: cashato/svc)
 #                              └─▶ build-push-migrate  (image: cashato/migrate)
@@ -18,7 +18,7 @@
 # is project-specific (cashato-lint-test, same namespace).
 #
 # Push target = gitea-http.gitea.svc:3000/cashato/<img>:<sha> — the same ref the
-# nodes' containerd mirror resolves for pulls (C7c-b). Plain HTTP -> TLSVERIFY=false.
+# nodes' containerd mirror resolves for pulls. Plain HTTP -> TLSVERIFY=false.
 # STORAGE_DRIVER=vfs for buildah-in-pod on kind.
 apiVersion: tekton.dev/v1
 kind: Pipeline
@@ -119,7 +119,7 @@ spec:
         - { name: source, workspace: shared }
         - { name: dockerconfig, workspace: dockerconfig }
 
-    # cashato/frontend — the SPA (phase E). CONSUMED BY the frontend Deployment
+    # cashato/frontend — the SPA. CONSUMED BY the frontend Deployment
     # (ns cashato). Multi-stage node→nginx build. (docker/Dockerfile.frontend)
     - name: build-push-frontend
       runAfter: [lint-test]
