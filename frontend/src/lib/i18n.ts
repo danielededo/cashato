@@ -143,7 +143,7 @@ const UI: Dict = {
   "inv.flow.cum": { it: "Versato nel tempo", en: "Contributed over time" },
   "inv.flow.cum.hint": { it: "cumulato · quanto hai accumulato finora", en: "cumulative · how much you have built up" },
   "inv.cumulative": { it: "Cumulato", en: "Cumulative" },
-  "inv.flow.hint": { it: "mensile, impilato per dettaglio disponibile", en: "monthly, stacked by available detail" },
+  "inv.flow.hint": { it: "mensile · quanto hai versato ogni mese", en: "monthly · how much you contributed each month" },
   "inv.allocation": { it: "Allocazione", en: "Allocation" },
   "inv.allocation.hint": { it: "per capitale investito, non per valore di mercato", en: "by capital invested, not by market value" },
   "inv.positions": { it: "Posizioni", en: "Positions" },

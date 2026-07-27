@@ -34,8 +34,7 @@ import { useAsync } from "../lib/useAsync";
 
 const StackedArea = lazy(() => import("../components/charts").then((m) => ({ default: m.StackedArea })));
 
-const KNOWN = "known";
-const UNKNOWN = "unknown";
+const TOTAL = "total";
 
 export function Investments() {
   const { t } = useT();
@@ -51,35 +50,27 @@ export function Investments() {
     const data = inv.data;
     if (!data || (!data.months.length && !data.holdings.length)) return null;
 
-    // Contributions over time, split by whether the instrument is known. Stacked
-    // so the two read as parts of one total rather than competing series.
-    const series: SeriesDef[] = [
-      { key: KNOWN, label: t("inv.known"), category: "investments" },
-      { key: UNKNOWN, label: t("inv.unknown"), category: "other" },
-    ];
+    // Contributions over time as ONE series: the known/unknown split lives in
+    // the KPI tiles, where the two figures visibly sum to the hero — repeating
+    // it here as stacked bands made the chart about the split instead of the
+    // contribution.
+    const series: SeriesDef[] = [{ key: TOTAL, label: t("inv.invested"), category: "investments" }];
     // The months arrive per kind, so fold them into one row per month.
     const byMonth = new Map<string, Row>();
     for (const m of data.months) {
       const row = byMonth.get(m.month) ?? { month: monthShort(m.month) };
-      row[KNOWN] = ((row[KNOWN] as number) ?? 0) + num(m.into_known);
-      row[UNKNOWN] = ((row[UNKNOWN] as number) ?? 0) + num(m.into_unknown);
+      row[TOTAL] = ((row[TOTAL] as number) ?? 0) + num(m.into_known) + num(m.into_unknown);
       byMonth.set(m.month, row);
     }
     const monthly: Row[] = [...byMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([, row]) => row);
-    // Running totals per series, so the stacked bands keep adding up.
-    let runK = 0;
-    let runU = 0;
+    let run = 0;
     const stackData: Row[] = cumulative
-      ? monthly.map((r) => {
-          runK += (r[KNOWN] as number) ?? 0;
-          runU += (r[UNKNOWN] as number) ?? 0;
-          return { month: r.month, [KNOWN]: runK, [UNKNOWN]: runU };
-        })
+      ? monthly.map((r) => ({ month: r.month, [TOTAL]: (run += (r[TOTAL] as number) ?? 0) }))
       : monthly;
     // Sparkline always shows the monthly pace, whatever the chart is showing.
-    const spark = monthly.map((r) => ((r[KNOWN] as number) ?? 0) + ((r[UNKNOWN] as number) ?? 0));
+    const spark = monthly.map((r) => (r[TOTAL] as number) ?? 0);
 
     // Colour follows the INSTRUMENT, not its rank: assigning by position in the
     // invested-sorted list would repaint every holding as soon as one overtakes

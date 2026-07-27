@@ -55,7 +55,8 @@ export const StackedArea = memo(function StackedArea({ data, series }: { data: R
         <XAxis dataKey="month" tick={axisTick} tickLine={false} stroke="var(--baseline)" />
         <YAxis tick={axisTick} tickLine={false} stroke="var(--baseline)" width={56} tickFormatter={moneyShort} />
         <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItem} formatter={(v: number) => money(v)} />
-        <Legend wrapperStyle={legendStyle} />
+        {/* A one-entry legend only repeats the panel title. */}
+        {series.length > 1 ? <Legend wrapperStyle={legendStyle} /> : null}
         {series.map((s) => (
           <Area
             key={s.key}
