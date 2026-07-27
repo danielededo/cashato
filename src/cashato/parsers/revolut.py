@@ -36,6 +36,7 @@ from .base import (
     INDIVIDUAL,
     JOINT,
     AccountInfo,
+    BalanceAnchor,
     Transaction,
     addressee_from_words,
     assign_occurrence_keys,
@@ -337,6 +338,27 @@ def extract_accounts(path: str | Path) -> list[AccountInfo]:
     return list(found.values())
 
 
+def extract_balances(path: str | Path) -> list[BalanceAnchor]:
+    """End-of-day balances from the Balance column (CSV and PDF alike).
+
+    Rows are chronological, so the LAST balance seen on a date is that date's
+    closing balance. Every date is anchored, including the newest one: if that
+    day later proves to have been exported mid-day, the next upload covering it
+    re-emits the anchor and the (account, date) upsert corrects it in place.
+    Interest/crypto sections carry no Balance column, so those accounts simply
+    have no anchors — absent is normal, not an error.
+    """
+    rows = iter_rows_pdf(path) if str(path).lower().endswith(".pdf") else iter_rows(path)
+    last: dict[tuple[str, date], Decimal] = {}
+    for r in rows:
+        if r.balance is not None:
+            last[(r.account, r.date)] = r.balance
+    return [
+        BalanceAnchor(account=a, balance_date=d, balance=b, currency=CURRENCY)
+        for (a, d), b in last.items()
+    ]
+
+
 def extract_holder(path: str | Path) -> str | None:
     """Account holder, from the PDF addressee block. ``None`` for the CSV, whose
     header carries account/institution details but no addressee."""
@@ -361,8 +383,10 @@ def parse(path: str | Path) -> list[Transaction]:
 def _build(rows: Iterator[RevolutRow]) -> list[Transaction]:
     """Build the normalized transactions from the cash-movement rows (CSV or PDF).
 
-    Each row with ``Fees`` != 0 produces a separate fee transaction (negative
-    amount) for traceability.
+    The ``Fees`` column is INFORMATIONAL: on every observed row with a fee, the
+    balance moves by ``Money in/out`` alone, so the fee is already inside the
+    amount. Emitting it as a separate transaction double-counts it (and breaks
+    reconciliation against the statement's own Balance column).
     """
     transactions: list[Transaction] = []
     for r in rows:
@@ -378,19 +402,6 @@ def _build(rows: Iterator[RevolutRow]) -> list[Transaction]:
                 native_category=r.category or None,  # seed for the Categorizer
             )
         )
-        if r.fee and r.fee != 0:
-            transactions.append(
-                Transaction(
-                    value_date=r.date,
-                    booking_date=r.date,
-                    description=f"Fee: {r.description}",
-                    amount=-r.fee,
-                    currency=CURRENCY,
-                    account=r.account,
-                    source=SOURCE,
-                    native_category="Fees",
-                )
-            )
     return transactions
 
 

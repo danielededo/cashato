@@ -371,8 +371,13 @@ def write_intesa_quarter(path: Path, movs: list[IMov], n: int, year: int,
             _intesa_header_row(pdf, 60)
             y = 80
             if first:
-                put(pdf, _I_X_DESC, y, f"Saldo iniziale al {period[0]:%d.%m.%Y}", size=7.5)
-                put_right(pdf, _I_X1_CREDIT, y, fmt_it(opening), size=7.5)
+                # Like the real statement: "al" the LAST day of the previous
+                # period (the balance BEFORE this quarter's movements), amount
+                # SIGNED ("+3.434,25") — the sign is how a debit balance shows.
+                put(pdf, _I_X_DESC, y,
+                    f"Saldo iniziale al {period[0] - timedelta(days=1):%d.%m.%Y}", size=7.5)
+                put_right(pdf, _I_X1_CREDIT, y,
+                          ("-" if opening < 0 else "+") + fmt_it(opening), size=7.5)
                 y += 13
                 first = False
         put(pdf, _I_X_BOOK, y, f"{t.booking:%d.%m.%Y}", size=7.5)
@@ -387,7 +392,7 @@ def write_intesa_quarter(path: Path, movs: list[IMov], n: int, year: int,
             put(pdf, _I_X_DESC, y, t.line2, size=7.5, max_x=358)
         y += 13
     put(pdf, _I_X_DESC, y, f"Saldo finale al {period[1]:%d.%m.%Y}", size=7.5)
-    put_right(pdf, _I_X1_CREDIT, y, fmt_it(closing), size=7.5)
+    put_right(pdf, _I_X1_CREDIT, y, ("-" if closing < 0 else "+") + fmt_it(closing), size=7.5)
     for i in range(1, pdf.pages_count + 1):
         pdf.page = i
         put(pdf, 40, 810, f"Pagina {i} di {pdf.pages_count}", size=7)
@@ -422,6 +427,12 @@ def write_intesa_xlsx(path: Path, movs: list[IMov]) -> None:
     ws.append(["Lista Operazioni"])
     ws.append([f"Intestatario: {HOLDER_FAMILY_FIRST.title()}"])
     ws.append([f"Periodo: {XLSX_START:%d.%m.%Y} - {END:%d.%m.%Y}"])
+    ws.append([])
+    # The real export opens with a filter recap; "Conti e Carte:" is the string
+    # content detection anchors on (the export carries no IBAN and never names
+    # the bank), so the demo file must carry it too.
+    ws.append([None, "Conti e Carte:", "Conto 1000 / 00012345"])
+    ws.append([None, "Finanziamento:", "-"])
     ws.append([])
     ws.append(["Data", "Operazione", "Dettagli", "Categoria", "Valuta", "Importo"])
     # The export lists by VALUE date (which is what the quarterlies' natural_key
@@ -466,7 +477,7 @@ def write_revolut_csv(path: Path, gt: GroundTruth, balances: dict[str, list[Deci
             for t, bal in zip(gt.rev[label], balances[label], strict=True):
                 fee = f"€{fmt_en(t.fee, signed=False)}" if t.fee else ""
                 w.writerow([_rev_date(t.d), t.desc, t.cat,
-                            fmt_en(t.amount), fmt_en(bal, signed=False), "", "", fee])
+                            fmt_en(t.amount), fmt_en(bal), "", "", fee])
             w.writerow(["---------"])
         # savings-interest section (parsed from the CSV only)
         w.writerow(["Savings Account (EUR)"])
@@ -533,7 +544,7 @@ def write_revolut_pdf(path: Path, gt: GroundTruth, balances: dict[str, list[Deci
             put(pdf, _R_X_DESC, y, t.desc, size=8, max_x=255)
             put(pdf, _R_X_CAT, y, t.cat, size=8)
             put(pdf, _R_X_MONEY, y, fmt_en(t.amount), size=8)
-            put(pdf, _R_X_BAL, y, fmt_en(bal, signed=False), size=8)
+            put(pdf, _R_X_BAL, y, fmt_en(bal), size=8)
             if t.fee:
                 put(pdf, _R_X_FEE, y, fmt_en(t.fee, signed=False), size=8)
             y += 13
@@ -542,12 +553,20 @@ def write_revolut_pdf(path: Path, gt: GroundTruth, balances: dict[str, list[Deci
 
 
 def revolut_balances(gt: GroundTruth) -> dict[str, list[Decimal]]:
-    """Running balance per account, one entry per movement (net of the fee)."""
+    """Running balance per account, one entry per movement.
+
+    The Fees column is informational — on real statements the balance moves by
+    ``Money in/out`` alone (the fee is already inside it), so the running
+    balance here must NOT subtract it again.
+    """
     out: dict[str, list[Decimal]] = {}
-    for label, start in (("Personal", eur(350)), ("Joint", eur(280))):
+    # Openings high enough that no account ever goes negative: Revolut accounts
+    # cannot run an overdraft, so a statement with a negative balance would be
+    # unrealistic (the joint account only ever spends in this dataset).
+    for label, start in (("Personal", eur(350)), ("Joint", eur(2800))):
         bal, seq = start, []
         for t in gt.rev[label]:
-            bal += t.amount - t.fee
+            bal += t.amount
             seq.append(bal)
         out[label] = seq
     return out
@@ -587,7 +606,9 @@ def write_tr_pdf(path: Path, movs: list[TMov]) -> None:
     sal_x1 = _T_X_SAL + pdf.get_string_width("SALDO")
     y += 16
 
-    bal = D0
+    # Opening balance: a cash account at a broker does not run an overdraft, so
+    # the statement's SALDO column never goes negative — start it high enough.
+    bal = eur(500)
     # balance-only row: becomes a dateless anchor the parser discards, absorbing
     # the header words that would otherwise leak into the first row's description
     put(pdf, _T_X_DESC, y, "Saldo iniziale", size=7)

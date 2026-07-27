@@ -33,6 +33,7 @@ from .base import (
     GIVEN_FIRST,
     SELL,
     AccountInfo,
+    BalanceAnchor,
     TradeLeg,
     Transaction,
     addressee_from_words,
@@ -189,6 +190,14 @@ class _Block:
         return re.sub(r"\s+", " ", " ".join(t[2] for t in toks)).strip()
 
 
+def _split_sign(tok: str) -> tuple[str, int]:
+    """Strip a leading minus (ASCII or unicode) off a token, remembering it."""
+    t = tok.strip()
+    if t[:1] in ("-", "−"):
+        return t[1:].lstrip(), -1
+    return t, 1
+
+
 def _amounts_in_row(
     ws: list[dict], cols: _Cols
 ) -> tuple[Decimal | None, str | None, Decimal | None]:
@@ -196,16 +205,30 @@ def _amounts_in_row(
 
     x0 gate so that foreign-currency amounts written in the description (e.g.
     "387,95 £" of a GBP payment) are not mistaken for the real amount.
+
+    IN ENTRATA / IN USCITA are always unsigned (the column IS the sign), but
+    SALDO goes negative and the layout may render the minus either glued to the
+    number or as its own token just left of it — both must keep the sign, or a
+    negative balance reads as a positive one.
     """
     amount = kind = balance = None
+    prev: dict | None = None
     for w in ws:
-        if _is_money(w["text"]) and w["x0"] >= cols.inflow - 45:
+        body, sign = _split_sign(w["text"])
+        if _is_money(body) and w["x0"] >= cols.inflow - 45:
             k = cols.classify(w["x1"])
-            val = _to_decimal(w["text"])
             if k == "balance":
+                val = _to_decimal(body)
+                if sign < 0 or (
+                    prev is not None
+                    and prev["text"].strip() in ("-", "−")
+                    and (w["x0"] - prev["x1"]) <= 4
+                ):
+                    val = -val
                 balance = val
-            elif amount is None:
-                amount, kind = val, k
+            elif amount is None and sign > 0:
+                amount, kind = _to_decimal(body), k
+        prev = w
     return amount, kind, balance
 
 
@@ -275,6 +298,34 @@ def extract_accounts(path: str | Path) -> list[AccountInfo]:
     with pdfplumber.open(path) as pdf:
         head = pdf.pages[0].extract_text() or ""
     return [AccountInfo(account_id=ACCOUNT, currency=CURRENCY, iban=find_iban(head))]
+
+
+def extract_balances(path: str | Path) -> list[BalanceAnchor]:
+    """End-of-day balances from the statement's SALDO column (PDF only).
+
+    Blocks are chronological, so the LAST balance of a date is that date's
+    closing balance. Dateless balance rows (the "Saldo iniziale" line) are
+    skipped — a balance we cannot anchor to a date cannot be reconciled. The
+    transaction-export CSV has no balance column at all.
+    """
+    if not str(path).lower().endswith(".pdf"):
+        return []
+    cols: _Cols | None = None
+    last: dict[date, Decimal] = {}
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            lines = _group_lines(page.extract_words(keep_blank_chars=False))
+            if cols is None:
+                cols = _detect_columns(lines)
+            if cols is None:
+                continue
+            for b in _parse_blocks(lines, cols):
+                if b.balance is not None and b.day and b.month and b.year:
+                    last[b.to_date()] = b.balance
+    return [
+        BalanceAnchor(account=ACCOUNT, balance_date=d, balance=v, currency=CURRENCY)
+        for d, v in last.items()
+    ]
 
 
 def extract_holder(path: str | Path) -> str | None:
