@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, ApiError } from "../api/client";
+import { dateLabel, money, num } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { invalidateAccounts, useAccounts } from "../lib/accounts";
+import { useAsync } from "../lib/useAsync";
 
 type Busy = null | "reprocess" | "reset";
 
@@ -32,6 +34,7 @@ export function Manage() {
 
   return (
     <div className="fade-in">
+      <HealthPanel />
       <AccountsPanel />
 
       {/* reprocess */}
@@ -102,6 +105,115 @@ python -m cashato.ml.label --limit 2000</code></pre>
       </div>
 
       {msg ? <div className={`panel state ${msg.ok ? "" : "error"}`}>{msg.text}</div> : null}
+    </div>
+  );
+}
+
+const MISMATCH_ROWS = 8;
+
+/** Do the imported movements add up to the balances the statements declare?
+ *
+ *  Read-only rollup of gold.v_reconciliation: one row per account, plus the
+ *  mismatched intervals when there are any. A discrepancy localizes a data
+ *  problem to one account and date range — which is also why the panel lives
+ *  here next to Reprocess, the button that usually fixes it. */
+function HealthPanel() {
+  const { t } = useT();
+  const { accountShort, accountLabel } = useAccounts();
+  const rec = useAsync(() => api.reconciliation(), []);
+  const d = rec.data;
+
+  const accounts = useMemo(() => {
+    if (!d) return [];
+    const by = new Map<string, { n: number; bad: number; disc: number; lastDate: string; lastBal: number }>();
+    for (const iv of d.intervals) {
+      const row = by.get(iv.account) ?? { n: 0, bad: 0, disc: 0, lastDate: "", lastBal: 0 };
+      row.n += 1;
+      const disc = num(iv.discrepancy);
+      if (disc !== 0) { row.bad += 1; row.disc += disc; }
+      if (iv.to_date > row.lastDate) { row.lastDate = iv.to_date; row.lastBal = num(iv.to_balance); }
+      by.set(iv.account, row);
+    }
+    return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [d]);
+
+  const mismatched = useMemo(
+    () => (d ? d.intervals.filter((iv) => num(iv.discrepancy) !== 0) : []),
+    [d],
+  );
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>{t("mng.health")}</h2>
+        <span className="hint">{t("mng.health.hint")}</span>
+      </div>
+      {rec.loading && !d ? <div className="state">{t("common.loading")}</div> : null}
+      {rec.error ? <div className="state error">{rec.error}</div> : null}
+      {d && d.n_intervals === 0 ? <div className="state">{t("mng.health.none")}</div> : null}
+      {d && d.n_intervals > 0 ? (
+        <div>
+          <p className={`health-verdict ${d.n_mismatched ? "neg" : "pos"}`}>
+            {d.n_mismatched
+              ? t("mng.health.bad", { bad: d.n_mismatched, n: d.n_intervals })
+              : t("mng.health.ok", { n: d.n_intervals })}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>{t("mng.health.account")}</th>
+                <th className="num">{t("mng.health.intervals")}</th>
+                <th className="num">{t("mng.health.mismatched")}</th>
+                <th className="num">{t("mng.health.netDisc")}</th>
+                <th className="num">{t("mng.health.lastBalance")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map(([acct, r]) => (
+                <tr key={acct}>
+                  <td className="dim" title={accountLabel(acct)}>{accountShort(acct)}</td>
+                  <td className="num mono">{r.n}</td>
+                  <td className="num"><span className={`amt ${r.bad ? "neg" : ""}`}>{r.bad || "—"}</span></td>
+                  <td className="num"><span className={`amt ${r.bad ? "neg" : ""}`}>{r.bad ? money(r.disc) : "—"}</span></td>
+                  <td className="num"><span className="amt">{money(r.lastBal)}</span>{" "}<span className="dim">{dateLabel(r.lastDate)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {mismatched.length > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("mng.health.account")}</th>
+                    <th>{t("mng.health.period")}</th>
+                    <th className="num">{t("mng.health.expected")}</th>
+                    <th className="num">{t("mng.health.actual")}</th>
+                    <th className="num">{t("mng.health.diff")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mismatched.slice(0, MISMATCH_ROWS).map((iv) => (
+                    <tr key={`${iv.account}${iv.from_date}`}>
+                      <td className="dim">{accountShort(iv.account)}</td>
+                      <td className="mono dim">{dateLabel(iv.from_date)} → {dateLabel(iv.to_date)}</td>
+                      <td className="num"><span className="amt">{money(num(iv.expected_delta))}</span></td>
+                      <td className="num"><span className="amt">{money(num(iv.actual_delta))}</span></td>
+                      <td className="num"><span className="amt neg">{money(num(iv.discrepancy))}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {mismatched.length > MISMATCH_ROWS ? (
+                <p className="footnote" style={{ paddingTop: 8 }}>
+                  {t("mng.health.more", { n: mismatched.length - MISMATCH_ROWS })}
+                </p>
+              ) : null}
+              <p className="footnote" style={{ paddingTop: 8 }}>{t("mng.health.boundaryNote")}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

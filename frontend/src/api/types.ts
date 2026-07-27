@@ -80,6 +80,24 @@ export interface TransfersResponse {
   transfers: TransferPair[];
 }
 
+export interface ReconciliationInterval {
+  account: string;
+  from_date: string;
+  to_date: string;
+  from_balance: string;
+  to_balance: string;
+  expected_delta: string;
+  actual_delta: string;
+  discrepancy: string;
+  n_movements: number;
+}
+
+export interface ReconciliationResponse {
+  n_intervals: number;
+  n_mismatched: number;
+  intervals: ReconciliationInterval[];
+}
+
 export interface UploadAccepted {
   status: string;
   filename: string;
