@@ -42,8 +42,10 @@ typecheck: ## Mypy
 test: ## Unit tests (pytest)
 	CASHATO_CONFIG_DIR=config $(PY) -m pytest
 
-export: ## Unified export (LANG=it|en)
-	CASHATO_CONFIG_DIR=config $(PY) -m cashato.cli.export --lang $(or $(LANG),it)
+# L, not LANG: make inherits the shell's LANG (e.g. it_IT.UTF-8), so the
+# default would never apply and the locale string would reach --lang.
+export: ## Unified export (L=it|en)
+	CASHATO_CONFIG_DIR=config $(PY) -m cashato.cli.export --lang $(or $(L),it)
 
 train: ## Build the embedding index
 	CASHATO_CONFIG_DIR=config CASHATO_MODEL_DIR=models $(PY) -m cashato.ml.train --include-rules --stamp "$$(date +%Y%m%d-%H%M)"
