@@ -1,0 +1,39 @@
+# Creates the MinIO bucket the CNPG backups land in. Loki/Mimir/Tempo make
+# their own buckets from an initContainer, but CNPG pods are operator-managed,
+# so a Job does it here instead. Racing the Cluster in the same wave is safe:
+# the WAL archiver retries until the bucket exists, and backoffLimit covers
+# MinIO not being up yet.
+# Replace=true for the same reason as db-grants: a Job's pod template is
+# immutable, so an edited Job would never re-apply via plain `apply`.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-bucket
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backup-bucket
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: create-bucket
+          image: minio/mc
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - >
+              mc alias set m http://minio.minio.svc:9000 "$MINIO_USER" "$MINIO_PASSWORD" &&
+              mc mb --ignore-existing m/cnpg-backups
+          env:
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: username }
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-creds, key: password }

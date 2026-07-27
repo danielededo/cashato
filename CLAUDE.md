@@ -190,7 +190,12 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   (pushes >50 commits build unconditionally — Gitea truncates the payload the
   filter reads). Model registry = **MLflow**. Secrets: **Sealed Secrets**.
 - Platform: kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC (OpenTofu),
-  DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/Tempo/
+  DB roles least-privilege.
+- DB backup: CNPG WAL archiving + daily `ScheduledBackup` (13:00 — the
+  workstation is off at night; `immediate: true`) to MinIO bucket
+  `cnpg-backups`, retention 30d. Protects the only non-re-derivable data:
+  manual corrections, `training_labels`, `category_feedback` (files reprocess,
+  labels don't). Observability = **LGTM** (Loki/Grafana/Tempo/
   **Mimir**, backends on MinIO S3; collector **Grafana Alloy**): metrics + logs
   + OTel cross-service traces (context propagated through NATS). metrics-server
   added (HPA/`kubectl top`).

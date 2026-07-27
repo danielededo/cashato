@@ -10,7 +10,10 @@ resources:
   - sealedsecret-query-reader.yaml
   - sealedsecret-mlflow-db.yaml
   - sealedsecret-ml-reader.yaml
+  - sealedsecret-minio.yaml
+  - backup-bucket-job.yaml
   - cluster.yaml
+  - scheduled-backup.yaml
   - migration-job.yaml
   - grant-job.yaml
   - mlflow-database.yaml

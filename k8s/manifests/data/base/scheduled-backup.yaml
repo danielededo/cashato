@@ -1,0 +1,22 @@
+# Daily base backup of cashato-db. Between base backups the archived WAL
+# (spec.backup on the Cluster) keeps recovery point-in-time, so a missed run
+# only lengthens the WAL replay on restore, it loses nothing.
+# CNPG cron has a leading SECONDS field (6 fields, not 5). 13:00, not the
+# classic 03:00: this cluster runs on a workstation that is usually off at
+# night, and a schedule that never fires while the machine is on would leave
+# only the initial backup. Missed runs are not replayed.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: cashato-db-daily
+  annotations:
+    # Wave 1: the Cluster (wave 0) must exist before a backup can target it.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  schedule: "0 0 13 * * *"
+  backupOwnerReference: self
+  # Take the first backup as soon as the resource lands, so protection starts
+  # now and after any rebuild, not at the next 13:00 the machine happens to be on.
+  immediate: true
+  cluster:
+    name: cashato-db

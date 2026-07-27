@@ -18,6 +18,30 @@ spec:
     parameters:
       wal_level: logical
 
+  # Continuous backup: WAL archiving + base backups (ScheduledBackup) to the
+  # in-cluster MinIO ("cnpg-backups" bucket, created by the backup-bucket Job).
+  # This window is what makes the hand-made data recoverable — uploaded files
+  # can always be reprocessed, but manual category corrections,
+  # gold.training_labels and category_feedback exist only in this database.
+  # In-tree barmanObjectStore is deprecated upstream in favour of the Barman
+  # Cloud plugin; the 1.30 CRD still serves it, migrate when the operator drops it.
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/
+      endpointURL: http://minio.minio.svc:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-creds
+          key: username
+        secretAccessKey:
+          name: minio-creds
+          key: password
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+
   bootstrap:
     initdb:
       database: cashato
