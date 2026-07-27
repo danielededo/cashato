@@ -217,7 +217,14 @@ a { color: inherit; text-decoration: none; }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 0; margin-bottom: 16px; }
 .panel > .panel-head { padding: 14px 18px 10px; }
-.panel > :not(.panel-head) { padding: 0 18px 16px; }
+/* Children carry the panel inset themselves — at ZERO specificity (:where) so
+   a component's own padding still wins. The previous (0,2,0) blanket silently
+   killed every padding-top a section declared (.filter-summary, .ranks,
+   .alloc, .state…), gluing them to the panel edge. */
+.panel > :where(:not(.panel-head)) { padding: 0 18px 16px; }
+/* Head-less panels: the first section must not sit on the top border. Also
+   zero specificity, so a section that picks its own top padding keeps it. */
+.panel > :where(:not(.panel-head):first-child) { padding-top: 14px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-head h2 { font-family: var(--f-display); font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; margin: 0; color: var(--text); }
 .panel-head .hint { font-size: 11px; color: var(--muted); }
@@ -321,15 +328,17 @@ button:disabled { opacity: 0.45; cursor: default; }
 .filter-summary .n { font-family: var(--f-mono); color: var(--text); }
 
 /* ---- Accounts management + notices ------------------------------------- */
-.panel.notice { border-left: 3px solid var(--series-2); font-size: 12.5px; padding: 11px 13px; }
-.acct-row { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(160px, 1fr) auto auto; gap: 9px; align-items: center; padding: 9px 0; border-top: 1px solid var(--rule); }
+/* 15px + the 3px accent border = 18px: text lines up with sibling panels. */
+.panel.notice { border-left: 3px solid var(--series-2); font-size: 12.5px; padding: 11px 18px 11px 15px; }
+.acct-row { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(160px, 1fr) auto auto; gap: 9px; align-items: center; padding: 9px 18px; border-top: 1px solid var(--rule); }
+.acct-row:last-of-type { padding-bottom: 16px; }
 .acct-row:first-of-type { border-top: none; }
 .acct-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .acct-id .dim { font-size: 11px; color: var(--muted); }
 @media (max-width: 760px) { .acct-row { grid-template-columns: 1fr 1fr; } }
 .kpis.kpis-4 { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 900px) { .kpis.kpis-4 { grid-template-columns: repeat(2, 1fr); } }
-.panel-foot { font-size: 11px; padding: 9px 0 0; border-top: 1px solid var(--rule); margin-top: 9px; }
+.panel-foot { font-size: 11px; padding: 9px 18px 16px; border-top: 1px solid var(--rule); margin-top: 9px; }
 
 /* ---- Transaction detail drawer ----------------------------------------- */
 .drawer-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40; }
