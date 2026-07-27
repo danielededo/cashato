@@ -149,12 +149,13 @@ def _upsert_balances(conn, path: Path, source: str, file_id: int) -> int:
             text(
                 """
                 INSERT INTO silver.balances
-                    (account, balance_date, balance, currency, source, file_id)
-                VALUES (:account, :date, :balance, :currency, :source, :file_id)
+                    (account, balance_date, balance, currency, source, basis, file_id)
+                VALUES (:account, :date, :balance, :currency, :source, :basis, :file_id)
                 ON CONFLICT (account, balance_date) DO UPDATE SET
                     balance = EXCLUDED.balance,
                     currency = EXCLUDED.currency,
                     source = EXCLUDED.source,
+                    basis = EXCLUDED.basis,
                     file_id = EXCLUDED.file_id,
                     updated_at = now()
                 """
@@ -165,6 +166,7 @@ def _upsert_balances(conn, path: Path, source: str, file_id: int) -> int:
                 "balance": a.balance,
                 "currency": a.currency,
                 "source": source,
+                "basis": a.basis,
                 "file_id": file_id,
             },
         )
@@ -281,18 +283,24 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
         for t in txs:
             # Inline provider-agnostic categorization: MCC -> rules -> model.
             r = _CATEGORIZER.resolve(t.description, t.source, t.mcc)
-            # Identity (natural_key, amount, dates, account) is immutable. The
-            # DESCRIPTIVE text converges to the RICHEST observed across twin
-            # formats (quarterly PDF / 13m PDF / XLSX). Longer wins, strictly
-            # (ties keep the existing row, so re-loading the same file is
-            # still a no-op).
-            # The category follows the text — a category computed on the old
-            # text is not justified for the new one — UNLESS the user set it
-            # (manual is ground truth, and the feedback reapply below enforces
-            # it anyway). mcc rides along when it fills a gap.
-            # RETURNING (xmax = 0): true for a fresh insert, false for the
-            # enrichment update; no row at all when the conflict kept the
-            # existing text.
+            # KEY identity (natural_key = account/value_date/amount/occurrence)
+            # is immutable. Two descriptive facts converge across twin formats:
+            # - DESCRIPTION converges to the RICHEST observed (strictly longer
+            #   wins; ties keep the existing row, so re-loading the same file
+            #   is still a no-op). The category follows the text — a category
+            #   computed on the old text is not justified for the new one —
+            #   UNLESS the user set it (manual is ground truth, and the
+            #   feedback reapply below enforces it anyway). mcc rides along
+            #   when it fills a gap.
+            # - BOOKING_DATE converges to the statement that actually knows it:
+            #   the 13-month export has a single date (== value date), so rows
+            #   it inserts first carry a flattened booking. A row whose two
+            #   dates DIFFER can only come from a document that distinguishes
+            #   them (the quarterly), and wins regardless of which file loaded
+            #   first. Reconciliation sums booking-basis anchors by this date.
+            # RETURNING: fresh = brand-new row; took_desc = the stored text is
+            # this file's (insert or enrichment) — false for a booking-only
+            # update, which must not count as enrichment nor nudge the model.
             res = conn.execute(
                 text(
                     """
@@ -305,18 +313,33 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                          :account, :source, :category, :category_confidence,
                          :category_source, :native_category, :mcc, :natural_key, :file_id)
                     ON CONFLICT (natural_key) DO UPDATE SET
-                        description = EXCLUDED.description,
-                        mcc = COALESCE(EXCLUDED.mcc, tx.mcc),
-                        category = CASE WHEN tx.category_source = 'manual'
-                                        THEN tx.category ELSE EXCLUDED.category END,
-                        category_confidence = CASE WHEN tx.category_source = 'manual'
-                                        THEN tx.category_confidence
-                                        ELSE EXCLUDED.category_confidence END,
-                        category_source = CASE WHEN tx.category_source = 'manual'
-                                        THEN tx.category_source
-                                        ELSE EXCLUDED.category_source END
+                        description = CASE
+                            WHEN length(EXCLUDED.description) > length(tx.description)
+                            THEN EXCLUDED.description ELSE tx.description END,
+                        mcc = CASE
+                            WHEN length(EXCLUDED.description) > length(tx.description)
+                            THEN COALESCE(EXCLUDED.mcc, tx.mcc) ELSE tx.mcc END,
+                        category = CASE
+                            WHEN tx.category_source = 'manual'
+                              OR length(EXCLUDED.description) <= length(tx.description)
+                            THEN tx.category ELSE EXCLUDED.category END,
+                        category_confidence = CASE
+                            WHEN tx.category_source = 'manual'
+                              OR length(EXCLUDED.description) <= length(tx.description)
+                            THEN tx.category_confidence
+                            ELSE EXCLUDED.category_confidence END,
+                        category_source = CASE
+                            WHEN tx.category_source = 'manual'
+                              OR length(EXCLUDED.description) <= length(tx.description)
+                            THEN tx.category_source ELSE EXCLUDED.category_source END,
+                        booking_date = CASE
+                            WHEN EXCLUDED.booking_date <> EXCLUDED.value_date
+                            THEN EXCLUDED.booking_date ELSE tx.booking_date END
                     WHERE length(EXCLUDED.description) > length(tx.description)
-                    RETURNING (xmax = 0) AS fresh
+                       OR (EXCLUDED.booking_date <> EXCLUDED.value_date
+                           AND EXCLUDED.booking_date <> tx.booking_date)
+                    RETURNING (xmax = 0) AS fresh,
+                              description = :description AS took_desc
                     """
                 ),
                 {
@@ -340,7 +363,7 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
             if row is not None:
                 if row.fresh:
                     inserted += 1
-                else:
+                elif row.took_desc:
                     enriched += 1
             if t.trade is not None:
                 # Keyed by natural_key, so this inherits the movement's dedup:

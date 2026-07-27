@@ -27,6 +27,7 @@ from pathlib import Path
 import pdfplumber
 
 from .base import (
+    BOOKING_BASIS,
     FAMILY_FIRST,
     AccountInfo,
     BalanceAnchor,
@@ -230,7 +231,12 @@ def extract_balances(path: str | Path) -> list[BalanceAnchor]:
                     parse_money(raw, thousands_sep=".", decimal_sep=","),
                 )
     return [
-        BalanceAnchor(account=ACCOUNT, balance_date=d, balance=v, currency=CURRENCY)
+        # The statement orders and totals by BOOKING date (data contabile):
+        # reconciling these anchors against value-date sums would show every
+        # cross-quarter valuta as a pair of mirrored discrepancies.
+        BalanceAnchor(
+            account=ACCOUNT, balance_date=d, balance=v, currency=CURRENCY, basis=BOOKING_BASIS
+        )
         for d, v in anchors.items()
     ]
 

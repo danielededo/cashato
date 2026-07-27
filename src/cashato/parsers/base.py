@@ -137,12 +137,23 @@ class AccountInfo:
     iban: str | None = None
 
 
+#: Which of the row's two dates a source's declared balances follow. Fintech
+#: statements (Revolut, Trade Republic) have one date, so the two coincide;
+#: classic bank statements (Intesa — and most Italian banks, should adapters
+#: follow) order and total by the BOOKING date, and reconciling their anchors
+#: against value-date sums manufactures mirrored discrepancies around every
+#: statement boundary.
+VALUE_BASIS = "value"
+BOOKING_BASIS = "booking"
+
+
 @dataclass
 class BalanceAnchor:
     """A balance the statement itself declares, anchored to a date.
 
-    Semantics: the account balance AFTER every movement with
-    ``value_date <= balance_date``. Anchors are what reconciliation checks the
+    Semantics: the account balance AFTER every movement whose ``basis`` date
+    (value or booking — a property of the SOURCE's statements, declared by the
+    adapter) is ``<= balance_date``. Anchors are what reconciliation checks the
     transactions against — between two consecutive anchors the sum of the
     movements must equal the balance delta; when it does not, a parser lost or
     invented rows (or two files disagree). The statement's own numbers are the
@@ -153,10 +164,13 @@ class BalanceAnchor:
     balance_date: date
     balance: Decimal
     currency: str = "EUR"
+    basis: str = VALUE_BASIS
 
     def __post_init__(self) -> None:
         if not isinstance(self.balance, Decimal):
             raise TypeError(f"balance must be Decimal, got {type(self.balance).__name__}")
+        if self.basis not in (VALUE_BASIS, BOOKING_BASIS):
+            raise ValueError(f"invalid basis: {self.basis!r}")
         self.balance = self.balance.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 

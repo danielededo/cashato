@@ -29,6 +29,7 @@ def _all():
     """(unique transactions by account, anchors by (account, date)) across files."""
     by_key: dict[str, object] = {}
     anchors: dict[tuple[str, date], Decimal] = {}
+    basis: dict[str, str] = {}  # per account — uniform per source
     for source, names in _FILES.items():
         for name in names:
             path = DEMO / name
@@ -38,14 +39,15 @@ def _all():
             if extract:
                 for a in extract(path):
                     anchors[(a.account, a.balance_date)] = a.balance
+                    basis[a.account] = a.basis
     tx = defaultdict(list)
     for t in by_key.values():
         tx[t.account].append(t)
-    return tx, anchors
+    return tx, anchors, basis
 
 
 def test_every_interval_reconciles():
-    tx, anchors = _all()
+    tx, anchors, basis = _all()
     per_account = defaultdict(list)
     for (acct, d), bal in anchors.items():
         per_account[acct].append((d, bal))
@@ -53,8 +55,10 @@ def test_every_interval_reconciles():
     intervals = 0
     for acct, ans in per_account.items():
         ans.sort()
+        # Sum by the anchors' declared basis date, exactly like the gold view.
+        key = (lambda t: t.booking_date) if basis[acct] == "booking" else (lambda t: t.value_date)
         for (d1, b1), (d2, b2) in zip(ans, ans[1:], strict=False):
-            got = sum((t.amount for t in tx[acct] if d1 < t.value_date <= d2), Decimal(0))
+            got = sum((t.amount for t in tx[acct] if d1 < key(t) <= d2), Decimal(0))
             assert got == b2 - b1, (
                 f"{acct} {d1}->{d2}: parsed {got}, statement says {b2 - b1}"
             )
@@ -71,10 +75,12 @@ def test_revolut_anchors_identical_across_formats():
 
 
 def test_intesa_quarterly_anchors():
-    a = {x.balance_date: x.balance
-         for x in intesa.extract_balances(DEMO / "intesa_estratto_conto_2025_Q2.pdf")}
+    xs = intesa.extract_balances(DEMO / "intesa_estratto_conto_2025_Q2.pdf")
+    a = {x.balance_date: x.balance for x in xs}
     # "Saldo iniziale al" names the last day of the PREVIOUS quarter.
     assert set(a) == {date(2025, 3, 31), date(2025, 6, 30)}
+    # The statement orders and totals by booking date; the anchors say so.
+    assert all(x.basis == "booking" for x in xs)
     # The 13-month export carries no balances: absent, not an error.
     assert intesa.extract_balances(DEMO / "intesa_lista_operazioni_13m.xlsx") == []
 

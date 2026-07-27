@@ -22,10 +22,13 @@ Schemas within a single database (not separate DBs):
   There is no raw-row landing table: reprocessing uses the retained file +
   sha256.
 - **silver** — `transactions`, the common normalized schema (below). Upsert on
-  `natural_key`: identity (amount/dates/account) is immutable; the DESCRIPTION
-  converges to the richest observed (strictly longer wins — twin formats carry
-  the same movement with different text, so the surviving text must not depend
-  on upload order). Category follows the text unless `manual`. Re-loading the
+  `natural_key`: KEY identity (amount/value date/account/occurrence) is
+  immutable; the DESCRIPTION converges to the richest observed (strictly longer
+  wins — twin formats carry the same movement with different text, so the
+  surviving text must not depend on upload order), and the BOOKING date
+  converges to the document that distinguishes it from the value date (the
+  quarterly; the 13-month export has one date, so rows it inserts first carry a
+  flattened booking). Category follows the text unless `manual`. Re-loading the
   same file is a no-op.
 - **gold** — read-only views for the query API: `v_category_totals`,
   `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
@@ -35,12 +38,13 @@ Schemas within a single database (not separate DBs):
 
 Silver also holds `balances` — the balances the statements themselves declare
 (Revolut/Trade Republic per-row running balance → end-of-day anchors; Intesa
-quarterly opening/closing lines), upserted on `(account, balance_date)` with
-"balance after every movement with `value_date <=` that date" semantics.
-`gold.v_reconciliation` compares each inter-anchor balance delta against the
-sum of parsed movements: a non-zero discrepancy localizes lost/invented rows
-(or an Intesa value date crossing the quarter boundary) to one account and
-date range. Revolut note: the statement's `Fees` column is informational — the
+quarterly opening/closing lines), upserted on `(account, balance_date)`. Each
+anchor declares its `basis` — which of the two dates the source's balances
+follow (`booking` for Intesa, whose statements total by data contabile;
+`value` where the dates coincide) — and `gold.v_reconciliation` sums the
+movements by that date, so a valuta crossing a quarter boundary is not a
+discrepancy. A non-zero discrepancy therefore localizes genuinely
+lost/invented rows to one account and date range. Revolut note: the statement's `Fees` column is informational — the
 fee is already inside `Money in/out` (the balance chain proves it), so no
 separate fee transaction is ever emitted.
 
