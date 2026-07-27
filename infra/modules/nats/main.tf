@@ -1,7 +1,7 @@
 # NATS with JetStream — the event backbone. ingest-api publishes ingest.jobs;
 # etl-worker consumes them (and category.feedback). Operator-style platform
 # component installed by Tofu; the stream/consumers are created by the services
-# at runtime (libs/messaging.py) with WorkQueue retention so the PVC stays bounded.
+# at runtime (src/cashato/messaging.py) with WorkQueue retention so the PVC stays bounded.
 resource "helm_release" "nats" {
   name             = "nats"
   repository       = "https://nats-io.github.io/k8s/helm/charts/"

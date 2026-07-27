@@ -20,15 +20,19 @@ Support files (no layer ordering):
 
 Layer files (numeric prefix = build order; Tofu still resolves the real DAG):
 
-| File                   | Component                          | Milestone |
-|------------------------|------------------------------------|-----------|
-| `01-cluster.tf`        | kind cluster (default CNI off)     | C1        |
-| `02-cilium.tf`         | Cilium CNI + Hubble                | C1        |
-| `03-cnpg.tf`           | CloudNativePG operator             | C2        |
-| `04-nats.tf`           | NATS JetStream                     | C3        |
-| `05-envoy-gateway.tf`  | Envoy Gateway (Gateway API)        | C3        |
-| `06-sealed-secrets.tf` | Sealed Secrets controller          | C4        |
-| `07-argocd.tf`         | Argo CD + app-of-apps root         | C5        |
+| File                    | Component                          |
+|-------------------------|------------------------------------|
+| `01-cluster.tf`         | kind cluster (default CNI off)     |
+| `02-cilium.tf`          | Cilium CNI + Hubble                |
+| `03-gitea.tf`           | Gitea (git + OCI registry)         |
+| `04-argocd.tf`          | Argo CD + app-of-apps root         |
+| `05-cnpg.tf`            | CloudNativePG operator             |
+| `06-nats.tf`            | NATS JetStream                     |
+| `07-envoy-gateway.tf`   | Envoy Gateway (Gateway API)        |
+| `08-sealed-secrets.tf`  | Sealed Secrets controller          |
+| `09-cert-manager.tf`    | cert-manager (KServe dependency)   |
+| `10-kserve.tf`          | KServe (model serving)             |
+| `11-metrics-server.tf`  | metrics-server (HPA, kubectl top)  |
 
 Each layer file is a thin call to a module under `modules/<component>/`, so the
 root directory reads as a table of contents of the whole platform.
@@ -51,7 +55,7 @@ tofu apply     # create the cluster + platform
 State (`*.tfstate`) and `.terraform/` are gitignored; `.terraform.lock.hcl` is
 committed to pin provider hashes.
 
-## Verify (C1)
+## Verify
 
 ```sh
 kubectl --context kind-cashato get nodes            # nodes Ready

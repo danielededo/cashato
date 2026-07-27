@@ -1,6 +1,6 @@
 # NATS server — the JetStream messaging backbone (ingest.jobs + category.feedback).
 # Single instance (no HA cluster) is right for a personal, single-node kind
-# platform. Streams themselves are created in app code (libs/messaging.py), not
+# platform. Streams themselves are created in app code (src/cashato/messaging.py), not
 # here — so retention/limits live there. The PVC size comes in via `set`.
 config:
   # Single server: no clustered routes. JetStream still persists to the PVC.

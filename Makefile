@@ -18,8 +18,7 @@ install: ## Install the package + service deps in editable mode
 install-dev: ## Install the development tools only (lint/test)
 	$(PIP) install -e '.[dev]'
 
-# Same container as the README quick-start (the compose file it used to
-# reference was lost in a restructure; a single container needs no compose).
+# Same container as the README quick-start.
 db-up: ## Start the local dev Postgres (docker)
 	docker start cashato-pg 2>/dev/null || docker run -d --name cashato-pg -p 5432:5432 \
 		-e POSTGRES_USER=cashato -e POSTGRES_PASSWORD=cashato -e POSTGRES_DB=cashato \
