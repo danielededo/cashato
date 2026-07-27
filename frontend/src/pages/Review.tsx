@@ -155,12 +155,12 @@ export function Review() {
                   <td className="num"><span className={`amt ${num(tx.amount) < 0 ? "neg" : "pos"}`}>{money(num(tx.amount))}</span></td>
                   <td className="dim" title={accountLabel(tx.account)}>{accountShort(tx.account)}</td>
                   <td>
-                    <span className="cat-cell">
+                    <span className="cat-cell assign">
                       <span className="swatch" style={{ background: colorFor(tx.category) }} />
                       {/* In lowconf mode the user is judging the model's guess —
                           it must be VISIBLE, and demoting it to `other` must be
                           possible (in the uncategorized queue `other` is noise). */}
-                      {mode === "lowconf" ? <span className="dim">{catLabel(tx.category)}</span> : null}
+                      {mode === "lowconf" ? <span className="dim guess">{catLabel(tx.category)}</span> : null}
                       <select className="cat" defaultValue="" onChange={(e) => e.target.value && relabel(tx, e.target.value)}>
                         <option value="" disabled>{t("rev.choose")}</option>
                         {categoryCodes.filter((c) => mode === "lowconf" || c !== "other").map((c) => (

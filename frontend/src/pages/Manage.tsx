@@ -60,7 +60,7 @@ python -m cashato.ml.label --limit 2000</code></pre>
           </li>
           <li>The categorizer service picks up the new MLflow model version automatically.</li>
         </ol>
-        <p className="dim" style={{ fontSize: 12 }}>
+        <p className="footnote">
           Runs locally on the host GPU — not in-cluster. Exact commands may differ; see the ML docs.
         </p>
       </div>
