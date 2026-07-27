@@ -132,6 +132,13 @@ class TransactionRow(BaseModel):
 class TransactionsResponse(BaseModel):
     lang: str
     total: int = Field(description="Total rows matching the filters (before paging)")
+    sum_income: Decimal | None = Field(
+        description="Sum of positive amounts over ALL matching rows, not just the page"
+    )
+    sum_expense: Decimal | None = Field(
+        description="Sum of negative amounts over ALL matching rows (signed, so <= 0)"
+    )
+    sum_net: Decimal | None = Field(description="Sum of every matching amount")
     limit: int
     offset: int
     transactions: list[TransactionRow]
@@ -624,7 +631,18 @@ def transactions(
         conds.append("transfer_group IS NULL")
     where = f"WHERE {' AND '.join(conds)}" if conds else ""
 
-    total = _rows(f"SELECT count(*) AS n FROM gold.v_transactions {where}", params)[0]["n"]
+    # One aggregate pass over the SAME filtered set the page comes from: the
+    # count the pager needs anyway, plus income/expense/net sums so a category
+    # or date-range total never requires fetching every page.
+    agg = _rows(
+        "SELECT count(*) AS n, "
+        "sum(amount) FILTER (WHERE amount > 0) AS sum_income, "
+        "sum(amount) FILTER (WHERE amount < 0) AS sum_expense, "
+        "sum(amount) AS sum_net "
+        f"FROM gold.v_transactions {where}",
+        params,
+    )[0]
+    total = agg["n"]
     page_params = {**params, "limit": limit, "offset": offset}
     # Column and direction come from the whitelists above, never from raw input.
     order_by = f"{_SORT_COLS[sort]} {order.upper()}, id DESC"
@@ -636,6 +654,9 @@ def transactions(
     return {
         "lang": lang,
         "total": total,
+        "sum_income": agg["sum_income"],
+        "sum_expense": agg["sum_expense"],
+        "sum_net": agg["sum_net"],
         "limit": limit,
         "offset": offset,
         "transactions": [{**r, "category_label": _CAT.label(r["category"], lang)} for r in rows],

@@ -221,6 +221,15 @@ export function Transactions() {
         <div className="filter-summary">
           <span><span className="n">{total.toLocaleString(lang === "it" ? "it-IT" : "en-US")}</span> {t("tx.matchN")}</span>
           {activeFilters.length ? <span className="dim">· {activeFilters.join(" · ")}</span> : <span className="dim">· {t("tx.noFilters")}</span>}
+          {/* Totals of the WHOLE filtered set (the API sums server-side), so a
+              category over a date range reads off here without paging through. */}
+          {state.data && total > 0 ? (
+            <span className="dim">
+              · {t("common.income")} <span className="amt pos">{money(num(state.data.sum_income ?? "0"))}</span>
+              {" · "}{t("common.expense")} <span className="amt neg">{money(num(state.data.sum_expense ?? "0"))}</span>
+              {" · "}{t("common.net")} <span className="amt">{money(num(state.data.sum_net ?? "0"))}</span>
+            </span>
+          ) : null}
         </div>
 
         {state.error ? <div className="state error">{state.error}</div> : null}

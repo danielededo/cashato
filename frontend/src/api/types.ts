@@ -58,6 +58,11 @@ export interface TransactionRow {
 export interface TransactionsResponse {
   lang: string;
   total: number;
+  /** Sums over ALL matching rows, not just the page; null when nothing matches. */
+  sum_income: Money | null;
+  /** Signed (<= 0). */
+  sum_expense: Money | null;
+  sum_net: Money | null;
   limit: number;
   offset: number;
   transactions: TransactionRow[];
