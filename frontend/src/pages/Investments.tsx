@@ -50,17 +50,20 @@ export function Investments() {
     const data = inv.data;
     if (!data || (!data.months.length && !data.holdings.length)) return null;
 
-    // Contributions over time as ONE series: the known/unknown split lives in
-    // the KPI tiles, where the two figures visibly sum to the hero — repeating
-    // it here as stacked bands made the chart about the split instead of the
-    // contribution.
-    const series: SeriesDef[] = [{ key: TOTAL, label: t("inv.invested"), category: "investments" }];
+    // ONE series (the known/unknown split lives in the KPI tiles) of the NET
+    // flow: contributed minus returned. Money coming back from a sale is not
+    // still invested, so charting gross let the line grow past reality — the
+    // cumulative chart now ends exactly on the hero's net subtitle figure.
+    // Gross stays in the hero, and the sparkline keeps the gross pace with it.
+    const series: SeriesDef[] = [{ key: TOTAL, label: t("inv.flow.series"), category: "investments" }];
     // The months arrive per kind, so fold them into one row per month.
     const byMonth = new Map<string, Row>();
+    const grossByMonth = new Map<string, number>();
     for (const m of data.months) {
       const row = byMonth.get(m.month) ?? { month: monthShort(m.month) };
-      row[TOTAL] = ((row[TOTAL] as number) ?? 0) + num(m.into_known) + num(m.into_unknown);
+      row[TOTAL] = ((row[TOTAL] as number) ?? 0) + num(m.net_invested);
       byMonth.set(m.month, row);
+      grossByMonth.set(m.month, (grossByMonth.get(m.month) ?? 0) + num(m.contributed));
     }
     const monthly: Row[] = [...byMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -69,8 +72,9 @@ export function Investments() {
     const stackData: Row[] = cumulative
       ? monthly.map((r) => ({ month: r.month, [TOTAL]: (run += (r[TOTAL] as number) ?? 0) }))
       : monthly;
-    // Sparkline always shows the monthly pace, whatever the chart is showing.
-    const spark = monthly.map((r) => (r[TOTAL] as number) ?? 0);
+    const spark = [...grossByMonth.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, v]) => v);
 
     // Colour follows the INSTRUMENT, not its rank: assigning by position in the
     // invested-sorted list would repaint every holding as soon as one overtakes
