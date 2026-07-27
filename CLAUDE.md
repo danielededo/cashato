@@ -1,34 +1,15 @@
 # Project: cashato — personal bank-transaction data platform
 
-> **Original intent (genesis).** This started as a narrow task: build Python
-> parsers for three heterogeneous sources (Revolut, Trade Republic, Intesa
-> Sanpaolo) and normalize their transactions into one common schema, classified
-> into income/expense and by category, to get a clear view of spending across
-> accounts. That goal still holds — it is now the **silver/gold** core of a
-> larger, cloud-native platform the project grew into (a deliberate learning
-> vehicle). Two constraints from day one are non-negotiable: **use `Decimal`,
-> never `float`** for money, and **no bank data leaves the machine — all
-> processing is local**.
-
-This file is the authoritative project guide. Keep it in sync with the code.
-Detailed status/decisions live in the memory (`~/.claude/.../memory/`) and the
-plan (`~/.claude/plans/leggi-il-file-claude-md-crispy-pixel.md`).
-
----
-
-## What it is now
-
-A local, provider-agnostic pipeline that ingests bank statements (any of several
+A local, provider-agnostic pipeline that ingests bank statements (several
 formats per source), normalizes them into a common schema, deduplicates across
 formats/sources, categorizes them with an ML model (not provider taxonomies),
 detects internal transfers, and exposes spending aggregates via APIs — packaged
 as microservices running on a Kubernetes (kind) platform, all as IaC.
 
-**Phases:** A (data core), B (adapters + microservices + ML) and **C (platform,
-IaC — kind/Cilium, Gitea+Argo GitOps, CNPG, NATS, Envoy Gateway, MinIO, Sealed
-Secrets, LGTM, MLflow+KServe, and Tekton CI/CD with build-on-push + automatic
-SHA-image deploy) are done and verified.** **Phase E (frontend SPA) is next**;
-D (CDC) optional. See the plan for the full breakdown.
+Two constraints are non-negotiable: **use `Decimal`, never `float`** for
+money, and **no bank data leaves the machine — all processing is local**.
+
+This file is the authoritative project guide. Keep it in sync with the code.
 
 ---
 
@@ -38,20 +19,20 @@ Schemas within a single database (not separate DBs):
 
 - **bronze** — `raw_files` (uploaded file registry: sha256 UNIQUE, status
   `pending|parsed|failed`, `rows_total`, `rows_new`, `error`, `account_holder`).
-  Raw row landing (`raw_rows`) was intentionally dropped (YAGNI): reprocessing
-  uses the retained file + sha256.
+  There is no raw-row landing table: reprocessing uses the retained file +
+  sha256.
 - **silver** — `transactions`, the common normalized schema (below). Upsert on
   `natural_key`: identity (amount/dates/account) is immutable; the DESCRIPTION
   converges to the richest observed (strictly longer wins — twin formats carry
-  the same movement with different text, and "first file loaded wins" made the
-  surviving text an accident of upload order). Category follows the text
-  unless `manual`. Re-loading the same file is still a no-op.
+  the same movement with different text, so the surviving text must not depend
+  on upload order). Category follows the text unless `manual`. Re-loading the
+  same file is a no-op.
 - **gold** — read-only views for the query API: `v_category_totals`,
   `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
   `v_transactions` (projection of silver so the read API stays gold-only). Plus
   ML tables `training_labels`, `category_feedback` (active learning).
 
-Migrations: Alembic (`src/cashato/db/migrations`), currently through **0013**.
+Migrations: Alembic (`src/cashato/db/migrations`).
 
 ### Common schema (`silver.transactions`) — English
 
@@ -93,15 +74,15 @@ Each source accepts more than one format; routing is content-based
 `source` override at upload. Inspect a real file before writing/adjusting a parser
 — never guess a PDF layout.
 
-- **Revolut** — consolidated-statement **CSV** *and* **PDF**. Not the flat format
-  once assumed: sections per currency (`Date, Description, Category, Money in/out,
-  Balance …`), amounts with `€`/thousands, no `State` column. **EUR only** (other
-  currencies ignored). Crypto/savings-interest sections → dedicated accounts and
+- **Revolut** — consolidated-statement **CSV** *and* **PDF**. Sections per
+  currency (`Date, Description, Category, Money in/out, Balance …`), amounts
+  with `€`/thousands, no `State` column. **EUR only** (other currencies
+  ignored). Crypto/savings-interest sections → dedicated accounts and
   `crypto`/`investments` categories.
 - **Trade Republic** — statement **PDF** *and* transaction-export **CSV**.
   Position-aware PDF parsing. Deposits/withdrawals/card payments = cash flow;
   securities/dividends → `investments`.
-- **Intesa Sanpaolo** — 21 quarterly statement **PDFs** *and* a 13-month
+- **Intesa Sanpaolo** — quarterly statement **PDFs** *and* a 13-month
   **PDF/XLSX** export. Italian statement layout: dare/avere → reconstruct the
   sign, double date, multi-line rows, skip headers/balances. Concatenate all
   files + dedup via `natural_key`.
@@ -128,17 +109,17 @@ Resolver chain (order = priority) over **universal** signals:
 categories are at most an opt-in training-bootstrap signal, off by default.
 
 **ML flow (offline, local):** Ollama (host, GPU) labels the long tail →
-`gold.training_labels` → `EmbeddingKNN` trained → recategorize. `other` dropped
-~52% → ~14%. Ollama is **not** in-cluster (labeling-time only). In phase C:
-MLflow (registry, + MinIO) + KServe (serving); a separate **categorizer** service
-does model categorization off an event, keeping the etl-worker light.
+`gold.training_labels` → `EmbeddingKNN` trained → recategorize. Ollama is
+**not** in-cluster (labeling-time only). On the platform: MLflow (registry,
++ MinIO) + KServe (serving); a separate **categorizer** service does model
+categorization off an event, keeping the etl-worker light.
 
 ## Internal transfers
 
 `src/cashato/transfers.py` pairs opposite-amount legs on different own-accounts within a
 window (`transfers.window_days`), guarded by same-day OR a transfer hint; tags
 both legs with `transfer_group`. Gold spend views **exclude** these (they net to
-zero, not spending). `link_transfers.py` runs the batch.
+zero, not spending). The etl-worker relinks after every ingest that inserts rows.
 
 ---
 
@@ -160,11 +141,12 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   persist + fast-path category) and `category.feedback` (apply correction to
   silver + record in `gold.category_feedback`). Stays light (no torch/model).
 - **query-api** — read-only over gold: `GET /summary`, `/monthly`,
-  `/categories/monthly`, `/transactions` (filterable/paginated), `/transfers`,
-  `/accounts` (bank/product/joint, composed display name). `?lang=it|en` for
-  category labels. The gateway routes ALL of `/api/v1` here and enumerates only
-  ingest-api's write paths — enumerating both meant a forgotten endpoint fell
-  through to the SPA and answered 200 with HTML instead of 404.
+  `/categories/monthly`, `/transactions` (filterable/paginated, with
+  filtered-set totals), `/transfers`, `/accounts` (bank/product/joint, composed
+  display name). `?lang=it|en` for category labels. The gateway routes ALL of
+  `/api/v1` here and enumerates only ingest-api's write paths — enumerating
+  both would let a forgotten endpoint fall through to the SPA and answer 200
+  with HTML instead of 404.
 
 ---
 
@@ -185,8 +167,8 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `config/categories.yaml`, `config/mcc.yaml`, `config/banks.yaml` (ABI -> bank
   name; most statements never name their own bank but all carry an IBAN).
   Editing one deploys via Argo with no image rebuild. Infra endpoints/secrets
-  stay env/Secret. (There is no
-  `sources.yaml` — the source registry is code, see "Add a source".)
+  stay env/Secret. (There is no `sources.yaml` — the source registry is code,
+  see "Add a source".)
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
   pytest, MIT license. Dev: a local Postgres for the data core; the full platform
@@ -198,31 +180,27 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 
 - Medallion = schemas in one Postgres. Dedup by canonical key (description
   excluded). Income/expense by sign. Provider-agnostic categorization.
-- CI/CD: **Tekton + Argo CD** (not GitHub Actions), **done (C7c)**. On every push
-  to `main` a Gitea webhook drives an in-cluster Tekton pipeline: lint/type/test →
-  buildah build+push `svc`+`migrate` to **Gitea's built-in OCI registry** (Harbor
-  was cut) tagged by commit SHA → a `bump-deploy` step pins those tags in a
-  **separate `cashato-deploy` config repo** (Argo watches it), so the build deploys
-  automatically. The **source repo stays human-only** (no CI commits); a CEL
-  path-filter only builds on `src/**`/`frontend/**`/`docker/**`/
-  `pyproject.toml`/`alembic.ini` changes (pushes >50 commits build
-  unconditionally — Gitea truncates the payload the filter reads). Model
-  registry = **MLflow**. Secrets: **Sealed Secrets**. Code → GitHub later (mirror).
-- Platform (phase C, DONE): kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC
-  (OpenTofu), DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/
-  Tempo/**Mimir**, backends on MinIO S3; collector **Grafana Alloy**) — NOT
-  kube-prometheus-stack: metrics + logs + OTel cross-service traces (context
-  propagated through NATS). metrics-server added (HPA/`kubectl top`).
+- CI/CD: **Tekton + Argo CD**. On every push to `main` a Gitea webhook drives an
+  in-cluster Tekton pipeline: lint/type/test → buildah build+push `svc`+`migrate`
+  +`frontend` to **Gitea's built-in OCI registry** tagged by commit SHA → a
+  `bump-deploy` step pins those tags in a **separate `cashato-deploy` config
+  repo** (Argo watches it), so the build deploys automatically. The **source
+  repo stays human-only** (no CI commits); a CEL path-filter only builds on
+  `src/**`/`frontend/**`/`docker/**`/`pyproject.toml`/`alembic.ini` changes
+  (pushes >50 commits build unconditionally — Gitea truncates the payload the
+  filter reads). Model registry = **MLflow**. Secrets: **Sealed Secrets**.
+- Platform: kind + Cilium + CNPG + Envoy Gateway + NATS, all IaC (OpenTofu),
+  DB roles least-privilege. Observability = **LGTM** (Loki/Grafana/Tempo/
+  **Mimir**, backends on MinIO S3; collector **Grafana Alloy**): metrics + logs
+  + OTel cross-service traces (context propagated through NATS). metrics-server
+  added (HPA/`kubectl top`).
 - Account **ids** are immutable: they are hashed into `natural_key`. Everything a
   statement says about an account (bank, product, joint) is display metadata in
   `silver.accounts`, projected as `gold.v_accounts`, with a user override on top.
 - DB Jobs (`db-migrate`, `db-grants`) are tracked resources with
   `Replace=true`, NOT Argo Sync hooks: a Job's pod template is immutable so plain
   apply can never update it, but hooks are excluded from Argo's diff, so as hooks
-  a new image produced no drift and the migration silently never ran.
+  a new image would produce no drift and the migration would silently never run.
 - **No personal data in repo files** — examples use `MARIO ROSSI` and fake IBANs;
-  the real name belongs only in LICENSE/pyproject authors. Git history still
-  contains earlier leaks: before any public GitHub mirror, start the public repo
-  from a **single squashed initial commit** rather than rewriting history (the
-  SHAs are image tags referenced by `cashato-deploy`).
+  the real name belongs only in LICENSE/pyproject authors.
 - Multi-user/household is future work (RLS + OIDC), not yet built.

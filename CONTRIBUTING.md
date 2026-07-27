@@ -25,7 +25,7 @@ make test        # pytest (unit tests, no DB/data needed)
 
 Before opening a PR: `make lint && make test` must pass.
 
-> CI/CD (phase C): **Tekton** (lint/test/build + ML pipeline) + **Argo CD**
+> CI/CD: **Tekton** (lint/test/build + ML pipeline) + **Argo CD**
 > (GitOps deploy), self-hosted on the cluster — not GitHub Actions.
 
 ## Conventions

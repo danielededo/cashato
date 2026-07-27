@@ -1,147 +1,95 @@
-# Finding: Intesa's content-detection markers collide with other Italian banks' documents
+# Detection design: why markers must be bank-specific
 
-Status: **FIXED (2026-07-25)**. Kept as the record of the problem and of why the
-fix is the shape it is. The demo files under `demo/other_banks/` are now the
-regression test: their pinned expectation is `None` (unclaimed), and it was
-`intesa` before.
+Content-based detection routes an uploaded file to a parser by matching marker
+groups against the file's head text. The tempting shortcut — generic banking
+vocabulary as markers — silently steals other banks' documents. This document
+is the worked example behind the rules in `src/cashato/parsers/detect.py` and
+the contributor checklist in CONTRIBUTING; the synthetic files under
+`demo/other_banks/` are its regression test (their pinned expectation is
+`None`, unclaimed).
 
-**What was done.** Intesa's detection was cut from six marker groups to two, both
-Intesa-specific. The decisive measurement: all 21 real quarterly statements
-already match the specific `["intesa sanpaolo"]` group — their page-1 footer
-carries "App Intesa Sanpaolo Mobile" — so `estratto conto`, `dettaglio
-movimenti`, `data contabile` and `["operazione","importo"]` were matching **no
-real Intesa file that the specific groups did not already cover**, while
-stealing other banks' documents. They were pure liability, not a trade-off.
+## How detection works
 
-The two 13-month exports (PDF + XLSX) were the only files needing a second
-group; they are covered by `["conti e carte"]`, the filter-recap header of
-Intesa's own web export, present in both and in none of the ten other-bank
-files. Verified: 23/23 real Intesa files still detected, 0 false positives,
-Revolut and Trade Republic unaffected.
+`src/cashato/parsers/detect.py` extracts a lowercased "head text" (CSV: first
+4096 bytes; PDF: **page 1 text only**; XLSX/XLS: first 25 rows via openpyxl).
+A source matches if, for ANY of its `DETECTION` groups, ALL markers in that
+group appear in the head text. **Every source is scored and the most specific
+match wins** (specific = matched more markers); a tie at the top is reported
+as AMBIGUOUS (`None`) rather than resolved by registry order, which is an
+implementation accident (alphabetical module discovery), not a contract.
 
-Recommendation 1 below (anchor on the IBAN's ABI) was **checked and rejected as
-the primary fix**: neither 13-month export prints an IBAN, so ABI cannot anchor
-them. The document flagged that as an open caveat; it is now settled.
-
-Recommendation 2 (guard the 0-rows outcome) was **also implemented**, as defence
-in depth — `cli/load.py` now marks a file `failed` with an explanatory error when
-a parse yields zero transactions, instead of storing an empty parse as success.
-
-Recommendations 3 and 4 remain open and still apply to whoever adds a parser.
-
----
-
-## Original briefing (2026-07-25, before the fix)
-
-
-## How detection works today (context)
-
-`src/cashato/parsers/detect.py` routes an uploaded file by content: it extracts
-a lowercased "head text" (CSV: first 4096 bytes; PDF: **page 1 text only**;
-XLSX/XLS: first 25 rows via openpyxl) and walks the sources in **registry
-order, first match wins**. A source matches if, for ANY of its `DETECTION`
-groups, ALL markers in that group appear in the head text. Registry order is
-alphabetical module discovery (`registry.py`): today `intesa` → `revolut` →
-`trade_republic`, so Intesa is tried first.
-
-Intesa's groups (`src/cashato/parsers/intesa.py`) are, by necessity, generic
-Italian banking vocabulary — the code comment on `extract_accounts` explains
-why: *the quarterly statement never names the bank*, so there is no
-Intesa-specific string to anchor on:
+Intesa's groups are deliberately narrow — two, both Intesa-specific:
 
 ```python
 DETECTION: list[list[str]] = [
-    ["intesa sanpaolo"],
-    ["estratto conto"],
-    ["dettaglio movimenti"],
-    ["lista movimenti"],
-    ["data contabile"],
-    ["operazione", "importo"],  # Intesa 13-month XLSX header
+    ["intesa sanpaolo"],   # page-1 footer of every quarterly statement
+    ["conti e carte"],     # filter-recap header of the 13-month web export
 ]
 ```
 
-Five of the six groups are not Intesa-specific at all.
+All real Intesa quarterly statements carry "App Intesa Sanpaolo Mobile" in the
+page-1 footer; the 13-month exports (PDF + XLSX) both carry the "Conti e
+Carte" recap header. Generic markers (`estratto conto`, `dettaglio movimenti`,
+`data contabile`, `["operazione","importo"]`) would match **no Intesa file the
+specific groups miss** — they only add false positives.
 
-## Confirmed collisions
+## The collision catalogue
 
-Evidence: the synthetic files in `demo/other_banks/`, whose text is faithful to
-the real formats (layout contracts taken verbatim from third-party open-source
-parsers of those banks). Reproduce with `.venv/bin/python demo/generate.py`
-(the verify step pins these outcomes).
+What generic Italian-banking markers would steal. Evidence: the synthetic
+files in `demo/other_banks/`, whose text is faithful to the real formats
+(layout contracts taken verbatim from third-party open-source parsers of
+those banks).
 
-1. **ING "Conto Arancio" quarterly statement PDF → detected as `intesa`.**
-   The real document necessarily contains the line
-   `Estratto conto trimestrale al dd/mm/yyyy` (the third-party parser
-   `g-gg/estratto_ing` requires it verbatim) and the title `LISTA MOVIMENTI` —
-   matching TWO Intesa groups. There is no faithful way to avoid it.
-   File: `demo/other_banks/ing_estratto_trimestrale.pdf`.
+1. **ING "Conto Arancio" quarterly statement PDF.** The real document
+   necessarily contains `Estratto conto trimestrale al dd/mm/yyyy` (the
+   third-party parser `g-gg/estratto_ing` requires it verbatim) and the title
+   `LISTA MOVIMENTI`. File: `demo/other_banks/ing_estratto_trimestrale.pdf`.
+2. **Hype (Banca Sella) movements PDF.** The movements table header contains
+   `Data Contabile` (the column set the `ofxstatement-hype` parser is built
+   around). File: `demo/other_banks/hype_lista_movimenti.pdf`.
+3. **Widiba XLSX** — the real export title is `Lista Movimenti` (per its
+   ofxstatement plugin).
+4. **Webank ".xls"** — the real header contains `Data Contabile`. (The file is
+   actually an HTML table with an .xls extension; openpyxl throws and the head
+   text is `None`, so it escapes for a second, accidental reason.)
+5. **Near-miss class — word-pair groups like `["operazione", "importo"]`.**
+   Several real Italian exports carry one of the two words in the header and
+   can pick up the other from any CELL in the head window: UniCredit format-2
+   CSV has `Importo (EUR)` in the header; BPER's XLS header has
+   `Data operazione`. One transaction description containing the missing word
+   flips the file.
 
-2. **Hype (Banca Sella) movements PDF → detected as `intesa`.**
-   The movements table header contains `Data Contabile` (it is the column set
-   the `ofxstatement-hype` parser is built around).
-   File: `demo/other_banks/hype_lista_movimenti.pdf`.
+## Why misrouting is worse than no match
 
-3. **Widiba XLSX — real export title is "Lista Movimenti"** (per its
-   ofxstatement plugin), an Intesa marker. The synthetic file dodges it by
-   using a different title, but a REAL Widiba export would collide.
+A misrouted file goes to a parser that finds none of its table anchors and
+yields **0 transactions**. Without a guard, that would land in bronze as
+`parsed` with `rows_new=0` — no error, nothing to alert on. Two defences are
+in place:
 
-4. **Webank ".xls" — real header contains `Data Contabile`**, an Intesa marker.
-   It escapes today only by accident: the file is an HTML table with an .xls
-   extension, openpyxl throws, head text is `None`, detection returns `None`.
-   That is luck, not design.
+- `cli/load.py` marks a file `failed` with an explanatory error when a parse
+  yields zero transactions, instead of storing an empty parse as success.
+- The upload-time explicit `source` override remains the manual escape hatch.
 
-5. **Near-miss class — the `["operazione", "importo"]` pair.** Several real
-   Italian exports carry one of the two words in the header and can pick up
-   the other from any cell in the head window: UniCredit format-2 CSV has
-   `Importo (EUR)` in the header (one description containing "operazione"
-   within the first 4096 bytes flips it to Intesa); BPER's XLS header has
-   `Data operazione` (any cell with "importo" in the first 25 rows flips it).
-   The demo files avoid the word "operazione" in descriptions on purpose.
+## Rules when adding a parser
 
-## Why it matters
-
-- **Failure mode is silent.** A misrouted file goes to the Intesa parser,
-  which finds no `Descrizione`/`Accred*` table header, returns **0
-  transactions**, and the file lands in bronze as `parsed` with `rows_new=0` —
-  no error, nothing to alert on. Worse than a hard failure.
-- **Registry order will shift under your feet.** Discovery is alphabetical:
-  future modules named `bper.py`, `fineco.py`, `hype.py`, `ing.py` would all be
-  probed BEFORE `intesa.py`, silently changing who wins ties. Order is an
-  implementation accident, not a contract.
-- The upload-time explicit `source` override exists and remains the manual
-  escape hatch, but detection is the default path.
-
-## Recommendations (in order of leverage)
-
-1. **Anchor Intesa on the IBAN's ABI code.** The one Intesa-specific signal the
-   quarterly statement always carries is the IBAN, and `base.abi_from_iban`
-   already decodes ABI `03069`. Detection could accept the generic markers only
-   together with a positive ABI match (or downgrade generic-marker-only matches
-   to a low-confidence result). This kills collisions 1–4 without touching the
-   genuinely specific `["intesa sanpaolo"]` group. Caveat: the 13-month
-   XLSX/PDF export may not print the IBAN — check a real one before relying on
-   this for every format.
-2. **Guard the 0-rows outcome.** Defense in depth regardless of markers: if the
-   detected parser returns 0 transactions, treat the file as `unknown source`
-   (fail the job / surface it in `/files`) instead of storing an empty parse as
-   success. Cheap, catches every future collision.
-3. **Make match specificity explicit rather than order-dependent.** E.g. score
-   by marker specificity (multi-marker and bank-name groups beat single generic
-   words) or require new sources' `DETECTION` to be checked before generic
-   groups. At minimum, document that single generic-word groups are last-resort
-   and that registry order is not a tie-breaking contract.
-4. **When adding ING/Hype/Widiba parsers**, their `DETECTION` must include
-   bank-specific strings (`"conto arancio"`, `"ing bank"`, `"hype"`, `"widiba"`)
-   AND Intesa's generic groups must be tightened first — otherwise Intesa still
-   steals their files whenever it sorts first.
+1. **Markers must be bank-specific.** Bank name, product name (`"conto
+   arancio"`, `"hype"`, `"widiba"`) — never generic vocabulary (`estratto
+   conto`, `lista movimenti`, `data contabile`) that any Italian bank prints.
+2. **Word-pair groups are a last resort** — any cell in the head window can
+   supply the missing word (collision class 5 above).
+3. **Never rely on registry order.** Scoring makes specificity explicit; a tie
+   means the file is reported ambiguous, not silently claimed.
+4. **Pin the negative case.** Add a synthetic look-alike document to
+   `demo/other_banks/` whose expected detection is `None` — that pin is what
+   keeps the next parser honest.
+5. An IBAN's ABI code (`base.abi_from_iban`) can confirm a match where the
+   document prints one, but cannot anchor detection alone: web exports (e.g.
+   Intesa's 13-month) may print no IBAN at all.
 
 ## Repro
 
 ```bash
-.venv/bin/python demo/generate.py            # look for the two lines:
-#   PASS  detect other_banks/hype_lista_movimenti.pdf -> intesa (expected intesa)
-#   PASS  detect other_banks/ing_estratto_trimestrale.pdf -> intesa (expected intesa)
+.venv/bin/python demo/generate.py   # regenerates demo/ and verifies:
+# every other_banks/ file must report  detect -> None (unclaimed)
+# every cashato-source file must report its own source
 ```
-
-(The `expected intesa` pins document the CURRENT misrouting on purpose; after
-fixing detection, flip those expectations to the new behaviour.)

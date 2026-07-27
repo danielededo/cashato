@@ -45,10 +45,10 @@ test: ## Unit tests (pytest)
 export: ## Unified export (LANG=it|en)
 	CASHATO_CONFIG_DIR=config $(PY) -m cashato.cli.export --lang $(or $(LANG),it)
 
-train: ## Build the embedding index (M2)
+train: ## Build the embedding index
 	CASHATO_CONFIG_DIR=config CASHATO_MODEL_DIR=models $(PY) -m cashato.ml.train --include-rules --stamp "$$(date +%Y%m%d-%H%M)"
 
-recategorize: ## Re-categorize the DB with the model (M3)
+recategorize: ## Re-categorize the DB with the model
 	CASHATO_CONFIG_DIR=config CASHATO_MODEL_DIR=models $(PY) -m cashato.ml.recategorize
 
 clean: ## Remove caches and temporary artifacts

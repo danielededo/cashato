@@ -13,7 +13,7 @@ machine.
 |------|-----|:--------:|
 | **Docker** | local Postgres (data core); kind (full platform) | yes |
 | **Python 3.12** | parsers, loader, services, ML | yes |
-| **Ollama** | offline LLM labeling (ML phase) | ML only |
+| **Ollama** | offline LLM labeling | ML only |
 
 ## Quick start
 
@@ -93,7 +93,7 @@ exclude them.
 OpenAPI at `/docs` · `/redoc` · `/openapi.json`; probes at `/healthz` · `/readyz`;
 business API under `/api/v1`.
 
-The full stack runs on the local **kind** cluster (phase C, IaC) — see `infra/`
+The full stack runs on the local **kind** cluster (IaC) — see `infra/`
 (OpenTofu) and `k8s/` (GitOps via Argo CD). CI/CD is **Tekton + Argo CD**: a push
 to `main` lints/tests, builds+pushes SHA-tagged images to Gitea's registry, and a
 separate `cashato-deploy` config repo pins the tags so Argo auto-deploys the build.
@@ -132,9 +132,9 @@ export PATH="$HOME/.local/bin:$PATH" && ollama serve &
 ### Run the ML pipeline
 
 ```bash
-./.venv/bin/python -m cashato.ml.label_llm --model qwen2.5:3b --limit 1000   # M1: label the long tail
-./.venv/bin/python -m cashato.ml.train --include-rules --stamp "$(date +%Y%m%d-%H%M)"  # M2: train embedding kNN
-./.venv/bin/python -m cashato.ml.recategorize                                # M3: apply + measure `other` drop
+./.venv/bin/python -m cashato.ml.label_llm --model qwen2.5:3b --limit 1000 # label the long tail
+./.venv/bin/python -m cashato.ml.train --include-rules --stamp "$(date +%Y%m%d-%H%M)" # train the embedding kNN
+./.venv/bin/python -m cashato.ml.recategorize                                # apply + measure `other` drop
 ```
 
 Metrics are tracked with **MLflow** if installed, otherwise the step is skipped.
@@ -156,7 +156,7 @@ src/cashato/      the installable package (pip install -e .)
   config.py (settings loader) · obs.py (logs/metrics/traces) · messaging.py (NATS) · objstore.py (MinIO) · transfers.py
   parsers/        base.py (Transaction, Decimal, dedup) · registry.py (auto-discovered adapters)
                   revolut.py · trade_republic.py · intesa.py (each: parse + DETECTION) · detect.py · categorize.py
-  ml/             label_llm.py (M1) · train.py (M2) · model.py (EmbeddingKNN) · recategorize.py (M3) · predictor.py
+  ml/             label_llm.py · train.py · model.py (EmbeddingKNN) · recategorize.py · predictor.py
   db/             db.py (engine) · migrations/ (Alembic)
   services/       ingest_api · etl_worker · query_api · categorizer   (launched via python -m / uvicorn)
   cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
