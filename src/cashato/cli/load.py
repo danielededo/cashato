@@ -28,9 +28,9 @@ from cashato.parsers.registry import (  # (auto-discovered)
 )
 
 # The loader only applies the deterministic fast-path (MCC + rules): lightweight,
-# no torch/model dependency. ML categorization is a separate concern
-# (ml/recategorize.py locally; a categorizer calling the KServe-served model in
-# phase C). This keeps the etl-worker light and fast.
+# no torch/model dependency. ML categorization is a separate concern — a
+# separate categorizer service does model categorization off an event. This
+# keeps the etl-worker light and fast.
 _CATEGORIZER = Categorizer.load()
 
 
@@ -237,11 +237,10 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
             # Inline provider-agnostic categorization: MCC -> rules -> model.
             r = _CATEGORIZER.resolve(t.description, t.source, t.mcc)
             # Identity (natural_key, amount, dates, account) is immutable. The
-            # DESCRIPTIVE text converges to the RICHEST observed: with twin
-            # formats (quarterly PDF / 13m PDF / XLSX) the surviving text used
-            # to be whichever file loaded first — an accident of upload order
-            # that a rebuild could flip. Longer wins, strictly (ties keep the
-            # existing row, so re-loading the same file is still a no-op).
+            # DESCRIPTIVE text converges to the RICHEST observed across twin
+            # formats (quarterly PDF / 13m PDF / XLSX). Longer wins, strictly
+            # (ties keep the existing row, so re-loading the same file is
+            # still a no-op).
             # The category follows the text — a category computed on the old
             # text is not justified for the new one — UNLESS the user set it
             # (manual is ground truth, and the feedback reapply below enforces

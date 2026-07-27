@@ -52,7 +52,6 @@ export function Dashboard() {
       const sInc: number[] = [], sExp: number[] = [], sNet: number[] = [];
       for (const m of win) {
         const r = byMonth.get(m);
-        // num() is the deliberate string->number boundary (Money on the wire).
         const i = num(r?.income), e = num(r?.expense), n = r?.net != null ? num(r.net) : i + e;
         income += i; expense += e; net += n;
         sInc.push(i); sExp.push(Math.abs(e)); sNet.push(n);

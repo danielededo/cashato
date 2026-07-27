@@ -59,8 +59,8 @@ class TestParseMoney:
         assert parse_money("−5,00", thousands_sep=".", decimal_sep=",") == Decimal("-5.00")
 
     def test_minus_after_currency_symbol(self):
-        # Review #17: the sign was read BEFORE stripping the currency, so a
-        # minus sitting after the symbol was silently dropped (+5.00).
+        # The sign must be read AFTER stripping the currency, or a minus
+        # sitting after the symbol is silently dropped (+5.00).
         assert parse_money("€-5.00") == Decimal("-5.00")
         assert parse_money("EUR -5,00", thousands_sep=".", decimal_sep=",") == Decimal("-5.00")
         assert parse_money("€−5.00") == Decimal("-5.00")
@@ -233,7 +233,7 @@ class TestAccountHolder:
 
 
 class TestParserRegressions:
-    """Cases that used to lose or corrupt money, from the 2026-07-25 review."""
+    """Cases that would lose or corrupt money."""
 
     def test_crypto_sale_over_one_thousand(self):
         # Revolut amounts use "," as the THOUSANDS separator, so splitting the

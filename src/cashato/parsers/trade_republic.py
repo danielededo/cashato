@@ -45,7 +45,7 @@ ACCOUNT = "trade_republic"
 SOURCE = "trade_republic"
 CURRENCY = "EUR"
 
-# Content-detection marker groups (was config/sources.yaml). A file is Trade
+# Content-detection marker groups. A file is Trade
 # Republic if, for ANY group, ALL markers appear in its lowercased head text.
 DETECTION: list[list[str]] = [
     ["asset_class", "transaction_id"],

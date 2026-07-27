@@ -16,8 +16,8 @@ and, optionally:
 
 Adding a bank = drop in a module exposing those two names; nothing here changes
 (the module name IS the source id). The package's non-adapter helpers are skipped
-by name. This replaces the old ``config/sources.yaml`` registry: detection markers
-and currency are parser-coupled knowledge, so they live WITH the parser.
+by name. Detection markers and currency are parser-coupled knowledge, so they
+live WITH the parser.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-// Categorical color assignment (dataviz skill: validated 8-slot palette, fixed
+// Categorical color assignment (validated 8-slot palette, fixed
 // order, never cycled). Colors are CSS custom properties (--series-1..8, defined
 // in styles.css for light+dark) so SVG marks swap with the theme automatically.
 //

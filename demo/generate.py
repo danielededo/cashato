@@ -988,11 +988,8 @@ def write_ing_pdf(path: Path, rng: random.Random) -> None:
     parser's closed list, a RECT_ footer closing every page, and SALDO
     INIZIALE/FINALE that must balance to the cent.
 
-    NOTE: this file used to be misrouted to the Intesa parser, because Intesa's
-    markers included the generic "estratto conto" / "lista movimenti". Those
-    were removed once it was shown that no real Intesa file needs them, so this
-    document is now correctly unclaimed. Keep the text faithful: it is the
-    regression test for that collision."""
+    Keep the text faithful: it is the regression test for the generic
+    "estratto conto" / "lista movimenti" detection collision."""
     movs = [m for m in _ob_history(rng, n=45) if date(2026, 4, 1) <= m[0] <= date(2026, 6, 30)]
     opening = eur(1500)
     balance = opening
@@ -1035,8 +1032,8 @@ def write_ing_pdf(path: Path, rng: random.Random) -> None:
 
 def write_other_banks(outdir: Path, rng: random.Random) -> list[tuple[Path, str | None]]:
     """Generate the other-bank files; each entry carries the detection outcome
-    cashato's CURRENT detect_source must produce for it (None = unclaimed;
-    "intesa" = known, REAL marker collision documented in the README)."""
+    cashato's detect_source must produce for it — None for all of them: these
+    documents belong to no cashato source and must stay unclaimed."""
     ob = outdir / "other_banks"
     ob.mkdir(parents=True, exist_ok=True)
     writers: list[tuple[Path, object, str | None]] = [
@@ -1140,9 +1137,9 @@ def verify(outdir: Path, paths: dict[str, list[Path]],
             missing += 1
     check(missing == 0, "xfer   monthly Intesa->Revolut opposite legs present in every month")
 
-    # other-bank files (future adapters): all must be UNCLAIMED. The ING and
-    # Hype PDFs used to be stolen by Intesa's generic markers; these two pins
-    # are the regression test for that fix, so keep their text faithful.
+    # other-bank files (future adapters): all must be UNCLAIMED. These two pins
+    # are the regression test for the generic Intesa-marker collision, so keep
+    # their text faithful.
     for p, expected in other:
         det = detect_source(p)
         check(det == expected, f"detect other_banks/{p.name} -> {det} (expected {expected})")

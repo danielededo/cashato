@@ -4,7 +4,7 @@ The row-level bronze landing table (JSONB payload per extracted row) was created
 in 0001 for "audit + reprocess without re-reading the file", but it was never
 populated or read: the etl-worker parses file -> silver directly, the original
 files are retained on disk and idempotency relies on ``natural_key``. Dropping
-it (YAGNI). Can be reintroduced if raw-extraction audit is ever needed.
+it. Can be reintroduced if raw-extraction audit is ever needed.
 
 Revision ID: 0007_drop_raw_rows
 Revises: 0006_internal_transfers

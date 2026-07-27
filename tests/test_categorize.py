@@ -89,9 +89,9 @@ class TestWealthDestinations:
 class TestDetectionSpecificity:
     """Intesa's markers must identify Intesa, not Italian banking in general.
 
-    Scoring now prevents the alphabetical-order accident, but a generic marker
-    is still wrong on its own terms: it makes another bank's file *ambiguous*
-    instead of unrecognised, which is a worse answer than not matching at all.
+    A generic marker is wrong on its own terms: it makes another bank's file
+    *ambiguous* instead of unrecognised, which is a worse answer than not
+    matching at all.
     """
 
     def test_generic_italian_banking_words_do_not_match_intesa(self):
@@ -102,8 +102,8 @@ class TestDetectionSpecificity:
             return any(all(m in t for m in g) for g in intesa.DETECTION)
 
         # An ING quarterly says exactly this; a Hype movements table has that
-        # column. Both used to be routed to the Intesa parser, which then found
-        # no table and returned 0 rows without an error.
+        # column. Neither must match Intesa: a misrouted file's parser finds
+        # no table and returns 0 rows without an error.
         assert not matches("Estratto conto trimestrale al 30/06/2026")
         assert not matches("LISTA MOVIMENTI\nData Contabile  Descrizione  Importo")
         assert not matches("Data operazione  Importo (EUR)")
@@ -145,8 +145,8 @@ class TestDetectionIsNotOrderDependent:
         assert src == "zzz_specific"
 
     def test_equally_specific_matches_are_ambiguous_not_a_coin_flip(self, monkeypatch):
-        # whoever sorted first used to win, silently: the file went to the
-        # wrong parser, which found no tables and returned 0 rows
+        # a tie must not be resolved by sort order: the file would go to the
+        # wrong parser, which finds no tables and returns 0 rows
         sigs = [("aaa", [["estratto conto"]]), ("bbb", [["estratto conto"]])]
         src, cands = self._detect(monkeypatch, "estratto conto trimestrale", sigs)
         assert src is None

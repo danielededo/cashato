@@ -40,17 +40,13 @@ ACCOUNT = "intesa"
 SOURCE = "intesa"
 CURRENCY = "EUR"
 
-# Content-detection marker groups (was config/sources.yaml). A file is Intesa if,
-# for ANY group, ALL markers appear in its lowercased head text. Italian markers
-# match the real document text — keep them in Italian.
-# Both groups are Intesa-SPECIFIC on purpose. The earlier set also carried
-# "estratto conto", "dettaglio movimenti", "data contabile" and
-# ["operazione","importo"] — generic Italian banking vocabulary that matched no
-# real Intesa file that these two do not already cover (checked against all 23),
-# while stealing other banks' documents: an ING quarterly says "Estratto conto
-# trimestrale", a Hype movements table has a "Data Contabile" column. Detection
-# is first-match-wins in alphabetical registry order, so `intesa` is tried first
-# and misrouting is silent — the wrong parser finds no table and returns 0 rows.
+# Content-detection marker groups. A file is Intesa if, for ANY group, ALL
+# markers appear in its lowercased head text. Italian markers match the real
+# document text — keep them in Italian.
+# Both groups are Intesa-SPECIFIC on purpose: generic Italian banking vocabulary
+# steals other banks' documents — an ING quarterly says "Estratto conto
+# trimestrale", a Hype movements table has a "Data Contabile" column — and
+# misrouting is silent: the wrong parser finds no table and returns 0 rows.
 DETECTION: list[list[str]] = [
     # The quarterly statement never names the bank in a field, but its page-1
     # footer does ("App Intesa Sanpaolo Mobile", intesasanpaolo.com).
@@ -299,8 +295,7 @@ def _parse_xlsx(path: str | Path) -> list[Transaction]:
 
     import openpyxl
 
-    # Scoped suppression: filterwarnings("ignore") without a context manager
-    # silenced EVERY warning from EVERY library for the process's whole life.
+    # Scoped suppression: keep the ignore local to this load.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -376,10 +371,7 @@ def _parse_operazioni_pdf(path: str | Path) -> list[Transaction]:
     Each movement is a block CENTERED on its anchor row (the one carrying date
     and amount): the description starts on the line(s) ABOVE the anchor,
     continues inline, and wraps below — e.g. "Bonifico istantaneo da voi" ↑ /
-    "disposto a favore di Mario" inline / "Rossi" ↓. Appending only the lines
-    after the anchor (the old logic) therefore stitched the HEAD of every
-    description onto the PREVIOUS movement — a rent transfer inherited the
-    next row's "Paypal *…" text and was categorized as a subscription.
+    "disposto a favore di Mario" inline / "Rossi" ↓.
 
     Assembly: every description/category line is assigned to the NEAREST anchor
     on the page (by vertical distance); lines above a page's first anchor whose

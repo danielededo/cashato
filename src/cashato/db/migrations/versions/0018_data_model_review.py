@@ -1,6 +1,6 @@
-"""Data-model review fixes (2026-07-26).
+"""Data-model corrections.
 
-Six independent corrections from the data-model review, batched:
+Six independent corrections, batched:
 
 1. ``v_income_expense_month`` loses ``net_excl_investments`` — dead since 0014:
    the asset exclusion moved into the view's WHERE, so the old FILTER matched

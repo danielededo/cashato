@@ -5,8 +5,8 @@ Two subjects on one stream:
 - ``category.feedback`` — a user corrected a transaction's category (active
   learning); the consumer applies it to silver + records it in gold.
 
-The feedback consumer lives in the etl-worker for now; in phase C it moves to the
-dedicated ``categorizer`` service (same event, same handler).
+The feedback consumer lives in the etl-worker; the ``categorizer`` service
+consumes recategorize events.
 """
 
 from __future__ import annotations
@@ -25,16 +25,13 @@ NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
 
 SUBJECT_INGEST = "ingest.jobs"
 SUBJECT_FEEDBACK = "category.feedback"
-# Emitted by the etl-worker after an ingest; consumed by the categorizer service
-# (C6d), which runs the model (via KServe) over the newly landed rows.
+# Emitted by the etl-worker after an ingest; consumed by the categorizer service,
+# which runs the model (via KServe) over the newly landed rows.
 SUBJECT_RECATEGORIZE = "category.recategorize"
 SUBJECTS = [SUBJECT_INGEST, SUBJECT_FEEDBACK, SUBJECT_RECATEGORIZE]
 STREAM = "CASHATO"
 
-# Backwards-compatible alias (ingest job subject was previously ``SUBJECT``).
-SUBJECT = SUBJECT_INGEST
-
-# Keep the JetStream fileStore PVC bounded (C4). Both subjects carry work-queue
+# Keep the JetStream fileStore PVC bounded. Both subjects carry work-queue
 # semantics — a job/feedback event is consumed once and acked, then it can go —
 # so WorkQueue retention deletes each message on ack. MaxAge is a safety cap so
 # an un-acked message (e.g. a poison job that always fails) can't pin the PVC
@@ -74,12 +71,10 @@ async def ensure_consumer(js, subject: str, durable: str, *, log):
     """Bind a pull subscription with the delivery budget ACTUALLY applied.
 
     ``pull_subscribe(config=...)`` silently ignores the config when the durable
-    already exists — it just binds to whatever is on the server. That is how a
-    deployed worker ended up running with the defaults (``ack_wait`` 30s,
-    ``max_deliver`` unlimited) while the code asked for 300s and 5, with nothing
-    reporting the mismatch. So reconcile explicitly with ``add_consumer`` (which
-    is create-or-update), then READ BACK what the server accepted and warn if it
-    still differs, rather than assuming it took.
+    already exists — it just binds to whatever is on the server. So reconcile
+    explicitly with ``add_consumer`` (which is create-or-update), then READ BACK
+    what the server accepted and warn if it still differs, rather than assuming
+    it took.
     """
     cfg = consumer_config(durable, subject)
     try:
@@ -181,9 +176,7 @@ async def consume_one(sub, handler, *, log, tracer, span_name: str, on_giving_up
                     )
                     if on_giving_up is not None:
                         # Best-effort: let the owner leave a visible trace (e.g.
-                        # mark the file failed) — a termed job used to leave the
-                        # upload as 'pending' forever, indistinguishable from a
-                        # queued one.
+                        # mark the file failed).
                         try:
                             await on_giving_up(data, exc)
                         except Exception as hook_exc:  # noqa: BLE001

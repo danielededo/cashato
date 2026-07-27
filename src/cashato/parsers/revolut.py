@@ -1,8 +1,8 @@
 """Revolut adapter -- "consolidated statement" format.
 
-The real Revolut CSV is NOT the flat format originally assumed, but a
-consolidated statement with **multiple sections per currency** separated by
-``---------``. Cash movements live in tables titled ``Transaction statement``
+The Revolut CSV is a consolidated statement with **multiple sections per
+currency** separated by ``---------``. Cash movements live in tables titled
+``Transaction statement``
 with header::
 
     Date, Description, Category, Money in/out, Balance, Tax withheld, Other taxes, Fees
@@ -47,7 +47,7 @@ from .base import (
 SOURCE = "revolut"
 CURRENCY = "EUR"
 
-# Content-detection marker groups (was config/sources.yaml). A file is Revolut if,
+# Content-detection marker groups. A file is Revolut if,
 # for ANY group, ALL markers appear in its lowercased head text.
 DETECTION: list[list[str]] = [
     ["current accounts summaries"],
@@ -460,11 +460,8 @@ _CRYPTO_LEGS_RE = re.compile(r",\s+(?=[+-])")
 def _crypto_sale_value(cell: str) -> Decimal | None:
     """Sale leg of a "Value (of Sale, of Purchase)" cell, e.g. "+ €1,150.00, - €1,000.00".
 
-    Splitting on the bare comma silently corrupted every amount >= 1,000: the
-    first fragment became "+ €1" and the sale was stored as one euro — with a
-    matching (wrong) natural_key, so a later corrected import would not even
-    dedup against it. Split on the boundary BETWEEN the legs instead: a comma
-    followed by whitespace and a sign, which a thousands separator never is.
+    Split on the boundary BETWEEN the legs: a comma followed by whitespace and
+    a sign, which a thousands separator never is.
     """
     for part in _CRYPTO_LEGS_RE.split(cell):
         if "+" in part:

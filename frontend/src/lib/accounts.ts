@@ -15,11 +15,8 @@ import { useAsync } from "./useAsync";
 // Accounts change on ingest, reset and rename, and several pages want them, so
 // one in-flight request is shared rather than refetched per mount.
 //
-// Two things the cache must NOT do. It must not outlive a change — a rename or
-// a reset used to leave every page showing the old names while Manage, which
-// refetches independently, disagreed. And it must not memoize a REJECTION: one
-// transient error at startup used to pin an empty list for the whole session,
-// so accounts rendered as raw ids until a full page reload.
+// Two things the cache must NOT do: it must not outlive a change, and it must
+// not memoize a REJECTION.
 let cached: Promise<Account[]> | null = null;
 // Bumped on invalidate() so mounted components refetch instead of sitting on a
 // stale promise they already resolved.
@@ -84,9 +81,7 @@ export function useAccounts(): AccountNaming {
     }
 
     // Fallback when nothing described the account. Title-cased so it sits
-    // beside real bank names without looking like a different kind of thing:
-    // the UI used to show "Trade Republic Bank" in one place and
-    // "trade republic" in another, purely by whether a PDF had been ingested.
+    // beside real bank names without looking like a different kind of thing.
     // Still visibly derived from the id — never an invented bank name.
     const raw = (id: string | null | undefined) =>
       id

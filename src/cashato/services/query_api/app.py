@@ -51,8 +51,6 @@ _CAT = Categorizer.load()
 _engine = get_engine()
 
 # Prometheus metrics on a dedicated port (:9100), uniform across all services.
-# The Instrumentator still records HTTP request metrics into the default registry;
-# start_metrics_server serves that registry on :9100 instead of the business port.
 Instrumentator().instrument(app)
 start_metrics_server()
 
@@ -68,12 +66,10 @@ if tracing_enabled():
 
 
 # --- response models (typed OpenAPI schema + examples) ---
-# Money fields are Decimal end to end (the founding rule): pydantic serializes
+# Money fields are Decimal end to end (the project rule): pydantic serializes
 # them as JSON STRINGS, and the frontend's `Money` type + num() convert
 # deliberately — a JSON number is an IEEE754 double, which is what the rule
-# exists to avoid. (Half of these used to be float; latent, never visibly
-# wrong at 2 dp, but the SQL sums exposed here are exactly where a 17-digit
-# float artifact would first appear.)
+# exists to avoid.
 class CategoryTotal(BaseModel):
     category: str = Field(examples=["groceries"])
     category_label: str = Field(examples=["Groceries"])
@@ -174,8 +170,7 @@ class Account(BaseModel):
     currency: str | None = None
     iban: str | None = None
     #: The user's chosen name, when set. Must be declared: response_model strips
-    #: anything absent here, so omitting it left the client seeing `undefined`
-    #: and the Reset button permanently disabled after a rename.
+    #: anything absent here.
     display_name_override: str | None = None
     display_name: str = Field(examples=["Revolut Bank UAB · Joint Account (Joint)"])
     transactions: int
@@ -208,8 +203,7 @@ class MetaResponse(BaseModel):
 
     Exists so no client has to restate the list of sources or categories. Those
     lists live in the adapter registry and in `categories.yaml`; a copy in the
-    frontend drifts the moment either changes — which it did, within a day of
-    the categories growing.
+    frontend drifts the moment either changes.
     """
 
     sources: list[SourceMeta]
@@ -270,7 +264,7 @@ class Holding(BaseModel):
     """A position, aggregated from the trades a source disclosed.
 
     Money stays ``Decimal`` all the way to the wire: the gold views compute it
-    exactly, and the project's founding rule is Decimal, never float.
+    exactly, and the project rule is Decimal, never float.
     """
 
     isin: str | None = None
@@ -382,8 +376,7 @@ def meta():
     the pipeline actually accepts.
     """
     # Name each source ONCE, here, rather than letting every client invent its
-    # own rendering of the id: the UI was showing "Trade Republic Bank" in one
-    # place and "trade republic" in another purely by which fallback it hit.
+    # own rendering of the id.
     # A source is named after its accounts' bank only when they all agree;
     # otherwise the id, title-cased, which is honest about being derived.
     banks = {
@@ -497,10 +490,8 @@ def investments(lang: str = _LANG):
                 "has_instruments": False,
             },
         )
-        # psycopg hands back Decimal for NUMERIC and we keep it that way: the
-        # earlier fix cast to float to stop `Decimal + float` raising, which
-        # silenced the error by breaking the invariant instead. Seeding the
-        # accumulators with Decimal(0) fixes it without leaving exact arithmetic.
+        # psycopg hands back Decimal for NUMERIC and we keep it that way: seed
+        # the accumulators with Decimal(0) to stay in exact arithmetic.
         k["net_invested"] += m["net_invested"] or 0
         k["contributed"] += m["contributed"] or 0
         k["returned"] += m["returned"] or 0

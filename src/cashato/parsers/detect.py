@@ -4,17 +4,11 @@ The user uploads any file and the ``etl-worker`` picks the right adapter based o
 content signatures (no filename guessing). If detection is uncertain the caller
 can pass an explicit source override (see the ingest API).
 
-**Registry order is not a tie-breaker.** Detection used to walk the sources in
-alphabetical module-discovery order and take the first match, which made the
-outcome depend on a filename: `intesa.py` sorted first, so its markers won every
-tie, and adding a `bper.py` or `hype.py` would silently change who wins. Worse,
-the loser was invisible — the wrong adapter simply finds no table and returns
-zero rows. See `demo/DETECTION_COLLISIONS.md`.
-
-Now every source is scored and the most specific match wins, where specific
-means "matched more markers". If two sources tie at the top the file is reported
-as AMBIGUOUS (``None``) rather than resolved by accident: an honest "I cannot
-tell, choose the bank yourself" beats a coin flip the user never sees.
+**Registry order is not a tie-breaker.** Every source is scored and the most
+specific match wins, where specific means "matched more markers". If two sources
+tie at the top the file is reported as AMBIGUOUS (``None``) rather than resolved
+by accident: an honest "I cannot tell, choose the bank yourself" beats a coin
+flip the user never sees. See `demo/DETECTION_COLLISIONS.md`.
 """
 
 from __future__ import annotations
@@ -42,8 +36,7 @@ def _xlsx_head(path: Path, max_rows: int = 25) -> str:
 
     import openpyxl
 
-    # Scoped suppression: filterwarnings("ignore") without a context manager
-    # silenced EVERY warning from EVERY library for the process's whole life.
+    # Scoped suppression: keep the ignore local to this load.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)

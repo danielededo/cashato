@@ -1,8 +1,7 @@
 """Observability helpers: structured JSON logging + Prometheus metrics.
 
-Code-level instrumentation (usable now); the collection/visualization stack
-(Prometheus, Loki, Tempo, Grafana) is deployed in phase C. Logs go to stdout as
-JSON (scraped by a log agent in k8s); metrics are exposed on an HTTP endpoint.
+Logs go to stdout as JSON (scraped by a log agent in k8s); metrics are exposed
+on an HTTP endpoint.
 """
 
 from __future__ import annotations

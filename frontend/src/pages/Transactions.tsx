@@ -39,8 +39,8 @@ export function Transactions() {
   const { categoryCodes, catLabel, sourceLabel } = useMeta();
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
-  // Filters apply INSTANTLY — no Apply button. Search is deferred so typing never
-  // blocks on a fetch (react-best-practices: useDeferredValue).
+  // Filters apply INSTANTLY — no Apply button. Search is deferred
+  // (useDeferredValue) so typing never blocks on a fetch.
   const [search, setSearch] = useState(params.get("q") ?? "");
   const deferredSearch = useDeferredValue(search);
   const [sign, setSign] = useState<Sign | "">((params.get("sign") as Sign) ?? "");

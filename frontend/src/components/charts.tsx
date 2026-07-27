@@ -1,4 +1,4 @@
-// Recharts-backed panels — bundled in ONE lazy chunk (bundle-dynamic-imports) so
+// Recharts-backed panels — bundled in ONE lazy chunk so
 // the console shell, KPIs, ranked bars and heatmap paint without paying for the
 // charting library. Marks read CSS custom properties so they re-theme for free.
 import { memo } from "react";

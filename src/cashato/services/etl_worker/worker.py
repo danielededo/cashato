@@ -6,8 +6,7 @@ with the **fast-path** category (MCC + rules). ML categorization is a separate
 concern; the etl-worker stays lightweight (no torch/model).
 
 Observability: structured JSON logs to stdout + Prometheus metrics on
-``METRICS_PORT`` (default 9100). The collection stack (Prometheus/Loki/Grafana)
-is deployed in phase C.
+``METRICS_PORT`` (default 9100).
 """
 
 from __future__ import annotations
@@ -65,8 +64,8 @@ def _process(key: str, filename: str | None, source_override: str | None, force:
     os.close(fd)
     try:
         objstore.fget(key, dest)
-        # ingest-api 422s unknown overrides, so this guard only fires for jobs
-        # queued before that gate existed — loudly, not as a silent fallback.
+        # ingest-api 422s unknown overrides; this guard fires loudly rather
+        # than falling back silently.
         if source_override and source_override not in load.ADAPTERS:
             log.warning("unknown source override %r ignored; detecting", source_override)
             source_override = None
@@ -130,11 +129,8 @@ def _apply_feedback(natural_key: str, category: str, corrected_by: str | None) -
 async def _handle_ingest(data: dict) -> int:
     """Process one ingest job. Returns the number of rows inserted.
 
-    Deliberately RE-RAISES. It used to swallow every exception and return 0,
-    while the consumer acked in a `finally` — and on a WorkQueue stream an ack
-    deletes the message, so a one-second Postgres or MinIO blip destroyed the
-    ingest with no way back except a manual /admin/reprocess. Letting it out
-    lets the consumer nak and have JetStream redeliver.
+    Deliberately RE-RAISES: on a WorkQueue stream an ack deletes the message,
+    so letting the exception out lets the consumer nak and JetStream redeliver.
     """
     try:
         return await asyncio.to_thread(
@@ -180,9 +176,7 @@ async def main() -> None:
         inserted = await _handle_ingest(data)
         if inserted:
             # The gold spend views exclude transfer-tagged legs, so the tagging
-            # must follow EVERY batch of new rows — as a manual CLI it simply
-            # never ran, and each upload counted both legs of its transfers as
-            # income+expense until someone shelled into a pod.
+            # must follow EVERY batch of new rows.
             try:
                 pairs, moved, _net = await asyncio.to_thread(link_transfers.relink_all)
             except Exception as exc:  # noqa: BLE001
@@ -215,9 +209,8 @@ async def main() -> None:
     async def mark_ingest_given_up(data: dict, exc: Exception) -> None:
         """Leave a visible trace when an ingest job exhausts its retry budget.
 
-        Without this the file sat as 'pending' forever in /files (or, if the
-        failure hit before registration, vanished entirely) — the message is
-        gone from the WorkQueue, so nothing else will ever update it.
+        The message is gone from the WorkQueue, so nothing else will ever
+        update it.
         """
         filename = data.get("filename") or data.get("key")
 

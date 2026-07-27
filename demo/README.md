@@ -98,20 +98,20 @@ import-extension testcases and the sources of the ofxstatement plugins
 
 Notes:
 - All these exports list movements **newest first** (like the real ones).
-- Descriptions deliberately avoid the word "operazione": several headers already
-  contain "importo", and the pair would trip Intesa's content detection. The
-  generator pins what `detect_source(...)` returns for each file — when you add
-  one of these parsers, its `DETECTION` groups must stay distinguishable from
-  Intesa's generic markers (and note that Webank's real header "Data Contabile"
-  IS an Intesa marker: it only escapes because openpyxl cannot open HTML).
-- Widiba's real export title "Lista Movimenti" also collides with an Intesa
-  marker; the synthetic file uses "Movimenti del conto" instead.
-- **Known REAL detection collisions** (kept faithful, pinned as `intesa` in the
-  verify step): the ING statement necessarily contains "Estratto conto
-  trimestrale" and "LISTA MOVIMENTI", and the Hype table header contains "Data
-  Contabile" — all Intesa markers. A genuine ING/Hype PDF uploaded today would
-  be misrouted to the Intesa parser (which then finds no table and yields 0
-  rows). Worth revisiting Intesa's generic markers before adding these sources.
+- Descriptions deliberately avoid the word "operazione": paired with "importo"
+  it is exactly the kind of generic word-pair marker detection must not rely
+  on. The generator pins what `detect_source(...)` returns for each file —
+  when you add one of these parsers, its `DETECTION` groups must be
+  bank-specific (see `DETECTION_COLLISIONS.md`), because generic vocabulary
+  like "Data Contabile" or "Lista Movimenti" appears in several banks' real
+  exports.
+- Widiba's real export title is "Lista Movimenti"; the synthetic file uses
+  "Movimenti del conto" instead.
+- **Known REAL detection collisions** (kept faithful, pinned in the verify
+  step): the ING statement necessarily contains "Estratto conto trimestrale"
+  and "LISTA MOVIMENTI", and the Hype table header contains "Data Contabile" —
+  generic Italian banking vocabulary. Intesa's markers are deliberately narrow
+  so these stay unclaimed.
 - The Poste and ING PDFs are additionally verified by **running the actual
   third-party parsers** on them — see `verify_thirdparty.py` for how (separate
   venv; not part of `generate.py`'s standard checks).

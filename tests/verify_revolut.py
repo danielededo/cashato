@@ -1,4 +1,4 @@
-"""End-to-end verification of the Revolut adapter on the real CSV (phase A).
+"""End-to-end verification of the Revolut adapter on the real CSV.
 
 No database required: it checks that the parsing is correct.
 

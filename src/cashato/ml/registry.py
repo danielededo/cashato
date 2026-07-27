@@ -1,4 +1,4 @@
-"""MLflow model-registry helpers for the categorizer (C6 / MLOps).
+"""MLflow model-registry helpers for the categorizer (MLOps).
 
 Centralizes the three registry operations shared by ``ml/train.py`` (retrain) and
 ``ml/register_model.py`` (import the existing model):

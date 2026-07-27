@@ -1,4 +1,4 @@
-"""M1 — Offline labeling with a local LLM (Ollama).
+"""Offline labeling with a local LLM (Ollama).
 
 Generates **canonical** labels (in OUR taxonomy) for the descriptions the
 fast-path leaves unresolved, so the training set does not depend on provider

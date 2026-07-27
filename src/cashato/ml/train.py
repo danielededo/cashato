@@ -1,4 +1,4 @@
-"""M2 / MLOps — Retrain the categorization model and register it in MLflow.
+"""MLOps — Retrain the categorization model and register it in MLflow.
 
 Provider-agnostic dataset of **canonical** labels, read from CNPG:
 - ``gold.training_labels`` (LLM / manual) — primary signal;

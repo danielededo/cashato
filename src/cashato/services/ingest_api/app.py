@@ -47,7 +47,7 @@ ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("ingest-api")
 # Valid category codes (for feedback validation); labels/model not needed here.
 _CATEGORY_CODES = set(Categorizer.load().categories)
-# Upload guards (configurable; ConfigMap in phase C).
+# Upload guards (configurable via the mounted config).
 _MAX_FILE_BYTES = int(setting("uploads.max_file_bytes", 10 * 1024 * 1024))
 _ALLOWED_EXT = {e.lower() for e in setting("uploads.allowed_extensions", [".pdf", ".csv", ".xlsx"])}
 _CHUNK = 1 << 20  # 1 MiB streaming read
@@ -217,8 +217,6 @@ class AdminResult(BaseModel):
 
 
 # Prometheus metrics on a dedicated port (:9100), uniform across all services.
-# The Instrumentator still records HTTP request metrics into the default registry;
-# start_metrics_server serves that registry on :9100 instead of the business port.
 Instrumentator().instrument(app)
 start_metrics_server()
 
@@ -293,8 +291,7 @@ async def create_upload(
             status_code=415,
             detail=f"unsupported file type {suffix!r}. Allowed: {sorted(_ALLOWED_EXT)}",
         )
-    # A typo'd override used to be silently ignored (the worker fell back to
-    # detection and answered 202): reject it here, where the caller can see it.
+    # Reject an unknown source override here, where the caller can see it.
     if source is not None and source not in SOURCE_NAMES:
         raise HTTPException(
             status_code=422,

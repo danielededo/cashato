@@ -2,8 +2,7 @@
 // `category` is the stable language-neutral code; `category_label` is localized.
 
 // Every money field is `Money` (an exact decimal STRING on the wire — see the
-// note at Money below); convert deliberately with num(). These were `number`
-// while the API sent floats; the API now keeps Decimal end to end.
+// note at Money below); convert deliberately with num().
 export interface CategoryTotal {
   category: string;
   category_label: string;
@@ -167,12 +166,10 @@ export interface TransactionFilters {
 
 /** Exact decimal as it arrives on the wire.
  *
- *  Money is `Decimal` server-side (the project's founding rule) and Pydantic
+ *  Money is `Decimal` server-side (the project rule) and Pydantic
  *  serializes that to a JSON STRING, not a number — a JSON number is an IEEE754
  *  double, exactly what the rule exists to avoid. Typed as `string` so every use
- *  is forced through `num()` and the conversion to a JS number is deliberate:
- *  these were typed `number` while the API sent strings, which type-checked
- *  perfectly and produced NaN across the whole Wealth page at runtime. */
+ *  is forced through `num()` and the conversion to a JS number is deliberate. */
 export type Money = string;
 
 /** A position, aggregated from the trades a source disclosed. */

@@ -20,6 +20,6 @@ uploads:
   # Upload page before anything is sent)
   max_files_per_batch: 50
   # accepted file extensions (bank statements are PDF / CSV / XLSX).
-  # No ".xls": no parser reads the legacy binary format, so inviting it only
-  # produced uploads that failed later in the worker.
+  # No ".xls": no parser reads the legacy binary format; inviting it would
+  # only produce uploads that fail in the worker.
   allowed_extensions: [".pdf", ".csv", ".xlsx"]

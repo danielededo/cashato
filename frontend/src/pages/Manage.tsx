@@ -116,8 +116,7 @@ python -m cashato.ml.label --limit 2000</code></pre>
 function AccountsPanel() {
   const { t } = useT();
   // The SHARED accounts cache, not a private fetch: a reset truncates
-  // silver.accounts, and this panel — sitting right above the reset button —
-  // kept listing the wiped accounts with live Rename buttons that 404'd.
+  // silver.accounts.
   const { accounts: rows } = useAccounts();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);

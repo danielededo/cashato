@@ -1,5 +1,5 @@
 """Import an existing EmbeddingKNN artifact into the MLflow registry as the
-incumbent ``@champion`` (C6 / MLOps).
+incumbent ``@champion`` (MLOps).
 
 Used once to **preserve the model we already have** (``models/latest.joblib``,
 whose original training dataset is no longer reproducible) without retraining, so

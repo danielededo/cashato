@@ -1,4 +1,4 @@
-"""KServe custom predictor for the categorization model (C6c).
+"""KServe custom predictor for the categorization model.
 
 Our model is a custom ``EmbeddingKNN`` (sentence-transformers + kNN), not a
 standard framework format, so KServe serves it via a **custom predictor**: this
@@ -8,7 +8,7 @@ subclass of ``kserve.Model`` implements load + predict, and the kserve SDK's
 At startup it pulls the model currently aliased ``@champion`` from the MLflow
 registry (``MLFLOW_TRACKING_URI``) — so promoting a new champion + restarting the
 predictor is all it takes to serve a new model. The heavy deps (torch, ST) live
-only in this image; the categorizer (C6d) is a light HTTP client of it.
+only in this image; the categorizer is a light HTTP client of it.
 
 Request  (V1):  {"instances": ["<raw description>", ...]}   (str or {"description": str})
 Response (V1):  {"predictions": [{"category": "<code>", "confidence": <float>}, ...]}

@@ -1,4 +1,4 @@
-"""The ingest-api CSRF guard (review #4): browser cross-site writes are
+"""The ingest-api CSRF guard: browser cross-site writes are
 rejected, everything legitimate passes.
 
 Kept in the app rather than the gateway on purpose: Envoy Gateway 1.8's

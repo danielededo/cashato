@@ -80,7 +80,7 @@ export const api = {
   files: () => get<FilesResponse>("/files"),
   profile: () => get<Profile>("/profile"),
 
-  // admin (destructive / operational) — backend endpoints land with a deploy
+  // admin (destructive / operational)
   reprocessAll: () => postJson<AdminResult>("/admin/reprocess", {}),
   resetData: (scope: "data" | "all", keepFiles = false, confirm = "") =>
     postJson<AdminResult>("/admin/reset", { scope, keep_files: keepFiles, confirm }),

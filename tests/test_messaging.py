@@ -1,8 +1,7 @@
 """How a NATS message gets 'settled'.
 
 On a WorkQueue stream an ack DELETES the message, so acking a failed job
-loses the ingest forever. These tests pin the four possible outcomes, which
-used to be a single one: ack in a `finally`, always.
+loses the ingest forever. These tests pin the four possible outcomes.
 """
 
 import asyncio
@@ -93,8 +92,8 @@ class TestSettlement:
         assert m.settled == "ack"
 
     def test_transient_failure_naks_for_redelivery(self):
-        # the case that used to lose the ingest: a one-second blip on MinIO or
-        # Postgres got acked and the message deleted
+        # a one-second blip on MinIO or Postgres must be retried, not acked
+        # (which deletes the message and loses the ingest)
         m = _Msg(num_delivered=1)
         _run(_Sub([m]), _boom)
         assert m.settled == "nak"
@@ -129,9 +128,9 @@ class TestFetchErrors:
         assert caplog.records == []
 
     def test_real_fetch_error_is_reported_not_mistaken_for_idle(self, caplog, monkeypatch):
-        # a conflicting consumer config or a deleted stream used to be mistaken
-        # for "no message": the worker looked healthy while every upload sat
-        # in the queue
+        # a conflicting consumer config or a deleted stream must not be
+        # mistaken for "no message": the worker would look healthy while
+        # every upload sat in the queue
         monkeypatch.setattr(messaging.asyncio, "sleep", _ok)
         sub = _Sub(raises=RuntimeError("consumer config conflict"))
         with caplog.at_level(logging.ERROR):

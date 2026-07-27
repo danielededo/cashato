@@ -1,4 +1,4 @@
-"""categorizer — event-driven model categorization (C6d).
+"""categorizer — event-driven model categorization.
 
 Consumes ``category.recategorize`` from NATS (emitted by the etl-worker after an
 ingest). Re-runs the resolver chain (MCC -> MODEL -> rules -> default) over the
@@ -92,8 +92,7 @@ async def _handle(_data: dict) -> None:
 async def _handle_counted(data: dict) -> None:
     """Wrap the handler so a failure is counted and then RE-RAISED.
 
-    Swallowing it and acking anyway dropped the recategorize request outright —
-    on a WorkQueue stream the ack deletes the message. Raising lets the shared
+    On a WorkQueue stream the ack deletes the message. Raising lets the shared
     consumer nak, so a KServe hiccup is retried rather than leaving the rows
     uncategorized until the next ingest happens to nudge it.
     """

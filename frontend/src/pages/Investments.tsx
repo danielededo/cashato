@@ -9,18 +9,6 @@
 // Insurance is deliberately NOT here by default: a protection policy is real
 // consumption, and only an accumulation policy is wealth. That split is a manual
 // reclassification, never inferred from a transfer description.
-//
-// Investments on the two levels the statements actually support.
-//
-// CONTRIBUTIONS are always knowable: money leaving towards investing, including
-// a plain transfer to an outside broker. POSITIONS need the source to disclose
-// the instrument, which a bank transfer never does. The page shows both and
-// states the gap between them — presenting only the instruments we happen to
-// know would quietly understate what was invested.
-//
-// No market prices anywhere: the last price we have is the one printed on a
-// statement, so anything derived from it is labelled as of that date rather
-// than dressed up as today's value.
 
 import { lazy, Suspense, useMemo, useState } from "react";
 import { api } from "../api/client";
@@ -52,9 +40,8 @@ export function Investments() {
 
     // ONE series (the known/unknown split lives in the KPI tiles) of the NET
     // flow: contributed minus returned. Money coming back from a sale is not
-    // still invested, so charting gross let the line grow past reality — the
-    // cumulative chart now ends exactly on the hero's net subtitle figure.
-    // Gross stays in the hero, and the sparkline keeps the gross pace with it.
+    // still invested. Gross stays in the hero, and the sparkline keeps the
+    // gross pace with it.
     const series: SeriesDef[] = [{ key: TOTAL, label: t("inv.flow.series"), category: "investments" }];
     // The months arrive per kind, so fold them into one row per month.
     const byMonth = new Map<string, Row>();

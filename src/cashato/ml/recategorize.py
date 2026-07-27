@@ -1,4 +1,4 @@
-"""M3 — In-place re-categorization of silver.transactions.
+"""In-place re-categorization of silver.transactions.
 
 Applies the provider-agnostic chain (MCC -> model -> rules -> default) to the
 rows already in the DB, without re-parsing files. Uses ``models/latest.joblib``

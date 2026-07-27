@@ -1,4 +1,4 @@
-"""End-to-end verification of the Intesa adapter on the 21 quarterly statements (phase B).
+"""End-to-end verification of the Intesa adapter on the 21 quarterly statements.
 
 For each file it reconciles the extracted sums against the totals declared on
 page 1 (Totale accrediti / Totale addebiti / Saldo iniziale+finale). It then

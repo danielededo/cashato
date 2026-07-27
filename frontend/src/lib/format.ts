@@ -47,7 +47,7 @@ export function isoDate(d: Date): string {
  *  Decimal and Pydantic will not degrade that to a JSON double. Converting to a
  *  JS number is unavoidable for charts and arithmetic, but making it an explicit
  *  call keeps it at the boundary — the alternative is silent coercion, and
- *  `"8951.0000" / 2` is NaN, which is how the whole Wealth page broke.
+ *  `"8951.0000" / 2` is NaN.
  */
 export function num(v: string | number | null | undefined): number {
   if (v == null) return 0;

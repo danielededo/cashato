@@ -1,8 +1,8 @@
 """Central configuration loader (leaf module: no adapter/model imports).
 
 Reads tunable settings from ``settings.yaml``; ``categories.yaml`` / ``mcc.yaml``
-are read by the categorizer. The source registry + content-detection signatures
-now live WITH the parsers (``cashato.parsers.registry``), not here.
+are read by the categorizer. The source registry and detection signatures live
+in ``cashato.parsers.registry``.
 
 The config directory is resolved from ``CASHATO_CONFIG_DIR`` — a read-only mounted
 ConfigMap in the cluster; defaults to ``./config`` for local dev. Model artifacts

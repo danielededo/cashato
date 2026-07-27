@@ -3,8 +3,7 @@
 // The list shows what you scan; this shows what you investigate: how the
 // category was decided and how sure that was, the raw provider signals behind
 // it, which uploaded file the row came from, the other leg if it is an internal
-// transfer, and the instrument if it was a trade. Most of this already existed
-// in the database and was simply never surfaced.
+// transfer, and the instrument if it was a trade.
 
 import { useEffect } from "react";
 import { api } from "../api/client";

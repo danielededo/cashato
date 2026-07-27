@@ -1,4 +1,4 @@
-"""End-to-end verification of the Trade Republic adapter on the real PDF (phase B).
+"""End-to-end verification of the Trade Republic adapter on the real PDF.
 
 Self-reconciling: it extracts the declared totals from the "ESTRATTO CONTO
 RIASSUNTIVO" box (opening balance, inflows, outflows, closing balance) and

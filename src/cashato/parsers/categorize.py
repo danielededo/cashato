@@ -84,9 +84,7 @@ class Categorizer:
             for src, m in config.get("seeds", {}).items()
         }
         self.model = model
-        # Read at CONSTRUCTION, not import: binding the setting at import time
-        # froze the threshold at whatever settings.yaml said when the module
-        # was first loaded, so a per-call reload of the config never saw edits.
+        # Read at CONSTRUCTION, not import, so a config reload is seen.
         self.model_threshold = (
             float(setting("categorization.model_threshold", _FALLBACK_THRESHOLD))
             if model_threshold is None

@@ -1,4 +1,4 @@
-"""The 0-row guard in cli.load (review #20): a parse that yields nothing must
+"""The 0-row guard in cli.load: a parse that yields nothing must
 be recorded as FAILED with a reason, never as an empty success — content
 detection can route a file to the wrong adapter, which then quietly returns [].
 

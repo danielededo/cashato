@@ -13,7 +13,7 @@ export function EmptyNote({ k }: { k: string }) {
   return <div className="chart-fallback">{t(k)}</div>;
 }
 
-/* Inline sparkline. Coordinates are rounded to 1dp (rendering-svg-precision). */
+/* Inline sparkline. Coordinates are rounded to 1dp. */
 export const Sparkline = memo(function Sparkline({
   values,
   width = 96,

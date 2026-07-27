@@ -6,9 +6,7 @@ groups are stable across runs. GOLD spend views exclude the tagged legs, so
 internal transfers do not pollute totals.
 
 The etl-worker calls :func:`relink_all` after every ingest that inserted rows —
-the gold views depend on the tagging, so it cannot be a manual afterthought
-(it used to be exactly that: a CLI nobody ran, and every upload re-polluted
-the dashboard until someone shelled into a pod).
+the gold views depend on the tagging, so it cannot be a manual afterthought.
 
 CLI usage (manual re-run):
     ./.venv/bin/python -m cashato.cli.link_transfers [--window 3]

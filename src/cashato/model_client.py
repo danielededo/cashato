@@ -1,4 +1,4 @@
-"""HTTP client for the KServe model predictor (C6d).
+"""HTTP client for the KServe model predictor.
 
 A drop-in for ``ml.model.EmbeddingKNN`` at inference time: same interface
 (``predict_batch`` / ``predict_one``) so the ``Categorizer`` resolver chain can
