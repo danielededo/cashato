@@ -165,6 +165,35 @@ const UI: Dict = {
   "inv.empty": { it: "Nessun movimento di patrimonio", en: "No wealth movements" },
   "inv.emptySub": { it: "Investimenti, fondo pensione, conti deposito e polizze di accumulo compariranno qui una volta caricati gli estratti.", en: "Investments, pension funds, deposits and savings policies will appear here once statements are loaded." },
 
+  // file coverage (per source: staleness + holes)
+  "cov.title": { it: "Copertura file", en: "File coverage" },
+  "cov.hint": {
+    it: "fin dove arrivano gli estratti caricati, per sorgente",
+    en: "how far the uploaded statements reach, per source",
+  },
+  "cov.ok": { it: "Tutte le sorgenti sono aggiornate.", en: "Every source is up to date." },
+  "cov.bad": {
+    it: "{n} sorgente/i indietro — carica un estratto più recente.",
+    en: "{n} source(s) behind — upload a newer statement.",
+  },
+  "cov.none": { it: "Nessun dato ancora.", en: "No data yet." },
+  "cov.source": { it: "Sorgente", en: "Source" },
+  "cov.range": { it: "Copertura", en: "Covered" },
+  "cov.behind": { it: "Silenzio da", en: "Silent for" },
+  "cov.status": { it: "Stato", en: "Status" },
+  "cov.days": { it: "gg", en: "days" },
+  "cov.stale": { it: "in ritardo", en: "behind" },
+  "cov.fresh": { it: "ok", en: "ok" },
+  "cov.accounts": { it: "conti", en: "accounts" },
+  "cov.hole": {
+    it: "{src}: nessun dato fra {from} e {to} ({n} giorni)",
+    en: "{src}: no data between {from} and {to} ({n} days)",
+  },
+  "cov.holeNote": {
+    it: "Un buco può essere un estratto mancante o un periodo davvero senza movimenti: i dati da soli non li distinguono.",
+    en: "A hole can be a missing statement or a genuinely quiet period: the data alone cannot tell them apart.",
+  },
+
   // recurring movements (subscriptions, salary, rent, bills)
   "rec.title": { it: "Ricorrenze", en: "Recurring" },
   "rec.hint": {

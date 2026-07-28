@@ -98,6 +98,32 @@ export interface ReconciliationResponse {
   intervals: ReconciliationInterval[];
 }
 
+export interface CoverageHole {
+  from_date: string;
+  to_date: string;
+  days: number;
+}
+export interface CoverageSource {
+  source: string;
+  accounts: string[];
+  n_movements: number;
+  n_anchors: number;
+  covered_from: string | null;
+  covered_until: string | null;
+  anchor_cadence_days: number | null;
+  stale_days: number;
+  /** Behind schedule given the source's own anchor cadence. */
+  stale: boolean;
+  /** Uncovered windows — a missing statement OR a quiet period; hints, not verdicts. */
+  holes: CoverageHole[];
+}
+export interface CoverageResponse {
+  today: string;
+  n_stale: number;
+  n_holes: number;
+  sources: CoverageSource[]; // worst first
+}
+
 export interface RecurringItem {
   description: string;
   category: string | null;

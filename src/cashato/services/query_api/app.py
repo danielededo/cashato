@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from cashato.config import setting
+from cashato.coverage import coverage_report
 from cashato.db.db import get_engine
 from cashato.obs import (
     setup_logging,
@@ -253,6 +254,45 @@ class RecurringResponse(BaseModel):
     )
     monthly_income: Decimal = Field(description="Sum of active recurring income per month.")
     items: list[RecurringItem]
+
+
+class CoverageHole(BaseModel):
+    """A window between two covered days that no data touches. A missing
+    statement and a genuinely quiet period look identical from the data alone,
+    so this is a hint to check, not a verdict."""
+
+    from_date: date
+    to_date: date
+    days: int
+
+
+class CoverageSource(BaseModel):
+    """Coverage of one SOURCE — the unit a statement is uploaded for. Every
+    account of the source testifies for the same file, so a dormant crypto
+    pocket does not look 'behind' while the cash account is fresh."""
+
+    source: str
+    accounts: list[str]
+    n_movements: int
+    n_anchors: int
+    covered_from: date | None
+    covered_until: date | None = Field(description="Last day any of its data covers.")
+    anchor_cadence_days: int | None = Field(
+        description="Median days between balance anchors; null below 3 anchors."
+    )
+    stale_days: int
+    stale: bool = Field(
+        description="Behind schedule given the source's own anchor cadence — a "
+        "quarterly source gets a quarter's grace, a daily export weeks."
+    )
+    holes: list[CoverageHole]
+
+
+class CoverageResponse(BaseModel):
+    today: date
+    n_stale: int
+    n_holes: int
+    sources: list[CoverageSource] = Field(description="Worst first.")
 
 
 class Account(BaseModel):
@@ -610,6 +650,27 @@ def investments(lang: str = _LANG):
         "total_invested": sum((m["net_invested"] or 0 for m in months), Decimal(0)),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,
+    }
+
+
+@api.get("/coverage", response_model=CoverageResponse, summary="File-coverage report")
+def coverage():
+    """Which statement is missing, and how far behind each account is.
+
+    Read off the data the statements left behind: staleness of the last
+    covered day against today (tolerance scaled to the account's own anchor
+    cadence) and holes in the anchor spacing. Uploading the missing file is
+    the fix, which is why the UI shows this next to Upload/Reprocess.
+    """
+    today = date.today()
+    movements = _rows("SELECT account, source, value_date FROM gold.v_transactions")
+    anchors = _rows("SELECT account, source, balance_date FROM gold.v_balances")
+    report = coverage_report(movements, anchors, today)
+    return {
+        "today": today,
+        "n_stale": sum(1 for c in report if c.stale),
+        "n_holes": sum(len(c.holes) for c in report),
+        "sources": [asdict(c) for c in report],
     }
 
 

@@ -3,6 +3,7 @@ import { api, ApiError } from "../api/client";
 import { dateLabel, money, num } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { invalidateAccounts, useAccounts } from "../lib/accounts";
+import { useMeta } from "../lib/meta";
 import { useAsync } from "../lib/useAsync";
 
 type Busy = null | "reprocess" | "reset";
@@ -35,6 +36,7 @@ export function Manage() {
   return (
     <div className="fade-in">
       <HealthPanel />
+      <CoveragePanel />
       <AccountsPanel />
 
       {/* reprocess */}
@@ -210,6 +212,88 @@ function HealthPanel() {
                 </p>
               ) : null}
               <p className="footnote" style={{ paddingTop: 8 }}>{t("mng.health.boundaryNote")}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** How far the uploaded statements reach, per SOURCE — the unit a file is
+ *  uploaded for, so a dormant crypto pocket never looks "behind" while the
+ *  cash account of the same export is fresh. Uploading the missing file is
+ *  the fix, which is why this sits next to Upload/Reprocess. */
+function CoveragePanel() {
+  const { t } = useT();
+  const { sourceLabel } = useMeta();
+  const cov = useAsync(() => api.coverage(), []);
+  const d = cov.data;
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>{t("cov.title")}</h2>
+        <span className="hint">{t("cov.hint")}</span>
+      </div>
+      {cov.loading && !d ? <div className="state">{t("common.loading")}</div> : null}
+      {cov.error ? <div className="state error">{cov.error}</div> : null}
+      {d && d.sources.length === 0 ? <div className="state">{t("cov.none")}</div> : null}
+      {d && d.sources.length > 0 ? (
+        <div>
+          <p className={`health-verdict ${d.n_stale ? "neg" : "pos"}`}>
+            {d.n_stale ? t("cov.bad", { n: d.n_stale }) : t("cov.ok")}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>{t("cov.source")}</th>
+                <th>{t("cov.range")}</th>
+                <th className="num">{t("cov.behind")}</th>
+                <th>{t("cov.status")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.sources.map((s) => (
+                <tr key={s.source}>
+                  <td>
+                    {sourceLabel(s.source)}{" "}
+                    <span className="dim">
+                      · {s.accounts.length} {t("cov.accounts")}
+                    </span>
+                  </td>
+                  <td className="mono dim">
+                    {s.covered_from && s.covered_until
+                      ? `${dateLabel(s.covered_from)} → ${dateLabel(s.covered_until)}`
+                      : "—"}
+                  </td>
+                  <td className="num mono">{s.stale_days} {t("cov.days")}</td>
+                  <td>
+                    {s.stale ? (
+                      <span className="amt neg">{t("cov.stale")}</span>
+                    ) : (
+                      <span className="dim">{t("cov.fresh")}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {d.n_holes > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              {d.sources.flatMap((s) =>
+                s.holes.map((h) => (
+                  <p className="footnote" key={`${s.source}${h.from_date}`}>
+                    {t("cov.hole", {
+                      src: sourceLabel(s.source),
+                      from: dateLabel(h.from_date),
+                      to: dateLabel(h.to_date),
+                      n: h.days,
+                    })}
+                  </p>
+                )),
+              )}
+              <p className="footnote">{t("cov.holeNote")}</p>
             </div>
           ) : null}
         </div>

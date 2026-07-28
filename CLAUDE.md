@@ -167,7 +167,9 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `/recurring` (subscriptions/salary/rent/bills detected on the fly by
   `src/cashato/recurrence.py` — same merchant key at a steady cadence, with a
   twin-format merge pass; transfers excluded, asset categories listed but kept
-  out of the spend totals). `?lang=it|en` for category labels. The gateway routes ALL of
+  out of the spend totals), `/coverage` (`src/cashato/coverage.py` — per-SOURCE
+  staleness scaled to anchor cadence + holes in the union of covered days;
+  holes are hints, a missing statement and a quiet period look identical). `?lang=it|en` for category labels. The gateway routes ALL of
   `/api/v1` here and enumerates only ingest-api's write paths — enumerating
   both would let a forgotten endpoint fall through to the SPA and answer 200
   with HTML instead of 404.

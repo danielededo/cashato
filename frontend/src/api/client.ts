@@ -4,6 +4,7 @@
 import type {
   AccountsResponse,
   CategoriesMonthlyResponse,
+  CoverageResponse,
   FeedbackAccepted,
   FilesResponse,
   InvestmentsResponse,
@@ -81,6 +82,7 @@ export const api = {
   investments: (lang: Lang) => get<InvestmentsResponse>("/investments", { lang }),
   wealth: () => get<WealthResponse>("/wealth"),
   recurring: (lang: Lang) => get<RecurringResponse>("/recurring", { lang }),
+  coverage: () => get<CoverageResponse>("/coverage"),
   transaction: (key: string, lang: Lang) =>
     get<TransactionDetail>(`/transactions/${encodeURIComponent(key)}`, { lang }),
   files: () => get<FilesResponse>("/files"),
