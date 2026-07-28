@@ -34,6 +34,9 @@ export interface SeriesDef {
   key: string;
   label: string;
   category: string;
+  /** Explicit series color for entities that are not category codes (accounts,
+   *  instruments); wins over the category→color map. */
+  color?: string;
 }
 export type Row = { month: string } & Record<string, number | string>;
 
@@ -46,8 +49,8 @@ export const StackedArea = memo(function StackedArea({ data, series }: { data: R
         <defs>
           {series.map((s) => (
             <linearGradient key={s.key} id={`g-${s.key}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={colorFor(s.category)} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={colorFor(s.category)} stopOpacity={0.06} />
+              <stop offset="0%" stopColor={s.color ?? colorFor(s.category)} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={s.color ?? colorFor(s.category)} stopOpacity={0.06} />
             </linearGradient>
           ))}
         </defs>
@@ -64,7 +67,7 @@ export const StackedArea = memo(function StackedArea({ data, series }: { data: R
             name={s.label}
             dataKey={s.key}
             stackId="1"
-            stroke={colorFor(s.category)}
+            stroke={s.color ?? colorFor(s.category)}
             strokeWidth={1.5}
             fill={`url(#g-${s.key})`}
           />

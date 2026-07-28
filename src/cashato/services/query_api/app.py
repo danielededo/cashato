@@ -11,6 +11,7 @@ Swagger UI at ``/docs``, ReDoc at ``/redoc``.
 from __future__ import annotations
 
 import os
+from dataclasses import asdict
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -30,6 +31,7 @@ from cashato.obs import (
 )
 from cashato.parsers.categorize import Categorizer
 from cashato.parsers.registry import SOURCE_NAMES
+from cashato.recurrence import ASSET_CATEGORIES, detect_recurring
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("query-api")
@@ -174,6 +176,83 @@ class ReconciliationResponse(BaseModel):
     n_intervals: int
     n_mismatched: int
     intervals: list[ReconciliationInterval]
+
+
+class BalanceMonthRow(BaseModel):
+    """One account's balance at one month's end, carried forward from the last
+    statement-declared anchor. ``as_of`` is that anchor's date — the figure's
+    age, not the month it is shown under."""
+
+    month: date
+    account: str
+    currency: str
+    balance: Decimal
+    as_of: date
+
+
+class AccountBalance(BaseModel):
+    """The latest balance a statement declared for one account."""
+
+    account: str
+    currency: str
+    balance: Decimal
+    as_of: date
+
+
+class WealthResponse(BaseModel):
+    """Liquid wealth over time, from the statements' own balances.
+
+    Only what a statement declared, carried forward — no market prices, no
+    reconstruction from movements. Invested wealth lives in ``/investments``;
+    the two are complementary, not overlapping.
+    """
+
+    months: list[BalanceMonthRow]
+    accounts: list[AccountBalance]
+    total_liquid: Decimal = Field(description="Sum of each account's latest declared balance.")
+    oldest_as_of: date | None = Field(
+        description="Age of the stalest figure inside total_liquid: the total is only "
+        "as fresh as its oldest account."
+    )
+
+
+class RecurringItem(BaseModel):
+    """One recurring relationship with a counterparty: a subscription, the
+    salary, rent, a utility. Detected from rhythm, never from a merchant list."""
+
+    description: str = Field(description="Richest description observed in the group.")
+    category: str | None
+    category_label: str
+    accounts: list[str]
+    cadence: str = Field(
+        description="weekly | monthly | bimonthly | quarterly | semiannual | yearly"
+    )
+    n_occurrences: int
+    first_date: date
+    last_date: date
+    amount: Decimal = Field(description="Signed median amount per occurrence.")
+    amount_min: Decimal
+    amount_max: Decimal
+    monthly_equivalent: Decimal = Field(
+        description="Signed cost/income normalized to one month (a yearly fee shows as 1/12)."
+    )
+    regularity: float = Field(description="Share of gaps inside the cadence window (0..1).")
+    active: bool = Field(
+        description="Judged against the newest data, not today: data ends with the last "
+        "statement, and silence after it is absence of evidence."
+    )
+    next_expected: date | None
+
+
+class RecurringResponse(BaseModel):
+    lang: str
+    horizon: date | None = Field(description="Newest movement date; activity is judged here.")
+    n_active: int
+    monthly_expense: Decimal = Field(
+        description="Sum of active recurring expenses per month (signed, <= 0)."
+    )
+    monthly_income: Decimal = Field(description="Sum of active recurring income per month.")
+    items: list[RecurringItem]
 
 
 class Account(BaseModel):
@@ -531,6 +610,69 @@ def investments(lang: str = _LANG):
         "total_invested": sum((m["net_invested"] or 0 for m in months), Decimal(0)),
         "total_in_known_instruments": known,
         "total_in_unknown": unknown,
+    }
+
+
+@api.get("/recurring", response_model=RecurringResponse, summary="Recurring movements")
+def recurring(lang: str = _LANG, active_only: bool = False):
+    """Subscriptions, salary, rent, utilities — detected from the data's rhythm.
+
+    Same merchant (numbers stripped from the normalized text) at a steady
+    cadence; amounts may drift the way salaries and utility bills do. Detection
+    runs on the fly over gold — a personal dataset is thousands of rows, and no
+    derived table means nothing to go stale. Internal transfers are excluded:
+    a monthly top-up of one's own account is a rhythm, not a subscription.
+    """
+    # Two exclusions for the same reason: linked transfer legs AND rows the
+    # model categorized as transfers (a leg whose twin sits outside the window,
+    # e.g. a monthly card top-up, is still own money moving).
+    rows = _rows(
+        "SELECT value_date, description, amount, account, category "
+        "FROM gold.v_transactions "
+        "WHERE transfer_group IS NULL AND (category IS NULL OR category <> 'transfers')"
+    )
+    groups = detect_recurring(rows)
+    if active_only:
+        groups = [g for g in groups if g.active]
+    # Asset-destined recurrences (an ETF savings plan) are listed but kept out
+    # of the spend/income totals, same line gold's spend views draw.
+    consumption = [g for g in groups if g.active and g.category not in ASSET_CATEGORIES]
+    return {
+        "lang": lang,
+        "horizon": max((r["value_date"] for r in rows), default=None),
+        "n_active": sum(1 for g in groups if g.active),
+        "monthly_expense": sum(
+            (g.monthly_equivalent for g in consumption if g.amount < 0), Decimal(0)
+        ),
+        "monthly_income": sum(
+            (g.monthly_equivalent for g in consumption if g.amount > 0), Decimal(0)
+        ),
+        "items": [
+            {**asdict(g), "category_label": _CAT.label(g.category, lang)} for g in groups
+        ],
+    }
+
+
+@api.get("/wealth", response_model=WealthResponse, summary="Declared balances over time")
+def wealth():
+    """Month-end balance per account, carried forward between statement anchors.
+
+    Dense sources (Revolut, Trade Republic) anchor almost every day; a quarterly
+    statement anchors four times a year. Carrying the last anchor forward puts
+    them on one monthly grid; ``as_of`` on every row says how old each figure
+    really is, and ``oldest_as_of`` bounds the freshness of the total.
+    """
+    rows = _rows("SELECT * FROM gold.v_balance_month ORDER BY month, account")
+    # Rows arrive month-ascending, so the last write per account is its latest.
+    latest: dict[str, dict] = {}
+    for r in rows:
+        latest[r["account"]] = r
+    accounts = sorted(latest.values(), key=lambda r: -r["balance"])
+    return {
+        "months": rows,
+        "accounts": accounts,
+        "total_liquid": sum((r["balance"] for r in latest.values()), Decimal(0)),
+        "oldest_as_of": min((r["as_of"] for r in latest.values()), default=None),
     }
 
 

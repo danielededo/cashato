@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Delta, Heatmap, RankBars, Sparkline, type HeatRow, type RankItem } from "../components/primitives";
-import { isoDate, money, num } from "../lib/format";
+import { colorFor } from "../lib/colors";
+import { dateLabel, isoDate, money, num } from "../lib/format";
 import { monthShort } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { PrivacyToggle } from "../lib/privacy";
@@ -34,6 +35,9 @@ export function Dashboard() {
   // Decorative: a missing/empty profile just falls back to the impersonal
   // heading, so swallow the failure rather than surfacing a page-level error.
   const profile = useAsync(() => api.profile().catch(() => null), []);
+  // Detected server-side from the data's rhythm; a failure only hides the
+  // panel, the rest of the dashboard owes it nothing.
+  const rec = useAsync(() => api.recurring(lang).catch(() => null), [lang]);
   const navigate = useNavigate();
 
   const months = monthly.data?.months;
@@ -243,6 +247,55 @@ export function Dashboard() {
               onPick={drillCell}
             />
           </div>
+
+          {/* Recurring commitments, independent of the selected period: a
+              subscription is a fact about the present, not about a window. */}
+          {rec.data?.items.some((i) => i.active) ? (
+            <div className="panel">
+              <div className="panel-head">
+                <h2>{t("rec.title")}</h2>
+                <span className="hint">{t("rec.hint")}</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("rec.what")}</th>
+                    <th>{t("rec.cadence")}</th>
+                    <th className="num">{t("rec.amount")}</th>
+                    <th className="num">{t("rec.perMonth")}</th>
+                    <th>{t("rec.next")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rec.data.items
+                    .filter((i) => i.active)
+                    .map((i) => (
+                      <tr key={`${i.description}|${i.amount}`}>
+                        <td className="desc" title={i.description}>
+                          <span className="cat-cell">
+                            <span className="swatch" style={{ background: colorFor(i.category) }} />
+                            {i.description}
+                          </span>
+                        </td>
+                        <td className="dim">{t(`cadence.${i.cadence}`)}</td>
+                        <td className="num mono">{money(num(i.amount))}</td>
+                        <td className="num mono dim">{money(num(i.monthly_equivalent))}</td>
+                        <td className="dim">{i.next_expected ? dateLabel(i.next_expected) : "—"}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              <div className="panel-foot dim">
+                {t("rec.totals", {
+                  out: money(Math.abs(num(rec.data.monthly_expense))),
+                  inc: money(num(rec.data.monthly_income)),
+                })}
+                {rec.data.items.length > rec.data.n_active
+                  ? ` · ${t("rec.inactive", { n: rec.data.items.length - rec.data.n_active })}`
+                  : ""}
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

@@ -33,7 +33,9 @@ Schemas within a single database (not separate DBs):
 - **gold** — read-only views for the query API: `v_category_totals`,
   `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
   `v_transactions` (projection of silver so the read API stays gold-only),
-  `v_balances`, `v_reconciliation`. Plus ML tables `training_labels`,
+  `v_balances`, `v_reconciliation`, `v_balance_month` (month-end declared
+  balance per account, carried forward from the last anchor — feeds the
+  wealth-over-time chart). Plus ML tables `training_labels`,
   `category_feedback` (active learning).
 
 Silver also holds `balances` — the balances the statements themselves declare
@@ -160,7 +162,12 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `/categories/monthly`, `/transactions` (filterable/paginated, with
   filtered-set totals), `/transfers`, `/accounts` (bank/product/joint, composed
   display name), `/reconciliation` (parsed movements vs statement-declared
-  balances, `?mismatched_only=true`). `?lang=it|en` for category labels. The gateway routes ALL of
+  balances, `?mismatched_only=true`), `/wealth` (declared balances carried
+  forward per month + latest per account, with per-figure `as_of` freshness),
+  `/recurring` (subscriptions/salary/rent/bills detected on the fly by
+  `src/cashato/recurrence.py` — same merchant key at a steady cadence, with a
+  twin-format merge pass; transfers excluded, asset categories listed but kept
+  out of the spend totals). `?lang=it|en` for category labels. The gateway routes ALL of
   `/api/v1` here and enumerates only ingest-api's write paths — enumerating
   both would let a forgotten endpoint fall through to the SPA and answer 200
   with HTML instead of 404.

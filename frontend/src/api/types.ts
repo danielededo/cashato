@@ -98,6 +98,55 @@ export interface ReconciliationResponse {
   intervals: ReconciliationInterval[];
 }
 
+export interface RecurringItem {
+  description: string;
+  category: string | null;
+  category_label: string;
+  accounts: string[];
+  cadence: "weekly" | "monthly" | "bimonthly" | "quarterly" | "semiannual" | "yearly";
+  n_occurrences: number;
+  first_date: string;
+  last_date: string;
+  amount: Money; // signed median per occurrence
+  amount_min: Money;
+  amount_max: Money;
+  monthly_equivalent: Money; // signed, normalized to one month
+  regularity: number;
+  /** Judged against the newest data, not today's date. */
+  active: boolean;
+  next_expected: string | null;
+}
+export interface RecurringResponse {
+  lang: string;
+  horizon: string | null;
+  n_active: number;
+  monthly_expense: Money; // signed (<= 0), consumption only
+  monthly_income: Money;
+  items: RecurringItem[];
+}
+
+export interface BalanceMonthRow {
+  month: string; // ISO date (first of month)
+  account: string;
+  currency: string;
+  balance: Money;
+  /** Date of the anchor the balance was carried from — the figure's age. */
+  as_of: string;
+}
+export interface AccountBalance {
+  account: string;
+  currency: string;
+  balance: Money;
+  as_of: string;
+}
+export interface WealthResponse {
+  months: BalanceMonthRow[];
+  accounts: AccountBalance[];
+  total_liquid: Money;
+  /** The stalest figure inside the total: it is only as fresh as this. */
+  oldest_as_of: string | null;
+}
+
 export interface UploadAccepted {
   status: string;
   filename: string;

@@ -14,6 +14,7 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Row, SeriesDef } from "../components/charts";
 import { Donut, RankBars, Sparkline, type DonutSlice, type RankItem } from "../components/primitives";
+import { useAccounts } from "../lib/accounts";
 import { colorFor, seriesColor } from "../lib/colors";
 import { dateLabel, money, monthShort, num } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -33,6 +34,49 @@ export function Investments() {
   // a different question — the pace of contribution, not the amount built up.
   const [cumulative, setCumulative] = useState(true);
   const inv = useAsync(() => api.investments(lang), [lang]);
+  const wealth = useAsync(() => api.wealth(), []);
+  const { accountShort } = useAccounts();
+
+  // Liquid side of the page: the balances the statements themselves declare,
+  // carried forward per month. Complementary to the invested flow below — no
+  // market prices, no overlap.
+  const wd = useMemo(() => {
+    const data = wealth.data;
+    if (!data || !data.months.length) return null;
+
+    // Colour follows the ACCOUNT (stable alphabetical slot), not its rank —
+    // same reasoning as the holdings below.
+    const ids = [...new Set(data.months.map((r) => r.account))].sort();
+    const series: SeriesDef[] = ids.map((id) => ({
+      key: id,
+      label: accountShort(id),
+      category: id,
+      color: seriesColor(ids.indexOf(id)),
+    }));
+
+    const byMonth = new Map<string, Row>();
+    for (const r of data.months) {
+      const row = byMonth.get(r.month) ?? { month: monthShort(r.month) };
+      row[r.account] = num(r.balance);
+      byMonth.set(r.month, row);
+    }
+    const stackData: Row[] = [...byMonth.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, row]) => {
+        // Months before an account's first anchor: it holds nothing yet.
+        for (const id of ids) row[id] = (row[id] as number | undefined) ?? 0;
+        return row;
+      });
+
+    // A carried-forward figure much older than its siblings deserves a note,
+    // not silence: the stack still shows it as if it were current.
+    const newest = data.accounts.reduce((m, a) => (a.as_of > m ? a.as_of : m), "");
+    const staleDays = (iso: string) =>
+      (new Date(newest).getTime() - new Date(iso).getTime()) / 86_400_000;
+    const stale = data.accounts.filter((a) => staleDays(a.as_of) > 45);
+
+    return { total: num(data.total_liquid), oldest: data.oldest_as_of, series, stackData, stale };
+  }, [wealth.data, accountShort]);
 
   const d = useMemo(() => {
     const data = inv.data;
@@ -87,16 +131,38 @@ export function Investments() {
     return { ...data, series, stackData, spark, split, donut, unknownPct };
   }, [inv.data, t, cumulative]);
 
+  // Rendered twice below: in place with the investment sections, or alone when
+  // the statements declare balances but no wealth movement exists yet.
+  const liquidityPanel = wd ? (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>{t("wealth.balances")}</h2>
+        <span className="hint">{t("wealth.balances.hint")}</span>
+      </div>
+      <Suspense fallback={chartFallback}>
+        <StackedArea data={wd.stackData} series={wd.series} />
+      </Suspense>
+      {wd.stale.length ? (
+        <div className="panel-foot dim">
+          {wd.stale
+            .map((a) => t("wealth.staleNote", { account: accountShort(a.account), d: dateLabel(a.as_of) }))
+            .join(" · ")}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
     <div className="fade-in">
       {inv.error ? <div className="panel state error">{inv.error}</div> : null}
       {inv.loading && !inv.data ? <div className="panel state">{t("common.loading")}</div> : null}
-      {inv.data && !d ? (
+      {inv.data && !d && !wealth.loading && !wd ? (
         <div className="panel empty">
           <div className="big">{t("inv.empty")}</div>
           <div className="sub">{t("inv.emptySub")}</div>
         </div>
       ) : null}
+      {!d && wd ? liquidityPanel : null}
 
       {d ? (
         <>
@@ -138,7 +204,20 @@ export function Investments() {
                 <span className="dim">{t("inv.returns.foot")}</span>
               </div>
             </div>
+            {wd ? (
+              <div className="kpi">
+                <div className="k">{t("wealth.liquid")}</div>
+                <div className="v">{money(wd.total)}</div>
+                <div className="foot">
+                  <span className="dim">
+                    {wd.oldest ? t("inv.asOf", { d: dateLabel(wd.oldest) }) : ""}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
+
+          {liquidityPanel}
 
           {/* One row per destination kind that actually has movements. With a
               single kind this says nothing new, so it is not rendered. */}

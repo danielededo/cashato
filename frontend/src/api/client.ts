@@ -12,12 +12,14 @@ import type {
   MonthlyResponse,
   Profile,
   ReconciliationResponse,
+  RecurringResponse,
   SummaryResponse,
   TransactionDetail,
   TransactionFilters,
   TransactionsResponse,
   TransfersResponse,
   UploadAccepted,
+  WealthResponse,
 } from "./types";
 
 const BASE = "/api/v1";
@@ -77,6 +79,8 @@ export const api = {
   meta: () => get<MetaResponse>("/meta"),
   accounts: () => get<AccountsResponse>("/accounts"),
   investments: (lang: Lang) => get<InvestmentsResponse>("/investments", { lang }),
+  wealth: () => get<WealthResponse>("/wealth"),
+  recurring: (lang: Lang) => get<RecurringResponse>("/recurring", { lang }),
   transaction: (key: string, lang: Lang) =>
     get<TransactionDetail>(`/transactions/${encodeURIComponent(key)}`, { lang }),
   files: () => get<FilesResponse>("/files"),

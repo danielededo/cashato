@@ -165,6 +165,41 @@ const UI: Dict = {
   "inv.empty": { it: "Nessun movimento di patrimonio", en: "No wealth movements" },
   "inv.emptySub": { it: "Investimenti, fondo pensione, conti deposito e polizze di accumulo compariranno qui una volta caricati gli estratti.", en: "Investments, pension funds, deposits and savings policies will appear here once statements are loaded." },
 
+  // recurring movements (subscriptions, salary, rent, bills)
+  "rec.title": { it: "Ricorrenze", en: "Recurring" },
+  "rec.hint": {
+    it: "stesso beneficiario a ritmo regolare — rilevate dai dati, non da una lista",
+    en: "same counterparty at a steady rhythm — detected from the data, not a list",
+  },
+  "rec.what": { it: "Descrizione", en: "Description" },
+  "rec.cadence": { it: "Cadenza", en: "Cadence" },
+  "rec.amount": { it: "Importo", en: "Amount" },
+  "rec.perMonth": { it: "Al mese", en: "Per month" },
+  "rec.next": { it: "Prossima attesa", en: "Next expected" },
+  "rec.totals": {
+    it: "spese ricorrenti {out}/mese · entrate ricorrenti {inc}/mese (investimenti esclusi)",
+    en: "recurring spend {out}/mo · recurring income {inc}/mo (investments excluded)",
+  },
+  "rec.inactive": { it: "{n} non più attive", en: "{n} no longer active" },
+  "cadence.weekly": { it: "settimanale", en: "weekly" },
+  "cadence.monthly": { it: "mensile", en: "monthly" },
+  "cadence.bimonthly": { it: "bimestrale", en: "bimonthly" },
+  "cadence.quarterly": { it: "trimestrale", en: "quarterly" },
+  "cadence.semiannual": { it: "semestrale", en: "semiannual" },
+  "cadence.yearly": { it: "annuale", en: "yearly" },
+
+  // liquid balances (statement-declared, carried forward)
+  "wealth.liquid": { it: "Liquidità", en: "Cash on hand" },
+  "wealth.balances": { it: "Liquidità nel tempo", en: "Cash over time" },
+  "wealth.balances.hint": {
+    it: "saldo di fine mese per conto, come dichiarato dagli estratti",
+    en: "month-end balance per account, as the statements declare it",
+  },
+  "wealth.staleNote": {
+    it: "{account}: saldo fermo al {d} — un estratto più recente lo aggiorna",
+    en: "{account}: balance last declared {d} — a newer statement refreshes it",
+  },
+
   // transaction detail
   "det.title": { it: "Dettaglio movimento", en: "Movement detail" },
   "det.close": { it: "Chiudi", en: "Close" },
