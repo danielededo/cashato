@@ -17,10 +17,14 @@ rhythm. Both halves matter and both are checked:
   you happen to visit most weeks: both have many occurrences, only one keeps
   the beat.
 
-Amounts are allowed to drift (salaries change, utility bills vary with the
-season) unless the rhythm is already shaky — a wide spread is only accepted
-when the dates are near-perfectly regular, so date-irregular AND
-amount-irregular groups (ordinary shopping) never qualify.
+Amounts are judged LOCALLY, not globally: a salary drifts from 500 to 2200
+over a career and stays one relationship, so a global min-max spread would
+reject exactly the series that matter most. What recurring amounts do not do
+is jump around between consecutive occurrences — so the gate is the share of
+consecutive pairs within a factor of 1.5 of each other, waived only when the
+dates are near-perfectly regular (utility bills vary with the season but
+arrive like clockwork). Date-irregular AND amount-inconsistent groups
+(ordinary shopping) never qualify.
 
 "Active" is judged against the newest date in the dataset, not the wall
 clock: the data ends when the last statement does, and a subscription is not
@@ -52,9 +56,11 @@ CADENCES: tuple[tuple[str, int, int, int], ...] = (
 MIN_OCCURRENCES = 3
 # Share of gaps that must fall inside the cadence window.
 MIN_REGULARITY = 0.7
-# Amount spread ((max-min)/|median|) tolerated at normal regularity; a wider
-# spread needs near-perfect dates (bills vary, but they arrive on schedule).
-MAX_SPREAD = Decimal("0.6")
+# Consecutive day-totals must be within this factor of each other to count as
+# consistent, and at least MIN_CONSISTENCY of the pairs must be — unless the
+# dates are near-perfectly regular (bills vary, but arrive on schedule).
+PAIR_FACTOR = Decimal("1.5")
+MIN_CONSISTENCY = 0.7
 STRICT_REGULARITY = 0.9
 # A group is still active while the silence after its last occurrence is
 # shorter than this multiple of the cadence's nominal gap.
@@ -125,16 +131,21 @@ def _qualify(members: list[dict], horizon: date) -> Recurring | None:
     if regularity < MIN_REGULARITY:
         return None
 
-    # Daily totals, so a split charge counts once at its full size.
+    # Daily totals IN DAY ORDER (consecutive pairs are compared below), so a
+    # split charge counts once at its full size.
     day_totals = [
-        sum((m["amount"] for m in ms), Decimal(0)).quantize(_CENT) for ms in by_day.values()
+        sum((m["amount"] for m in by_day[d]), Decimal(0)).quantize(_CENT) for d in days
     ]
     amt_med = median(day_totals).quantize(_CENT)
     amt_min, amt_max = min(day_totals), max(day_totals)
     if amt_med == 0:
         return None
-    spread = (amt_max - amt_min) / abs(amt_med)
-    if spread > MAX_SPREAD and regularity < STRICT_REGULARITY:
+    consistent = 0
+    for a, b in zip(day_totals, day_totals[1:], strict=False):
+        lo, hi = min(abs(a), abs(b)), max(abs(a), abs(b))
+        if lo > 0 and hi / lo <= PAIR_FACTOR:
+            consistent += 1
+    if consistent / (len(day_totals) - 1) < MIN_CONSISTENCY and regularity < STRICT_REGULARITY:
         return None
 
     active = (horizon - days[-1]).days <= nominal * ACTIVE_SLACK

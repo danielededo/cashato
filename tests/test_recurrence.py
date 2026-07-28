@@ -131,6 +131,38 @@ def test_refund_does_not_join_the_charge_group():
     assert g.n_occurrences == 5
 
 
+def test_salary_with_raises_and_bonus_detected():
+    # A career: 900 → 1400 → 2100 over three years, a thirteenth-month payment
+    # each December and one bonus month. Global min-max spread would reject
+    # this; consecutive amounts resemble each other, and that is the test.
+    rows = []
+    for year, base in ((2024, "900.00"), (2025, "1400.00"), (2026, "2100.00")):
+        for m in range(1, 13 if year < 2026 else 7):
+            rows.append(_row(date(year, m, 16), base, "STIPENDIO ACME SRL"))
+        if year < 2026:
+            rows.append(_row(date(year, 12, 28), base, "STIPENDIO ACME SRL"))  # tredicesima
+    rows.append(_row(date(2026, 2, 20), "3100.00", "STIPENDIO ACME SRL"))  # bonus
+    (g,) = detect_recurring(rows, horizon=HORIZON)
+    assert g.cadence == "monthly"
+    assert g.active
+    assert g.amount == Decimal("1400.00")
+
+
+def test_erratic_amounts_with_loose_dates_rejected():
+    # Gaps mostly inside the monthly window but not clockwork (regularity
+    # between the two floors), amounts all over the place: no relationship.
+    pts = [
+        (date(2026, 1, 5), "-12.00"),
+        (date(2026, 2, 4), "-190.00"),
+        (date(2026, 3, 9), "-45.00"),
+        (date(2026, 4, 6), "-310.00"),
+        (date(2026, 5, 22), "-19.00"),  # 46-day gap: breaks perfect regularity
+        (date(2026, 6, 20), "-77.00"),
+    ]
+    rows = [_row(d, a, "AMAZON MARKETPLACE") for d, a in pts]
+    assert detect_recurring(rows, horizon=HORIZON) == []
+
+
 def test_twin_format_split_merges_into_one_series():
     # The same salary, worded differently before/after a format boundary
     # (quarterly vs 13-month export): one continuous series, two keys.
