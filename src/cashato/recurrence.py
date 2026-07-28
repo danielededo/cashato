@@ -75,11 +75,42 @@ _CENT = Decimal("0.01")
 ASSET_CATEGORIES = frozenset({"investments", "crypto"})
 
 _NUM_RE = re.compile(r"[0-9]+")
+# Month names are calendar tokens — the same class as digits. A payroll
+# causale names the month it settles ("saldo cedolino giugno"), which would
+# otherwise give every occurrence of one salary a unique key. Full names
+# only: abbreviations collide with real words ("mar", "ago").
+_MONTH_RE = re.compile(
+    r"\b(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre"
+    r"|ottobre|novembre|dicembre|january|february|march|april|may|june|july"
+    r"|august|september|october|november|december)\b"
+)
 
 
 def recurrence_key(description: str) -> str:
-    """Merchant key: normalized description with every number dropped."""
-    return re.sub(r"\s+", " ", _NUM_RE.sub(" ", normalize_desc(description))).strip()
+    """Merchant key: normalized description with numbers and month names
+    dropped, and runs of single-letter tokens joined.
+
+    The join makes punctuation-variant acronyms one token — a statement writes
+    the same employer as "ACME SPA" one month and "ACME S.P.A." the next, and
+    normalization turns the latter into "s p a". Single letters standing alone
+    are kept: only a RUN of them spells an acronym.
+    """
+    text = _MONTH_RE.sub(" ", _NUM_RE.sub(" ", normalize_desc(description)))
+    tokens = re.sub(r"\s+", " ", text).strip().split(" ")
+    out: list[str] = []
+    run: list[str] = []
+    for tok in [*tokens, ""]:  # sentinel flushes the last run
+        if len(tok) == 1:
+            run.append(tok)
+            continue
+        if len(run) > 1:
+            out.append("".join(run))
+        else:
+            out.extend(run)
+        run = []
+        if tok:
+            out.append(tok)
+    return " ".join(out)
 
 
 @dataclass

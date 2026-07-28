@@ -92,6 +92,23 @@ def test_numbers_stripped_from_key():
     )
 
 
+def test_month_names_stripped_from_key():
+    # Payroll causali name the month they settle; it must not split the series.
+    assert recurrence_key("SALDO CEDOLINO GIUGNO 2026 STIPENDIO ACME") == recurrence_key(
+        "SALDO CEDOLINO Luglio 2026 STIPENDIO ACME"
+    )
+    assert recurrence_key("salary June 2026") == recurrence_key("salary July 2026")
+
+
+def test_acronym_punctuation_variants_share_a_key():
+    # "S.P.A." normalizes to "s p a"; the run-join folds it back to "spa".
+    assert recurrence_key("BONIFICO DA ACME S.P.A. STIPENDIO") == recurrence_key(
+        "Bonifico da ACME SPA stipendio"
+    )
+    # A single letter standing alone is kept as-is, not glued to neighbours.
+    assert "t" in recurrence_key("codice T riferimento").split(" ")
+
+
 def test_variable_bill_needs_regular_dates():
     # Bimonthly bill, amounts vary widely (spread > 0.6) — accepted only
     # because every gap sits in the bimonthly window.
