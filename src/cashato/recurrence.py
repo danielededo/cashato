@@ -28,7 +28,11 @@ arrive like clockwork). Date-irregular AND amount-inconsistent groups
 
 "Active" is judged against the newest date in the dataset, not the wall
 clock: the data ends when the last statement does, and a subscription is not
-lapsed just because no statement has been uploaded since.
+lapsed just because no statement has been uploaded since. Within that
+horizon, though, an occurrence that SHOULD have appeared and did not is a
+lapse: a group stays active only while its next expected date is overdue by
+less than a short grace, so a yearly renewal seven covered months past due
+reads as cancelled, not as "still running".
 """
 
 from __future__ import annotations
@@ -62,9 +66,13 @@ MIN_REGULARITY = 0.7
 PAIR_FACTOR = Decimal("1.5")
 MIN_CONSISTENCY = 0.7
 STRICT_REGULARITY = 0.9
-# A group is still active while the silence after its last occurrence is
-# shorter than this multiple of the cadence's nominal gap.
-ACTIVE_SLACK = 1.6
+# A group is active while its next expected occurrence is not overdue by more
+# than this grace, IN COVERED DATA. The grace scales with the cadence but has
+# an absolute floor, not a proportional one only: a salary may slip weeks, a
+# yearly renewal is punctual — 1.6x-the-gap slack would keep a lapsed annual
+# subscription "active" for seven months past its missed renewal.
+GRACE_FACTOR = 0.35
+MIN_GRACE_DAYS = 21
 
 _AVG_MONTH_DAYS = Decimal("30.44")
 _CENT = Decimal("0.01")
@@ -157,7 +165,7 @@ def _qualify(members: list[dict], horizon: date) -> Recurring | None:
     cadence = _cadence_for(med_gap)
     if cadence is None:
         return None
-    code, nominal, lo, hi = cadence
+    code, _nominal, lo, hi = cadence
     regularity = sum(1 for g in gaps if lo <= g <= hi) / len(gaps)
     if regularity < MIN_REGULARITY:
         return None
@@ -179,7 +187,9 @@ def _qualify(members: list[dict], horizon: date) -> Recurring | None:
     if consistent / (len(day_totals) - 1) < MIN_CONSISTENCY and regularity < STRICT_REGULARITY:
         return None
 
-    active = (horizon - days[-1]).days <= nominal * ACTIVE_SLACK
+    next_expected = days[-1] + timedelta(days=round(med_gap))
+    grace = max(MIN_GRACE_DAYS, GRACE_FACTOR * med_gap)
+    active = (horizon - next_expected).days <= grace
     # The richest description names the merchant best (same convergence rule
     # silver uses); categories follow the most recent occurrence.
     richest = max(members, key=lambda m: len(m["description"]))
@@ -201,7 +211,7 @@ def _qualify(members: list[dict], horizon: date) -> Recurring | None:
         monthly_equivalent=(amt_med * _AVG_MONTH_DAYS / Decimal(str(med_gap))).quantize(_CENT),
         regularity=round(regularity, 3),
         active=active,
-        next_expected=days[-1] + timedelta(days=round(med_gap)) if active else None,
+        next_expected=next_expected if active else None,
     )
 
 

@@ -69,6 +69,17 @@ def test_yearly_detected_from_three_occurrences():
     assert g.active
 
 
+def test_yearly_renewal_overdue_in_covered_data_is_lapsed():
+    # Renewed every late December through 2024, then never again — and the
+    # data COVERS 2026-07, so the missed 2025 renewal is evidence, not
+    # absence. "Next expected" must never be a date in the covered past.
+    rows = [_row(date(y, 12, 30), "-49.90", "AMAZON PRIME AMAZON.IT/PRM") for y in (2022, 2023, 2024)]
+    (g,) = detect_recurring(rows, horizon=date(2026, 7, 17))
+    assert g.cadence == "yearly"
+    assert not g.active
+    assert g.next_expected is None
+
+
 def test_lapsed_subscription_not_active():
     rows = _monthly(10, 4, "-7.99", "SPOTIFY AB", year=2025)  # ends 2025-04
     (g,) = detect_recurring(rows, horizon=HORIZON)
