@@ -95,7 +95,8 @@ seeds:
 # (\b) so they match inflected forms (e.g. \baffitt -> "affitti", "affitto");
 # short/risky words have both boundaries (\bbar\b).
 rules:
-  - {pattern: "\\b(?:dividend|cedol|coupon|etf|ishares|vanguard|msci|savings plan|piano di accumulo|buy trade|sell trade|tax optimisation|investiment)", category: investments}
+  # cedol(?!in): cedola/cedole (coupons) yes, CEDOLINO (a payslip) no.
+  - {pattern: "\\b(?:dividend|cedol(?!in)|coupon|etf|ishares|vanguard|msci|savings plan|piano di accumulo|buy trade|sell trade|tax optimisation|investiment)", category: investments}
   - {pattern: "\\b(?:crypto|bitcoin|ethereum|coinbase|binance)|\\b(?:btc|eth)\\b", category: crypto}
   - {pattern: "\\b(?:interess|interest)", category: investments}
   # Must precede `salary`: its "pension" keyword matches "fondo pensione" too,

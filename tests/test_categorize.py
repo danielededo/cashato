@@ -82,6 +82,41 @@ class TestBuildText:
         assert build_text(desc) == normalize_desc(desc)
 
 
+class TestMerchantlessRowsResolveByRuleFirst:
+    """A confident-but-wrong model must not outrank an exact keyword hit on a
+    wire transfer: 24 rent payments once landed in `leisure` this way."""
+
+    class _AlwaysWrong:
+        def predict_one(self, text):  # noqa: ANN001, ANN201 - test double
+            return ("leisure", 0.99)
+
+        def predict_batch(self, texts):  # noqa: ANN001, ANN201 - test double
+            return [("leisure", 0.99)] * len(texts)
+
+    def _cat_with_model(self):
+        c = Categorizer.load()
+        c.model = self._AlwaysWrong()
+        return c
+
+    def test_rent_transfer_hits_the_rule(self):
+        desc = "Bonifico istantaneo da voi disposto a favore di MARIO ROSSI Affitto via Roma 1"
+        r = self._cat_with_model().resolve(desc, "intesa")
+        assert (r.code, r.source) == ("rent", "rule")
+
+    def test_merchant_rows_still_lead_with_the_model(self):
+        desc = "Pagamento POS EFFETTUATO IL 01/01/2026 ALLE ORE 12:00 MEDIANTE LA CARTA 1 PRESSO CINEMA ESEMPIO"
+        r = self._cat_with_model().resolve(desc, "intesa")
+        assert r.source == "model"
+
+    def test_resolve_many_matches_resolve(self):
+        c = self._cat_with_model()
+        rent = "Bonifico da Voi disposto a favore di MARIO ROSSI Affitto via Roma 1"
+        pos = "Pagamento su POS FARMACIA ESEMPIO 01/011200 Carta n.1"
+        out = c.resolve_many([(rent, "intesa", None), (pos, "intesa", None)])
+        assert (out[0].code, out[0].source) == ("rent", "rule")
+        assert out[1].source == "model"
+
+
 class TestWealthDestinations:
     """Wealth is not just securities. Destinations are not consumption —
     except protection policies, which are."""

@@ -150,18 +150,32 @@ class Categorizer:
             mcc_code = self.mcc_category(mcc)
             if mcc_code:
                 return Result(mcc_code, 1.0, "mcc")
-        # 2. embedding model (does the bulk of the work) if confident
-        if self.model is not None:
-            pred = self._predict(description, source)
-            if pred and pred[1] >= self.model_threshold:
-                return Result(pred[0], pred[1], "model")
-        # 3. keyword rules: thin, high-precision safety net
-        norm = normalize_desc(description)
-        for pattern, code in self.rules:
-            if pattern.search(norm):
-                return Result(code, 0.9, "rule")
+        # 2/3. Model and keyword rules, ORDERED PER ROW. With a merchant the
+        # model leads (embeddings generalize to unseen merchants; rules only
+        # know a fixed list). Without one the feature text is operation
+        # boilerplate where every wire transfer looks like every other — the
+        # distinguishing word ("Affitto") drowns for the embedding but is
+        # EXACTLY what a keyword rule reads, so rules lead there.
+        rule_hit = self._rule(description)
+        merchant_led = self._has_merchant(description, source)
+        order = ("model", "rule") if merchant_led else ("rule", "model")
+        for step in order:
+            if step == "rule" and rule_hit:
+                return Result(rule_hit, 0.9, "rule")
+            if step == "model" and self.model is not None:
+                pred = self._predict(description, source)
+                if pred and pred[1] >= self.model_threshold:
+                    return Result(pred[0], pred[1], "model")
         # 4. default
         return Result(self.default, 0.0, "default")
+
+    def _rule(self, description: str) -> str | None:
+        norm = normalize_desc(description)
+        return next((code for pattern, code in self.rules if pattern.search(norm)), None)
+
+    @staticmethod
+    def _has_merchant(description: str, source: str | None) -> bool:
+        return source is not None and extract_merchant(source, description).merchant is not None
 
     def categorize(
         self,
@@ -172,8 +186,8 @@ class Categorizer:
         return self.resolve(description, source, mcc).code
 
     def resolve_many(self, items: list[tuple[str, str | None, str | None]]) -> list[Result]:
-        """Batch version of :meth:`resolve` for large volumes (same order:
-        MCC -> model -> rules -> default), with a **single encode** for the model."""
+        """Batch version of :meth:`resolve` (same per-row ordering), with a
+        **single encode** for every row that reaches the model."""
         results: list[Result | None] = [None] * len(items)
         pending_idx: list[int] = []
         pending_desc: list[str] = []
@@ -181,10 +195,14 @@ class Categorizer:
         for i, (descr, source, mcc) in enumerate(items):
             if mcc and (code := self.mcc_category(mcc)):
                 results[i] = Result(code, 1.0, "mcc")
-            else:
-                pending_idx.append(i)
-                pending_desc.append(descr)
-                pending_src.append(source)
+                continue
+            # Merchant-less rows resolve by rule BEFORE the model (see resolve).
+            if not self._has_merchant(descr, source) and (hit := self._rule(descr)):
+                results[i] = Result(hit, 0.9, "rule")
+                continue
+            pending_idx.append(i)
+            pending_desc.append(descr)
+            pending_src.append(source)
         batch = (
             self.model.predict_batch(
                 [build_text(d, s) for d, s in zip(pending_desc, pending_src, strict=True)]
@@ -197,8 +215,7 @@ class Categorizer:
             if pred and pred[1] >= self.model_threshold:
                 results[i] = Result(pred[0], pred[1], "model")
                 continue
-            norm = normalize_desc(pending_desc[k])
-            code = next((c for pat, c in self.rules if pat.search(norm)), None)
+            code = self._rule(pending_desc[k])
             results[i] = Result(code, 0.9, "rule") if code else Result(self.default, 0.0, "default")
         return results  # type: ignore[return-value]
 
