@@ -156,9 +156,12 @@ export function Dashboard() {
   const pv = (x: number) => (compare && d?.hasPrev ? x : null);
 
   const chartFallback = <div className="chart-fallback">{t("common.loadingChart")}</div>;
-  const drillCategory = (category: string) => navigate(`/transactions?category=${category}&sign=expense`);
+  // No sign filter on drill-downs: a refund keeps its expense's category and
+  // NETS in every panel total, so hiding it made the drilled list disagree
+  // with the number the user just clicked.
+  const drillCategory = (category: string) => navigate(`/transactions?category=${category}`);
   const drillCell = (category: string, month: string) =>
-    navigate(`/transactions?category=${category}&sign=expense&date_from=${month}&date_to=${endOfMonth(month)}`);
+    navigate(`/transactions?category=${category}&date_from=${month}&date_to=${endOfMonth(month)}`);
 
   const rangeNote =
     compare && d && d.hasPrev
