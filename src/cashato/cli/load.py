@@ -21,6 +21,7 @@ from sqlalchemy import text
 from cashato.db.db import get_engine
 from cashato.parsers.base import bank_from_iban
 from cashato.parsers.categorize import Categorizer
+from cashato.parsers.merchant import extract_merchant
 from cashato.parsers.registry import (  # (auto-discovered)
     ACCOUNT_EXTRACTORS,
     ADAPTERS,
@@ -283,6 +284,9 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
         for t in txs:
             # Inline provider-agnostic categorization: MCC -> rules -> model.
             r = _CATEGORIZER.resolve(t.description, t.source, t.mcc)
+            # Merchant + time-of-day are derived from the description, so they
+            # ride the same convergence: whichever text survives, they follow.
+            mi = extract_merchant(t.source, t.description)
             # KEY identity (natural_key = account/value_date/amount/occurrence)
             # is immutable. Two descriptive facts converge across twin formats:
             # - DESCRIPTION converges to the RICHEST observed (strictly longer
@@ -307,11 +311,13 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                     INSERT INTO silver.transactions AS tx
                         (value_date, booking_date, description, amount, currency,
                          account, source, category, category_confidence,
-                         category_source, native_category, mcc, natural_key, file_id)
+                         category_source, native_category, mcc, natural_key, file_id,
+                         merchant, purchase_time)
                     VALUES
                         (:value_date, :booking_date, :description, :amount, :currency,
                          :account, :source, :category, :category_confidence,
-                         :category_source, :native_category, :mcc, :natural_key, :file_id)
+                         :category_source, :native_category, :mcc, :natural_key, :file_id,
+                         :merchant, :purchase_time)
                     ON CONFLICT (natural_key) DO UPDATE SET
                         description = CASE
                             WHEN length(EXCLUDED.description) > length(tx.description)
@@ -319,6 +325,13 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                         mcc = CASE
                             WHEN length(EXCLUDED.description) > length(tx.description)
                             THEN COALESCE(EXCLUDED.mcc, tx.mcc) ELSE tx.mcc END,
+                        merchant = CASE
+                            WHEN length(EXCLUDED.description) > length(tx.description)
+                            THEN EXCLUDED.merchant ELSE tx.merchant END,
+                        purchase_time = CASE
+                            WHEN length(EXCLUDED.description) > length(tx.description)
+                            THEN COALESCE(EXCLUDED.purchase_time, tx.purchase_time)
+                            ELSE tx.purchase_time END,
                         category = CASE
                             WHEN tx.category_source = 'manual'
                               OR length(EXCLUDED.description) <= length(tx.description)
@@ -357,6 +370,8 @@ def load(path: Path, source: str, force: bool = False, filename: str | None = No
                     "mcc": t.mcc,
                     "natural_key": t.natural_key,
                     "file_id": file_id,
+                    "merchant": mi.merchant,
+                    "purchase_time": mi.purchase_time,
                 },
             )
             row = res.first()

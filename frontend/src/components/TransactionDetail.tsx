@@ -70,6 +70,10 @@ export function TransactionDetail({
               ) : null}
               <Field label={t("common.account")}>{accountLabel(d.account)}</Field>
               <Field label={t("common.category")}>{d.category_label ?? d.category ?? "—"}</Field>
+              {d.merchant ? <Field label={t("det.merchant")}>{d.merchant}</Field> : null}
+              {d.purchase_time ? (
+                <Field label={t("det.purchaseTime")} mono>{d.purchase_time.slice(0, 5)}</Field>
+              ) : null}
             </div>
 
             <div className="det-section">

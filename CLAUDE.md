@@ -70,6 +70,8 @@ Migrations: Alembic (`src/cashato/db/migrations`).
 | `mcc`                | str \| null| ISO 18245 merchant category code when available |
 | `transfer_group`     | str \| null| shared id of the two legs of an internal transfer |
 | `natural_key`        | str UNIQUE | canonical dedup key |
+| `merchant`           | str \| null| counterparty dug out of the description (`parsers/merchant.py`); follows the description's convergence |
+| `purchase_time`      | time \| null| time of day the statement text carries (POS/ATM) |
 
 Income vs expense is derived from the **sign** of `amount`, not a separate column.
 
@@ -169,7 +171,10 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   twin-format merge pass; transfers excluded, asset categories listed but kept
   out of the spend totals), `/coverage` (`src/cashato/coverage.py` — per-SOURCE
   staleness scaled to anchor cadence + holes in the union of covered days;
-  holes are hints, a missing statement and a quiet period look identical). `?lang=it|en` for category labels. The gateway routes ALL of
+  holes are hints, a missing statement and a quiet period look identical),
+  `/merchants` (top merchants by net spend, case-insensitive grouping, refunds
+  netted; extraction is per-source in `src/cashato/parsers/merchant.py` —
+  transfers/P2P/securities yield no merchant by design). `?lang=it|en` for category labels. The gateway routes ALL of
   `/api/v1` here and enumerates only ingest-api's write paths — enumerating
   both would let a forgotten endpoint fall through to the SPA and answer 200
   with HTML instead of 404.

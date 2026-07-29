@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
@@ -126,6 +126,12 @@ class TransactionRow(BaseModel):
     category_confidence: float | None = None
     transfer_group: str | None = None
     natural_key: str
+    merchant: str | None = Field(
+        default=None, description="Counterparty extracted from the description, when one exists"
+    )
+    purchase_time: time | None = Field(
+        default=None, description="Time of day the statement text carries (POS/ATM operations)"
+    )
 
 
 class TransactionsResponse(BaseModel):
@@ -141,6 +147,22 @@ class TransactionsResponse(BaseModel):
     limit: int
     offset: int
     transactions: list[TransactionRow]
+
+
+class MerchantRow(BaseModel):
+    merchant: str = Field(description="Display name (most frequent casing in the group)")
+    n_movements: int
+    total_spent: Decimal = Field(description="Net outflow at this merchant (refunds netted), > 0")
+    avg_spent: Decimal = Field(description="total_spent / n_movements")
+    last_date: date
+    category: str | None = Field(default=None, description="Dominant category in the group")
+    category_label: str
+
+
+class MerchantsResponse(BaseModel):
+    lang: str
+    n_merchants: int = Field(description="Distinct merchants matching the filters (before limit)")
+    merchants: list[MerchantRow]
 
 
 class TransferPair(BaseModel):
@@ -399,6 +421,8 @@ class TransactionDetail(BaseModel):
     quantity: Decimal | None = None
     unit_price: Decimal | None = None
     side: str | None = None
+    merchant: str | None = None
+    purchase_time: time | None = None
 
 
 class Holding(BaseModel):
@@ -758,6 +782,55 @@ def categories_monthly(lang: str = _LANG):
     }
 
 
+@api.get("/merchants", response_model=MerchantsResponse, summary="Top merchants by spend")
+def merchants(
+    lang: str = _LANG,
+    date_from: date | None = Query(default=None, description="Value date >= (inclusive)"),
+    date_to: date | None = Query(default=None, description="Value date <= (inclusive)"),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """Where the money actually goes, by counterparty instead of raw text.
+
+    Groups case-insensitively (the quarterly writes ALL CAPS, the 13-month
+    export Title-Cases the same merchant) and nets refunds against purchases.
+    Internal transfers never carry a merchant's weight here, and rows whose
+    description yields no merchant (wire transfers, ATM, securities) are out
+    by construction — this reads as a shopping report, not a counterparty list.
+    """
+    conds = ["merchant IS NOT NULL", "transfer_group IS NULL"]
+    params: dict = {"limit": limit}
+    if date_from:
+        conds.append("value_date >= :date_from")
+        params["date_from"] = date_from
+    if date_to:
+        conds.append("value_date <= :date_to")
+        params["date_to"] = date_to
+    where = f"WHERE {' AND '.join(conds)}"
+    # HAVING net < 0: a group that is pure inflow (a refunded purchase whose
+    # expense leg fell outside the range, P2P money received via a PSP) is not
+    # a place money went.
+    grouped = (
+        f"FROM gold.v_transactions {where} "
+        "GROUP BY lower(merchant) HAVING sum(amount) < 0"
+    )
+    n_merchants = _rows(f"SELECT count(*) AS n FROM (SELECT 1 {grouped}) g", params)[0]["n"]
+    rows = _rows(
+        "SELECT mode() WITHIN GROUP (ORDER BY merchant) AS merchant, "
+        "count(*) AS n_movements, "
+        "round(-sum(amount), 2) AS total_spent, "
+        "round(-sum(amount) / count(*), 2) AS avg_spent, "
+        "max(value_date) AS last_date, "
+        "mode() WITHIN GROUP (ORDER BY category) AS category "
+        f"{grouped} ORDER BY total_spent DESC LIMIT :limit",
+        params,
+    )
+    return {
+        "lang": lang,
+        "n_merchants": n_merchants,
+        "merchants": [{**r, "category_label": _CAT.label(r["category"], lang)} for r in rows],
+    }
+
+
 # Sortable columns of gold.v_transactions, keyed by the public param value.
 _SORT_COLS = {
     "date": "value_date",
@@ -782,6 +855,9 @@ def transactions(
     date_from: date | None = Query(default=None, description="Value date >= (inclusive)"),
     date_to: date | None = Query(default=None, description="Value date <= (inclusive)"),
     q: str | None = Query(default=None, description="Case-insensitive text search in the description"),
+    merchant: str | None = Query(
+        default=None, description="Filter by extracted merchant (exact, case-insensitive)"
+    ),
     min_amount: float | None = Query(default=None, description="Amount >= (signed)"),
     max_amount: float | None = Query(default=None, description="Amount <= (signed)"),
     min_confidence: float | None = Query(default=None, description="Category confidence >= (0..1)"),
@@ -831,6 +907,9 @@ def transactions(
     if q:
         conds.append("description ILIKE :q")
         params["q"] = f"%{q}%"
+    if merchant:
+        conds.append("lower(merchant) = lower(:merchant)")
+        params["merchant"] = merchant
     if min_amount is not None:
         conds.append("amount >= :min_amount")
         params["min_amount"] = min_amount

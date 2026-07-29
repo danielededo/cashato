@@ -9,6 +9,7 @@ import type {
   FilesResponse,
   InvestmentsResponse,
   Lang,
+  MerchantsResponse,
   MetaResponse,
   MonthlyResponse,
   Profile,
@@ -75,6 +76,8 @@ export const api = {
   monthly: () => get<MonthlyResponse>("/monthly"),
   categoriesMonthly: (lang: Lang) => get<CategoriesMonthlyResponse>("/categories/monthly", { lang }),
   transactions: (f: TransactionFilters) => get<TransactionsResponse>("/transactions", { ...f }),
+  merchants: (p: { lang?: Lang; date_from?: string; date_to?: string; limit?: number }) =>
+    get<MerchantsResponse>("/merchants", { ...p }),
   transfers: () => get<TransfersResponse>("/transfers"),
   reconciliation: () => get<ReconciliationResponse>("/reconciliation"),
   meta: () => get<MetaResponse>("/meta"),

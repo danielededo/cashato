@@ -53,6 +53,10 @@ export interface TransactionRow {
   category_confidence: number | null;
   transfer_group: string | null;
   natural_key: string;
+  /** Counterparty extracted from the description, when one exists. */
+  merchant: string | null;
+  /** "HH:MM:SS" when the statement text carries a time of day (POS/ATM). */
+  purchase_time: string | null;
 }
 export interface TransactionsResponse {
   lang: string;
@@ -65,6 +69,22 @@ export interface TransactionsResponse {
   limit: number;
   offset: number;
   transactions: TransactionRow[];
+}
+
+export interface MerchantRow {
+  merchant: string;
+  n_movements: number;
+  /** Net outflow at this merchant (refunds netted), positive. */
+  total_spent: Money;
+  avg_spent: Money;
+  last_date: string;
+  category: string | null;
+  category_label: string;
+}
+export interface MerchantsResponse {
+  lang: string;
+  n_merchants: number;
+  merchants: MerchantRow[];
 }
 
 export interface TransferPair {
@@ -246,6 +266,7 @@ export interface TransactionFilters {
   date_from?: string;
   date_to?: string;
   q?: string;
+  merchant?: string;
   min_amount?: number;
   max_amount?: number;
   min_confidence?: number;
@@ -355,6 +376,8 @@ export interface TransactionDetail {
   quantity: Money | null;
   unit_price: Money | null;
   side: string | null;
+  merchant: string | null;
+  purchase_time: string | null;
 }
 
 /** The vocabulary the UI builds its selectors from — sources from the adapter

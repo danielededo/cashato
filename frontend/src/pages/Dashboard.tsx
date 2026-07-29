@@ -43,6 +43,39 @@ export function Dashboard() {
   const months = monthly.data?.months;
   const catRows = catMonthly.data?.rows;
 
+  // Merchant ranking is aggregated server-side (case-insensitive grouping,
+  // refunds netted), so it cannot be derived from the monthly rows above:
+  // fetch both windows and let the compare toggle decide what to show.
+  const windows = useMemo(() => {
+    if (!months) return null;
+    const { current, previous } = splitWindows(months.map((m) => m.month), monthsFor(period));
+    if (!current.length) return null;
+    return { current, previous };
+  }, [months, period]);
+  const merch = useAsync(async () => {
+    if (!windows) return null;
+    const { current, previous } = windows;
+    const cur = api.merchants({ lang, date_from: current[0], date_to: endOfMonth(current[current.length - 1]), limit: TOP_RANK });
+    const prev = previous.length
+      ? api.merchants({ lang, date_from: previous[0], date_to: endOfMonth(previous[previous.length - 1]), limit: 100 })
+      : Promise.resolve(null);
+    return Promise.all([cur, prev]).catch(() => null);
+  }, [windows, lang]);
+  const merchItems = useMemo<RankItem[] | null>(() => {
+    const [cur, prev] = merch.data ?? [null, null];
+    if (!cur?.merchants.length) return null;
+    const prevBy = new Map((prev?.merchants ?? []).map((m) => [m.merchant.toLowerCase(), num(m.total_spent)]));
+    return cur.merchants.map((m) => ({
+      category: m.merchant,
+      label: m.merchant,
+      value: num(m.total_spent),
+      prev: compare ? (prevBy.get(m.merchant.toLowerCase()) ?? null) : null,
+      // A merchant is not a category code, so colorFor would render it grey;
+      // its dominant category ties it visually to the panels above.
+      color: colorFor(m.category ?? ""),
+    }));
+  }, [merch.data, compare]);
+
   const d = useMemo(() => {
     if (!months || !catRows) return null;
     const allMonths = months.map((m) => m.month);
@@ -247,6 +280,24 @@ export function Dashboard() {
               onPick={drillCell}
             />
           </div>
+
+          {merchItems ? (
+            <div className="panel">
+              <div className="panel-head">
+                <h2>{t("panel.merchants")}</h2>
+                <span className="hint">{t("panel.merchants.hint")}</span>
+              </div>
+              <RankBars
+                items={merchItems}
+                onSelect={(m) => navigate(`/transactions?merchant=${encodeURIComponent(m)}`)}
+              />
+              {merch.data?.[0] && merch.data[0].n_merchants > merchItems.length ? (
+                <div className="panel-foot dim">
+                  {t("panel.merchants.more", { n: merch.data[0].n_merchants - merchItems.length })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Recurring commitments, independent of the selected period: a
               subscription is a fact about the present, not about a window. */}

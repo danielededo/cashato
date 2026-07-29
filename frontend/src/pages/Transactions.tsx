@@ -43,6 +43,8 @@ export function Transactions() {
   // (useDeferredValue) so typing never blocks on a fetch.
   const [search, setSearch] = useState(params.get("q") ?? "");
   const deferredSearch = useDeferredValue(search);
+  // Set only by drill-downs (no manual control): a dismissible chip clears it.
+  const [merchant, setMerchant] = useState(params.get("merchant") ?? "");
   const [sign, setSign] = useState<Sign | "">((params.get("sign") as Sign) ?? "");
   const [source, setSource] = useState(params.get("source") ?? "");
   const [category, setCategory] = useState(params.get("category") ?? "");
@@ -57,7 +59,7 @@ export function Transactions() {
 
   useEffect(() => {
     setOffset(0);
-  }, [deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, sort]);
+  }, [deferredSearch, merchant, sign, source, category, includeTransfers, dateFrom, dateTo, sort]);
 
   // URL params are read at mount AND on every later change: a nav click to the
   // same route (or a drill-down while already here) clears/changes the query
@@ -65,6 +67,7 @@ export function Transactions() {
   // and the list contradict each other.
   useEffect(() => {
     setSearch(params.get("q") ?? "");
+    setMerchant(params.get("merchant") ?? "");
     setSign((params.get("sign") as Sign) ?? "");
     setSource(params.get("source") ?? "");
     setCategory(params.get("category") ?? "");
@@ -81,6 +84,7 @@ export function Transactions() {
     () => ({
       lang,
       q: deferredSearch || undefined,
+      merchant: merchant || undefined,
       sign: sign || undefined,
       source: source || undefined,
       category: category || undefined,
@@ -92,7 +96,7 @@ export function Transactions() {
       limit: PAGE,
       offset,
     }),
-    [lang, deferredSearch, sign, source, category, includeTransfers, dateFrom, dateTo, sort, offset],
+    [lang, deferredSearch, merchant, sign, source, category, includeTransfers, dateFrom, dateTo, sort, offset],
   );
 
   const state = useAsync(() => api.transactions(query), [query]);
@@ -147,6 +151,7 @@ export function Transactions() {
   const total = state.data?.total ?? 0;
   const of = lang === "it" ? "di" : "of";
   const activeFilters = [
+    merchant,
     sign && (sign === "income" ? t("common.income") : t("common.expense")),
     source && sourceLabel(source),
     category && catLabel(category),
@@ -176,6 +181,11 @@ export function Transactions() {
               {sourceLabel(s)}
             </button>
           ))}
+          {merchant ? (
+            <button className="chip" aria-pressed onClick={() => setMerchant("")} title={t("tx.clearMerchant")}>
+              {merchant} ✕
+            </button>
+          ) : null}
           <button className="disclosure" onClick={() => setShowAdvanced((v) => !v)}>
             {showAdvanced ? "▾ " : "▸ "}{t("tx.filters")}
           </button>
@@ -287,12 +297,18 @@ export function Transactions() {
                       {/* The row also holds a category <select>, so the whole
                           row cannot be the click target — the description is. */}
                       <td className="desc">
+                        {/* The extracted merchant reads like a ledger line; the
+                            raw statement text stays a tooltip away (and in the
+                            detail modal). Rows without one show the raw text. */}
                         <button
                           className="link-cell"
-                          title={t("tx.investigate")}
+                          title={tx.merchant ? `${tx.description} — ${t("tx.investigate")}` : t("tx.investigate")}
                           onClick={() => setDetailKey(tx.natural_key)}
                         >
-                          {tx.description}
+                          {tx.merchant ?? tx.description}
+                          {tx.merchant && tx.purchase_time ? (
+                            <span className="dim"> · {tx.purchase_time.slice(0, 5)}</span>
+                          ) : null}
                         </button>
                       </td>
                       <td>

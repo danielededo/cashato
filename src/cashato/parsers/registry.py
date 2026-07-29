@@ -33,7 +33,7 @@ from . import __name__ as _PKG
 from . import __path__ as _PKG_PATH
 
 # Modules in this package that are NOT source adapters.
-_NON_ADAPTERS = {"base", "categorize", "detect", "registry"}
+_NON_ADAPTERS = {"base", "categorize", "detect", "merchant", "registry"}
 
 ADAPTERS: dict[str, Callable] = {}
 _DETECTION: dict[str, list[list[str]]] = {}
