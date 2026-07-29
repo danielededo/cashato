@@ -119,8 +119,13 @@ Resolver chain (order = priority) over **universal** signals:
 
 1. **MCC** (ISO 18245, `config/mcc.yaml`) — exact, high precision.
 2. **Embedding model** — `EmbeddingKNN` (`src/cashato/ml/model.py`): multilingual
-   sentence-transformers + kNN; used if `confidence ≥ threshold`. Feature text =
-   `normalize_desc` only (no regex cleaning). This does the bulk of the work.
+   sentence-transformers + kNN; used if `confidence ≥ threshold`. Feature text
+   (`build_text`) = the extracted **merchant** when the description carries one
+   (in a POS line the counterparty drowns in boilerplate), the full
+   `normalize_desc` otherwise (for transfers/salaries the wording IS the
+   signal). The default code is never a training class — an example labeled
+   `other` is "nobody knew", and as kNN anchors those flooded the sum-vote and
+   outvoted exact real-class matches. This does the bulk of the work.
 3. **Rules** — thin bilingual keyword safety net (`config/categories.yaml`).
 4. Default `other`.
 

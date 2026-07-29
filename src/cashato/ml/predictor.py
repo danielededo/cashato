@@ -60,7 +60,9 @@ class CategorizerModel(kserve.Model):
     def predict(self, payload: dict, headers: dict | None = None) -> dict:
         instances = payload.get("instances", [])
         texts = [
-            build_text(x if isinstance(x, str) else (x.get("description", "")))
+            build_text(x, None)
+            if isinstance(x, str)
+            else build_text(x.get("description", ""), x.get("source"))
             for x in instances
         ]
         assert self._model is not None  # set in load(), which raises otherwise

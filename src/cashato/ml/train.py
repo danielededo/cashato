@@ -32,23 +32,29 @@ from sqlalchemy import text
 from cashato.config import MODEL_DIR
 from cashato.db.db import get_engine
 from cashato.ml.model import DEFAULT_K, EmbeddingKNN
-from cashato.parsers.categorize import build_text
+from cashato.parsers.categorize import Categorizer, build_text
 
 MODELS_DIR = MODEL_DIR
 
 
 def load_dataset(include_rules: bool) -> tuple[list[str], list[str]]:
+    # The default code is a VERDICT, not a class: an example labeled "other"
+    # says "nobody knew", which is no evidence at all — yet as anchors those
+    # examples flood the kNN neighborhood (sum-voting) and outvote exact
+    # matches of real classes. Unknown stays what the resolver produces when
+    # confidence is low, never something the model asserts.
+    default = Categorizer.load().default
     engine = get_engine()
     seen: dict[str, str] = {}
     with engine.connect() as conn:
         if include_rules:
-            for descr, cat in conn.execute(
+            for descr, src, cat in conn.execute(
                 text(
-                    "SELECT description, category FROM silver.transactions "
+                    "SELECT description, source, category FROM silver.transactions "
                     "WHERE category_source IN ('rule','mcc')"
                 )
             ):
-                seen[build_text(descr)] = cat
+                seen[build_text(descr, src)] = cat
         # Deterministic precedence: manual labels beat llm/native for the same
         # text (last write into `seen` wins), instead of heap-scan luck.
         for t, cat in conn.execute(
@@ -60,16 +66,17 @@ def load_dataset(include_rules: bool) -> tuple[list[str], list[str]]:
             seen[t] = cat
         # Latest correction per natural_key wins — same contract as the
         # loader's reapply; an unordered scan could train on a superseded fix.
-        for cat, descr in conn.execute(
+        for cat, descr, src in conn.execute(
             text(
-                "SELECT f.category, s.description FROM ("
+                "SELECT f.category, s.description, s.source FROM ("
                 "  SELECT DISTINCT ON (natural_key) natural_key, category"
                 "  FROM gold.category_feedback ORDER BY natural_key, id DESC"
                 ") f JOIN silver.transactions s ON s.natural_key = f.natural_key"
             )
         ):
-            seen[build_text(descr)] = cat
+            seen[build_text(descr, src)] = cat
     seen.pop("", None)
+    seen = {t: c for t, c in seen.items() if c != default}
     return list(seen.keys()), list(seen.values())
 
 

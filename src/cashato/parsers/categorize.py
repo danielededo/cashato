@@ -26,6 +26,7 @@ import yaml
 from cashato.config import CONFIG_DIR, setting
 
 from .base import normalize_desc
+from .merchant import extract_merchant
 
 _CONFIG_PATH = CONFIG_DIR / "categories.yaml"
 _MCC_PATH = CONFIG_DIR / "mcc.yaml"
@@ -41,13 +42,23 @@ class Result:
     source: str  # mcc | rule | model | manual | default
 
 
-def build_text(description: str) -> str:
+def build_text(description: str, source: str | None = None) -> str:
     """Model feature text, shared between training and inference.
 
-    Only basic normalization (lowercase, no accents): no provider-specific regex
-    cleaning, no source token. Noise (dates, codes, masked card numbers) is left
-    to the model -- best handled by semantic **embeddings**, robust to noise and
-    able to generalize to unseen merchants/languages."""
+    When the source is known and the description carries a merchant, the
+    merchant IS the feature text: in a POS line the counterparty is a handful
+    of tokens drowning in boilerplate ("Pagamento POS EFFETTUATO IL ... PRESSO
+    IKEA"), and embedding the whole line made every POS payment look like every
+    other. Rows without a merchant (wire transfers, salaries) keep the full
+    text — there the operation wording is exactly the signal.
+
+    Otherwise only basic normalization (lowercase, no accents): remaining noise
+    is left to the semantic **embeddings**, robust and able to generalize to
+    unseen merchants/languages."""
+    if source:
+        merchant = extract_merchant(source, description).merchant
+        if merchant:
+            return normalize_desc(merchant)
     return normalize_desc(description)
 
 
@@ -141,7 +152,7 @@ class Categorizer:
                 return Result(mcc_code, 1.0, "mcc")
         # 2. embedding model (does the bulk of the work) if confident
         if self.model is not None:
-            pred = self._predict(description)
+            pred = self._predict(description, source)
             if pred and pred[1] >= self.model_threshold:
                 return Result(pred[0], pred[1], "model")
         # 3. keyword rules: thin, high-precision safety net
@@ -166,14 +177,18 @@ class Categorizer:
         results: list[Result | None] = [None] * len(items)
         pending_idx: list[int] = []
         pending_desc: list[str] = []
-        for i, (descr, _source, mcc) in enumerate(items):
+        pending_src: list[str | None] = []
+        for i, (descr, source, mcc) in enumerate(items):
             if mcc and (code := self.mcc_category(mcc)):
                 results[i] = Result(code, 1.0, "mcc")
             else:
                 pending_idx.append(i)
                 pending_desc.append(descr)
+                pending_src.append(source)
         batch = (
-            self.model.predict_batch([build_text(d) for d in pending_desc])
+            self.model.predict_batch(
+                [build_text(d, s) for d, s in zip(pending_desc, pending_src, strict=True)]
+            )
             if self.model is not None
             else [None] * len(pending_desc)
         )
@@ -187,9 +202,9 @@ class Categorizer:
             results[i] = Result(code, 0.9, "rule") if code else Result(self.default, 0.0, "default")
         return results  # type: ignore[return-value]
 
-    def _predict(self, description: str) -> tuple[str, float] | None:
+    def _predict(self, description: str, source: str | None = None) -> tuple[str, float] | None:
         try:
-            text = build_text(description)
+            text = build_text(description, source)
             # embedding model (EmbeddingKNN): predict_one -> (code, confidence)
             if hasattr(self.model, "predict_one"):
                 return self.model.predict_one(text)

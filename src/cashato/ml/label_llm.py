@@ -104,7 +104,7 @@ def main() -> int:
     with engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT DISTINCT description FROM silver.transactions "
+                "SELECT DISTINCT description, source FROM silver.transactions "
                 "WHERE category = :d LIMIT :lim"
             ),
             {"d": cat.default, "lim": args.limit},
@@ -113,7 +113,7 @@ def main() -> int:
     print(f"To label: {len(rows)} distinct descriptions (model {args.model})")
     labeled = 0
     with engine.begin() as conn:
-        for i, (descr,) in enumerate(rows, 1):
+        for i, (descr, src) in enumerate(rows, 1):
             code = _ask(args.model, system, descr)
             if code not in valid:
                 continue
@@ -125,7 +125,7 @@ def main() -> int:
                     ON CONFLICT (text_norm, source) DO UPDATE SET category = EXCLUDED.category
                     """
                 ),
-                {"t": build_text(descr), "c": code},
+                {"t": build_text(descr, src), "c": code},
             )
             labeled += 1
             if i % 50 == 0:

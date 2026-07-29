@@ -1,5 +1,6 @@
 """Categorizer unit tests (no ML model: MCC + rules + default)."""
 
+from cashato.parsers.base import normalize_desc
 from cashato.parsers.categorize import Categorizer, build_text
 
 
@@ -61,6 +62,24 @@ class TestI18nLabels:
 class TestBuildText:
     def test_normalizes(self):
         assert build_text("Caffè BAR!") == "caffe bar"
+
+    def test_merchant_is_the_feature_when_extractable(self):
+        # The POS boilerplate drowned the merchant: with a known source the
+        # counterparty alone is the feature text.
+        desc = (
+            "Pagamento POS EFFETTUATO IL 24/01/2024 ALLE ORE 02:27 MEDIANTE LA "
+            "CARTA 1234 XXXX XXXX XX99 PRESSO RISTORANTE DA MARIO MILANO"
+        )
+        assert build_text(desc, "intesa") == "ristorante da mario milano"
+
+    def test_full_text_when_no_merchant(self):
+        # Wire transfers carry no merchant: the operation wording IS the signal.
+        desc = "Bonifico a Vostro favore disposto da MITT. ESEMPIO S.P.A."
+        assert build_text(desc, "intesa") == normalize_desc(desc)
+
+    def test_full_text_without_source(self):
+        desc = "Pagamento POS PRESSO ESEMPIO"
+        assert build_text(desc) == normalize_desc(desc)
 
 
 class TestWealthDestinations:
