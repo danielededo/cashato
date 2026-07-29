@@ -40,5 +40,8 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 
+# macOS Finder debris
+.DS_Store
+
 # setuptools debris from a non-editable pip install
 build/

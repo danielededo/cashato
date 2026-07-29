@@ -26,5 +26,8 @@ spec:
     resources:
       - taskrun
       - pipelinerun
-    keep: 20
-    schedule: "0 8 * * *"
+    keep: 5
+    # Same reasoning as the CNPG backup at 13:00: the workstation is off at
+    # night and often at 08:00 too, so an early-morning cron simply never
+    # fires and Completed CI pods pile up anyway.
+    schedule: "30 13 * * *"
