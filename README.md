@@ -22,6 +22,21 @@ multilingual (IT/EN) way. All processing is **local** — no bank data leaves th
 machine. Money is **`Decimal` end to end**, never `float` — including on the
 wire, where amounts travel as JSON strings.
 
+## Why
+
+This project was born from a personal need: a **single place to see all of my
+finances** — scattered across banks that don't talk to each other — and to
+understand **where my money actually goes** and **what my recurring habits
+are** (subscriptions, salary, rent, bills). Not budgeting software, but
+**financial awareness**: one dashboard that answers "how am I really doing?"
+without handing my statements to a third-party service.
+
+It doubles as a **learning ground**: an excuse to go deep on tools and
+open-source infrastructure — Kubernetes, GitOps (Argo CD), in-cluster CI
+(Tekton), event streaming (NATS), local ML (embeddings + a local LLM), and the
+LGTM observability stack — at a deliberately over-engineered scale for a
+one-user app, because that's the point.
+
 ## How it flows
 
 ```mermaid
