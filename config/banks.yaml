@@ -18,7 +18,6 @@ abi:
   "03069": Intesa Sanpaolo
   "03669": Revolut Bank UAB
   "03674": Trade Republic Bank
-  # Common Italian banks, so a newly added source resolves out of the box.
   "01005": BNL
   "01015": Banco di Sardegna
   "02008": UniCredit
