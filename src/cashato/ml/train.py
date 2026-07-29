@@ -135,12 +135,23 @@ def main() -> int:
     print("Refit challenger on the full dataset ...")
     challenger.fit(X, y)
     MODELS_DIR.mkdir(exist_ok=True)
+    # The stamped file is the experiment record and is always written.
+    # ``latest.joblib`` is NOT: it is what ml/recategorize.py applies to the
+    # whole DB, so it must only ever name a model that is actually in use.
+    # Writing it here unconditionally armed a REJECTED challenger for the next
+    # batch run — the registry gate protected KServe serving while the batch
+    # path walked straight past it.
     artifact = MODELS_DIR / f"emb-knn-{args.stamp}.joblib"
     challenger.save(artifact)
-    challenger.save(MODELS_DIR / "latest.joblib")
-    print(f"Local artifact: {artifact} (+ latest.joblib) | examples={len(X)}")
+    print(f"Local artifact: {artifact} | examples={len(X)}")
+
+    def _make_latest() -> None:
+        challenger.save(MODELS_DIR / "latest.joblib")
+        print("Local latest.joblib -> this model.")
 
     if not args.register:
+        # No registry to arbitrate: this run's model IS the local model.
+        _make_latest()
         print("[info] --register not set: model NOT registered in MLflow.")
         return 0
 
@@ -165,9 +176,14 @@ def main() -> int:
     )
     if promote:
         set_champion(version)
+        _make_latest()
         print(f"Promoted v{version} to @champion.")
     else:
-        print(f"Kept current champion (challenger {macro_f1:.3f} < {champ_f1:.3f}).")
+        print(
+            f"Kept current champion (challenger {macro_f1:.3f} < {champ_f1:.3f}); "
+            f"latest.joblib left untouched, so a batch recategorize still "
+            f"applies the champion, not this challenger."
+        )
     return 0
 
 

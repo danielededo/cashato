@@ -3,8 +3,13 @@
 # Infra endpoints (DATABASE_URL, NATS_URL) stay as env vars / Secrets.
 
 categorization:
-  # minimum model confidence to accept an ML prediction (else rules/default)
-  model_threshold: 0.55
+  # minimum model confidence to accept an ML prediction (else rules/default).
+  # Calibrated on 5 held-out splits (2026-07): every confidence band below
+  # 0.75 was majority-WRONG (20-45% precision) while 0.75-0.80 was already
+  # majority-right (59%); cumulative >= 0.75 is ~79% precise on ~77% of
+  # unseen texts. Below the bar an honest `other` feeds the Review queue and
+  # the next labeling round instead of silently polluting the aggregates.
+  model_threshold: 0.75
   # embedding model used by the classifier (sentence-transformers)
   embed_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
   knn_k: 5
