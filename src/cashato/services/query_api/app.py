@@ -832,9 +832,13 @@ def merchants(
 
 
 # Sortable columns of gold.v_transactions, keyed by the public param value.
+# `abs_amount` ranks by magnitude regardless of sign: a review queue wants the
+# rows that move the totals most, and ordering by the signed amount would put
+# every inflow at one end instead.
 _SORT_COLS = {
     "date": "value_date",
     "amount": "amount",
+    "abs_amount": "abs(amount)",
     "description": "description",
     "category": "category",
     "account": "account",

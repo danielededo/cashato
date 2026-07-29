@@ -30,12 +30,23 @@ export function Review() {
   const { accountLabel, accountShort } = useAccounts();
   const [mode, setMode] = useState<"other" | "lowconf">("other");
   const sample = useAsync(() => api.transactions({ limit: SAMPLE, include_transfers: false, lang }), [lang]);
+  // Biggest amounts FIRST, not newest: attention here is scarce and every
+  // correction is worth what the row moves in the aggregates — fixing one
+  // 400-euro row beats fixing eighty coffees, and the queue is capped anyway.
   const queue = useAsync(
     () =>
       api.transactions(
         mode === "other"
-          ? { category: "other", limit: QUEUE, include_transfers: false, lang }
-          : { category_source: "model", max_confidence: LOWCONF_MAX, limit: QUEUE, include_transfers: false, lang },
+          ? { category: "other", limit: QUEUE, include_transfers: false, lang, sort: "abs_amount", order: "desc" }
+          : {
+              category_source: "model",
+              max_confidence: LOWCONF_MAX,
+              limit: QUEUE,
+              include_transfers: false,
+              lang,
+              sort: "abs_amount",
+              order: "desc",
+            },
       ),
     [lang, mode],
   );
@@ -120,6 +131,16 @@ export function Review() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span className="hint">
               {queue.data ? t(mode === "lowconf" ? "rev.total.lowconf" : "rev.total", { n: queue.data.total }) : "…"}
+              {/* Value of the WHOLE queue (summed server-side), so the payoff of
+                  working top-down is visible before the first correction. The
+                  figure carries `.amt` so privacy mode blurs it like any other. */}
+              {queue.data && queue.data.total > 0 ? (
+                <>
+                  {" · "}
+                  <span className="amt">{money(Math.abs(num(queue.data.sum_expense ?? "0")))}</span>
+                  {t("rev.atStake")}
+                </>
+              ) : null}
               {done ? t("rev.labelled", { n: done }) : ""}
             </span>
             <div className="segmented" role="group" aria-label="Review mode">

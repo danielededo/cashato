@@ -113,6 +113,7 @@ const UI: Dict = {
   "rev.queue.lowconf": { it: "Coda di revisione · bassa confidenza", en: "Review queue · low confidence" },
   "rev.total.lowconf": { it: "{n} proposte incerte del modello", en: "{n} uncertain model guesses" },
   "rev.labelled": { it: " · {n} etichettate in questa sessione", en: " · {n} labelled this session" },
+  "rev.atStake": { it: " in gioco, dai più grandi", en: " at stake, biggest first" },
   "rev.setCategory": { it: "Assegna categoria", en: "Set category" },
   "rev.choose": { it: "scegli…", en: "choose…" },
   "rev.cleared": { it: "Coda svuotata — bene.", en: "Queue cleared — nice." },
