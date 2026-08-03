@@ -6,18 +6,13 @@ halves of that contract — the mapping stays free of anything a f-string could
 turn into injection, and `abs_amount` (what the Review queue orders by, so the
 user's attention goes to the rows that move the totals) stays available.
 
-No DB: the whitelist is data. Importing the app module does bind the Prometheus
-port at import time, so METRICS_PORT is pinned to 0 (an OS-assigned ephemeral
-port) FIRST — otherwise a dev server already holding :9100 makes this file fail
-collection, which is a broken test suite rather than a broken app.
+No DB: the whitelist is data, and the routes module carries no import-time
+side effects (metrics/tracing live in app.py, which this test avoids).
 """
 
-import os
 import re
 
-os.environ.setdefault("METRICS_PORT", "0")
-
-from cashato.services.query_api.app import _SORT_COLS  # noqa: E402
+from cashato.services.query_api.routes import SORT_COLS as _SORT_COLS
 
 # A column name, or a single call over one column: `abs(amount)`. Nothing that
 # could carry a subquery, a semicolon, a comment or a second expression.
