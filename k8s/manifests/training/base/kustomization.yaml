@@ -13,12 +13,15 @@ resources:
 # Runtime config ConfigMap in cashato-ml (also consumed by the serving app, which
 # references it by this stable name). Stable name = no hash suffix. Source files
 # live at the repo root → Argo needs `--load-restrictor LoadRestrictionsNone`.
+# SAME FILE LIST as services/base: the two declarations share the name, so a
+# list that differs here silently ships a different config to this namespace.
 configMapGenerator:
   - name: cashato-config
     files:
       - ../../../../config/settings.yaml
       - ../../../../config/categories.yaml
       - ../../../../config/mcc.yaml
+      - ../../../../config/banks.yaml
 generatorOptions:
   disableNameSuffixHash: true
 

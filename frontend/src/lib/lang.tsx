@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { Lang } from "../api/types";
+import { setFormatLocale } from "./format";
 
-// Language drives the API `lang` param (localized category labels). Persisted so
-// the choice survives reloads. The UI chrome stays English by project convention;
-// this switches the *data* language (category labels).
+// Language drives the API `lang` param (localized category labels), the i18n
+// dictionary, and the date/number locale (pushed into format.ts). Persisted so
+// the choice survives reloads.
 const LANG_KEY = "cashato.lang.v1";
 
 interface LangCtx {
@@ -17,8 +18,14 @@ function readLang(): Lang {
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(readLang);
+  // The locale must be set before the first child renders a date.
+  const [lang, setLangState] = useState<Lang>(() => {
+    const l = readLang();
+    setFormatLocale(l);
+    return l;
+  });
   const setLang = useCallback((l: Lang) => {
+    setFormatLocale(l);
     setLangState(l);
     localStorage.setItem(LANG_KEY, l);
   }, []);

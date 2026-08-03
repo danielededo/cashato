@@ -70,6 +70,12 @@ The design is built so adding a bank touches **one adapter module**, nothing els
      Declaring the *document's* convention is what lets the API pick out the first
      name without guessing which token is the surname.
 
+   One registration that is NOT optional: add the source to `_BY_SOURCE` in
+   `parsers/merchant.py` — a regex digging the counterparty out of the
+   description, or `None` to declare "this source's texts carry no extractable
+   merchant". The test suite fails on a registered source with no entry, so the
+   decision is made once, explicitly, instead of defaulting to silence.
+
    The module name **is** the source id; the registry auto-discovers it by scanning
    the package (no config entry, no edit to the loader). **Inspect a real file first**;
    don't guess the layout.

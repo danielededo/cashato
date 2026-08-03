@@ -51,7 +51,7 @@ def _group_id(a: str, b: str) -> str:
 
 
 def find_pairs(
-    legs: list[Leg], window_days: int = 3, require_hint: bool = True
+    legs: list[Leg], window_days: int = 4, require_hint: bool = True
 ) -> list[tuple[int, int, str]]:
     """Return ``(out_id, in_id, transfer_group)`` for each detected internal
     transfer. ``require_hint``: if True, non-same-day candidates must carry a

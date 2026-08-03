@@ -14,6 +14,14 @@
 
 default: other
 
+# Which categories are WEALTH CHANGING FORM rather than consumption: spend
+# figures exclude them everywhere. This list is the declared source for
+# runtime code and /meta; the SQL twin is `silver.asset_categories` (what the
+# gold views read), seeded by the baseline migration — a test keeps the two
+# in step. Adding one here without the matching table row (or vice versa)
+# fails the suite instead of silently splitting the platform in two.
+asset_categories: [investments, crypto, pension_fund, deposits, insurance_savings]
+
 # Canonical code -> localized labels (extensible with new languages)
 categories:
   groceries:     {it: "Spesa",          en: "Groceries"}
@@ -34,7 +42,7 @@ categories:
   investments:   {it: "Investimenti",   en: "Investments"}
   crypto:        {it: "Crypto",         en: "Crypto"}
   # Wealth destinations other than securities. Money sent here is not spending:
-  # it changes form. See silver.asset_categories, which is what actually decides.
+  # it changes form. Membership is declared in `asset_categories` above.
   pension_fund:  {it: "Fondo pensione",  en: "Pension fund"}
   deposits:      {it: "Conti deposito",  en: "Savings deposits"}
   # Protection is genuine CONSUMPTION (motor, home, term life) and stays a

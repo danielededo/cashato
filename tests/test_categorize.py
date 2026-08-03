@@ -210,3 +210,37 @@ class TestDetectionIsNotOrderDependent:
         sigs = [("aaa", [["pippo"]]), ("bbb", [["estratto conto"]])]
         src, _ = self._detect(monkeypatch, "estratto conto trimestrale", sigs)
         assert src == "bbb"
+
+
+class TestAssetCategories:
+    """The asset/spend split is declared once in categories.yaml; its SQL twin
+    (silver.asset_categories, what gold's views read) is seeded by the baseline
+    migration. These tests are the coupling: drift fails here, not in prod."""
+
+    def test_asset_codes_are_valid_categories(self):
+        c = _cat()
+        assert c.asset_categories
+        assert c.asset_categories <= c.categories.keys()
+
+    def test_matches_migration_seed(self):
+        import re
+        from pathlib import Path
+
+        baseline = (
+            Path(__file__).parent.parent
+            / "src/cashato/db/migrations/versions/0022_baseline.py"
+        ).read_text(encoding="utf-8")
+        insert = re.search(
+            r"INSERT INTO silver\.asset_categories.*?VALUES(.*?)\"\"\"",
+            baseline,
+            re.DOTALL,
+        )
+        assert insert, "asset_categories seed not found in baseline migration"
+        seeded = set(re.findall(r"\(\s*'([a-z_]+)'", insert.group(1)))
+        assert seeded == set(_cat().asset_categories)
+
+    def test_unknown_asset_code_fails_at_load(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="asset_categories"):
+            Categorizer({"categories": {"other": {}}, "asset_categories": ["typo_code"]})

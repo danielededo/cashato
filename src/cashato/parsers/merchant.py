@@ -154,6 +154,10 @@ def _trade_republic(desc: str) -> MerchantInfo:
     return _NONE
 
 
+# One strategy PER REGISTERED SOURCE, and the test suite enforces the
+# coverage: a new adapter must add its entry here (use ``None`` to declare
+# "this source's texts carry no extractable merchant"). Without that guard a
+# drop-in source silently got no merchant, no purchase_time and no error.
 _BY_SOURCE = {
     "intesa": _intesa,
     "revolut": _revolut,

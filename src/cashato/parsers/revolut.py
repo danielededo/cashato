@@ -88,6 +88,9 @@ class RevolutRow:
 
 
 def _parse_date(raw: str) -> date:
+    # The consolidated statement writes month-name dates ("Jan 5, 2025"),
+    # never ambiguous numerics — so no dayfirst here. The crypto section is
+    # the exception (numeric day-first) and parses with dayfirst=True there.
     return dateparser.parse(raw.strip()).date()
 
 
@@ -483,6 +486,11 @@ def _crypto_sale_value(cell: str) -> Decimal | None:
 def _parse_crypto_csv(path: str | Path) -> list[Transaction]:
     """Crypto sales -> realized proceeds tagged 'crypto' (kept, excluded from spend)."""
     txs: list[Transaction] = []
+    # Unlike the account/savings sections there is no non-EUR skip here: the
+    # crypto section declares no currency of its own, so what _iter_section
+    # yields is stale carry-over from whatever fiat section preceded it —
+    # filtering on it would drop or keep sales based on an unrelated header.
+    # The sale value is in the statement's fiat (EUR in every observed file).
     for _currency, row in _iter_section(
         path, "only sales", ["Date (of Sale, of Purchase)"]
     ):

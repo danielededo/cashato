@@ -285,7 +285,7 @@ export function Transactions() {
                   const dayHead =
                     sort.key === "date" && (i === 0 || rows[i - 1].value_date !== tx.value_date) ? (
                       <tr className="day-row">
-                        <td colSpan={6}>{dateLabel(tx.value_date)}</td>
+                        <td colSpan={5}>{dateLabel(tx.value_date)}</td>
                       </tr>
                     ) : null;
                   const cat = overrides[tx.natural_key] ?? tx.category ?? "";

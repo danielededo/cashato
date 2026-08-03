@@ -77,11 +77,6 @@ MIN_GRACE_DAYS = 21
 _AVG_MONTH_DAYS = Decimal("30.44")
 _CENT = Decimal("0.01")
 
-# The categories gold's spend views exclude as wealth changing form rather
-# than consumption. A monthly ETF plan is a genuine recurrence worth listing,
-# but it must not inflate the recurring-SPEND total.
-ASSET_CATEGORIES = frozenset({"investments", "crypto"})
-
 _NUM_RE = re.compile(r"[0-9]+")
 # Month names are calendar tokens — the same class as digits. A payroll
 # causale names the month it settles ("saldo cedolino giugno"), which would

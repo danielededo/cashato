@@ -30,7 +30,15 @@ from .merchant import extract_merchant
 
 _CONFIG_PATH = CONFIG_DIR / "categories.yaml"
 _MCC_PATH = CONFIG_DIR / "mcc.yaml"
-_FALLBACK_THRESHOLD = 0.6  # when settings.yaml has no categorization.model_threshold
+# When settings.yaml has no categorization.model_threshold. Mirrors the
+# shipped config value so an unmounted settings.yaml degrades to the SAME
+# behavior, not a silently different one.
+_FALLBACK_THRESHOLD = 0.75
+
+# Everything that may ever stamp silver.transactions.category_source, in
+# resolver-priority order. The DB enforces the same vocabulary with a CHECK
+# constraint; /meta publishes this tuple so clients never restate it.
+CATEGORY_SOURCES = ("mcc", "model", "rule", "manual", "default")
 
 
 @dataclass
@@ -72,6 +80,14 @@ class Categorizer:
     ):
         self.default: str = config.get("default", "other")
         self.categories: dict[str, dict[str, str]] = config.get("categories", {})
+        # Wealth-not-consumption codes: spend figures exclude these. The SQL
+        # twin is silver.asset_categories (gold's views read the table); a
+        # test keeps the two in step. Validated eagerly so a typo fails the
+        # service at startup instead of quietly mis-counting spend.
+        self.asset_categories: frozenset[str] = frozenset(config.get("asset_categories", []))
+        unknown = self.asset_categories - self.categories.keys()
+        if unknown:
+            raise ValueError(f"asset_categories not in categories: {sorted(unknown)}")
         self.rules = [
             (re.compile(r["pattern"], re.IGNORECASE), r["category"])
             for r in config.get("rules", [])

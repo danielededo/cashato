@@ -80,9 +80,13 @@ def load_dataset(include_rules: bool) -> tuple[list[str], list[str]]:
     return list(seen.keys()), list(seen.values())
 
 
-def _macro_f1(model: EmbeddingKNN, x: list[str], y: list[str]) -> tuple[float, float]:
-    """Return (accuracy, macro-F1) of ``model`` on (x, y)."""
-    preds = [(p or ("other", 0.0))[0] for p in model.predict_batch(x)]
+def _macro_f1(
+    model: EmbeddingKNN, x: list[str], y: list[str], default: str = "other"
+) -> tuple[float, float]:
+    """Return (accuracy, macro-F1) of ``model`` on (x, y). ``default`` stands
+    in for a no-prediction answer — the configured fallback code, so scoring
+    charges the model the same miss the resolver chain would produce."""
+    preds = [(p or (default, 0.0))[0] for p in model.predict_batch(x)]
     acc = sum(a == b for a, b in zip(preds, y, strict=True)) / len(y)
     return acc, f1_score(y, preds, average="macro", zero_division=0)
 
@@ -114,7 +118,8 @@ def main() -> int:
     xtr, xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     print("Embedding + fit challenger on train split ...")
     challenger = EmbeddingKNN(k=args.k).fit(xtr, ytr)
-    acc, macro_f1 = _macro_f1(challenger, xte, yte)
+    default = Categorizer.load().default
+    acc, macro_f1 = _macro_f1(challenger, xte, yte, default)
     print(f"Challenger holdout: accuracy={acc:.3f} macro-F1={macro_f1:.3f}")
 
     # Champion/challenger: re-evaluate the current champion on the SAME holdout.
@@ -125,7 +130,7 @@ def main() -> int:
 
             champ = load_champion()
             if champ is not None:
-                _, champ_f1 = _macro_f1(champ, xte, yte)
+                _, champ_f1 = _macro_f1(champ, xte, yte, default)
                 print(f"Champion holdout : macro-F1={champ_f1:.3f}")
             else:
                 print("No @champion yet (first model).")

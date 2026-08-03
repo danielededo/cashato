@@ -12,6 +12,9 @@ const SAMPLE = 500;
 const QUEUE = 100;
 
 // How much can we trust a category? Colour each provenance by certainty.
+// The vocabulary itself comes from /meta; this is presentation metadata
+// (trust ordering + colors) layered on top, with a fallback for any value
+// the backend grows that this build does not know yet.
 const SOURCE_META: Record<string, { tkey: string; color: string; trust: "sure" | "guess" | "none" }> = {
   manual: { tkey: "src.manual", color: "var(--series-3)", trust: "sure" },
   mcc: { tkey: "src.mcc", color: "var(--series-6)", trust: "sure" },
@@ -20,13 +23,18 @@ const SOURCE_META: Record<string, { tkey: string; color: string; trust: "sure" |
   default: { tkey: "src.default", color: "var(--expense)", trust: "none" },
   unknown: { tkey: "src.unknown", color: "var(--cat-other)", trust: "none" },
 };
-const SOURCE_ORDER = ["manual", "mcc", "rule", "model", "default", "unknown"];
+const TRUST_ORDER = ["manual", "mcc", "rule", "model", "default", "unknown"];
+const UNLISTED_META = { color: "var(--cat-other)", trust: "none" as const };
 
-const LOWCONF_MAX = 0.7;
+// "Low confidence" = the model's calls just above the calibrated cut (below
+// it the backend never stamps `model` at all). The band is a UI choice; the
+// cut itself comes from /meta, so a recalibration can't strand this queue —
+// the 0.7 literal this replaces died silently when 0.6 became 0.75.
+const LOWCONF_BAND = 0.1;
 
 export function Review() {
   const { t, lang } = useT();
-  const { categoryCodes, catLabel } = useMeta();
+  const { categoryCodes, catLabel, defaultCategory, modelThreshold } = useMeta();
   const { accountLabel, accountShort } = useAccounts();
   const [mode, setMode] = useState<"other" | "lowconf">("other");
   const sample = useAsync(() => api.transactions({ limit: SAMPLE, include_transfers: false, lang }), [lang]);
@@ -34,21 +42,23 @@ export function Review() {
   // correction is worth what the row moves in the aggregates — fixing one
   // 400-euro row beats fixing eighty coffees, and the queue is capped anyway.
   const queue = useAsync(
-    () =>
-      api.transactions(
+    () => {
+      if (mode === "lowconf" && modelThreshold == null) return Promise.resolve(null);
+      return api.transactions(
         mode === "other"
-          ? { category: "other", limit: QUEUE, include_transfers: false, lang, sort: "abs_amount", order: "desc" }
+          ? { category: defaultCategory, limit: QUEUE, include_transfers: false, lang, sort: "abs_amount", order: "desc" }
           : {
               category_source: "model",
-              max_confidence: LOWCONF_MAX,
+              max_confidence: modelThreshold! + LOWCONF_BAND,
               limit: QUEUE,
               include_transfers: false,
               lang,
               sort: "abs_amount",
               order: "desc",
             },
-      ),
-    [lang, mode],
+      );
+    },
+    [lang, mode, defaultCategory, modelThreshold],
   );
   const [labelled, setLabelled] = useState<Record<string, string>>({});
 
@@ -61,15 +71,25 @@ export function Review() {
       const src = r.category_source ?? "unknown";
       bySource.set(src, (bySource.get(src) ?? 0) + 1);
       if (r.category_confidence != null) { confSum += r.category_confidence; confN += 1; }
-      if (r.category === "other") other += 1;
+      if (r.category === defaultCategory) other += 1;
     }
     const total = rows.length;
-    const breakdown = SOURCE_ORDER.filter((s) => bySource.has(s)).map((s) => ({
-      source: s, n: bySource.get(s)!, pct: (bySource.get(s)! / total) * 100, ...SOURCE_META[s],
+    // Known provenances in trust order, then anything unexpected — visible
+    // with fallback styling rather than silently dropped from the breakdown.
+    const ordered = [
+      ...TRUST_ORDER.filter((s) => bySource.has(s)),
+      ...[...bySource.keys()].filter((s) => !TRUST_ORDER.includes(s)).sort(),
+    ];
+    const breakdown = ordered.map((s) => ({
+      source: s,
+      n: bySource.get(s)!,
+      pct: (bySource.get(s)! / total) * 100,
+      label: SOURCE_META[s] ? undefined : s,
+      ...(SOURCE_META[s] ?? { tkey: undefined, ...UNLISTED_META }),
     }));
     const sure = breakdown.filter((b) => b.trust === "sure").reduce((a, b) => a + b.n, 0);
     return { total, breakdown, surePct: (sure / total) * 100, otherPct: (other / total) * 100, avgConf: confN ? confSum / confN : 0 };
-  }, [sample.data]);
+  }, [sample.data, defaultCategory]);
 
   async function relabel(row: TransactionRow, code: string) {
     setLabelled((m) => ({ ...m, [row.natural_key]: code }));
@@ -115,7 +135,7 @@ export function Review() {
             <div className="ranks">
               {trust.breakdown.map((b) => (
                 <div key={b.source} className="rank" style={{ cursor: "default", gridTemplateColumns: "148px 1fr 92px" }}>
-                  <span className="name"><span className="swatch" style={{ background: b.color }} />{t(b.tkey)}</span>
+                  <span className="name"><span className="swatch" style={{ background: b.color }} />{b.tkey ? t(b.tkey) : b.label}</span>
                   <span className="track"><span className="fill" style={{ width: `${b.pct}%`, background: b.color }} /></span>
                   <span className="amt">{b.n} · {Math.round(b.pct)}%</span>
                 </div>
@@ -184,7 +204,7 @@ export function Review() {
                       {mode === "lowconf" ? <span className="dim guess">{catLabel(tx.category)}</span> : null}
                       <select className="cat" defaultValue="" onChange={(e) => e.target.value && relabel(tx, e.target.value)}>
                         <option value="" disabled>{t("rev.choose")}</option>
-                        {categoryCodes.filter((c) => mode === "lowconf" || c !== "other").map((c) => (
+                        {categoryCodes.filter((c) => mode === "lowconf" || c !== defaultCategory).map((c) => (
                           <option key={c} value={c}>{catLabel(c)}</option>
                         ))}
                       </select>

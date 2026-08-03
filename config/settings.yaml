@@ -1,5 +1,7 @@
 # Tunable settings (data, not logic). Mounted as the cashato-config ConfigMap
-# (kustomize name-hash: editing this rolls the pods, no image rebuild).
+# (STABLE name, no kustomize hash: editing this deploys via Argo without an
+# image rebuild, but pods keep the old copy until restarted —
+# `kubectl rollout restart deploy -n cashato` after a config-only change).
 # Infra endpoints (DATABASE_URL, NATS_URL) stay as env vars / Secrets.
 
 categorization:

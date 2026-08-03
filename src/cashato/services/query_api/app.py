@@ -30,9 +30,9 @@ from cashato.obs import (
     start_metrics_server,
     tracing_enabled,
 )
-from cashato.parsers.categorize import Categorizer
+from cashato.parsers.categorize import CATEGORY_SOURCES, Categorizer
 from cashato.parsers.registry import SOURCE_NAMES
-from cashato.recurrence import ASSET_CATEGORIES, detect_recurring
+from cashato.recurrence import detect_recurring
 
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 _log = setup_logging("query-api")
@@ -372,6 +372,14 @@ class MetaResponse(BaseModel):
     sources: list[SourceMeta]
     categories: list[CategoryMeta]
     languages: list[str]
+    # The default code, the wealth-not-consumption codes and the provenance
+    # vocabulary are pipeline knowledge too: published here so no client
+    # hardcodes 'other', an asset list, or a threshold that drifts the moment
+    # the config is recalibrated.
+    default_category: str
+    asset_categories: list[str]
+    category_sources: list[str]
+    model_threshold: float
     allowed_extensions: list[str]
     max_file_bytes: int
     max_files_per_batch: int
@@ -561,6 +569,10 @@ def meta():
             {"code": code, "labels": labels} for code, labels in sorted(_CAT.categories.items())
         ],
         "languages": _CAT.languages,
+        "default_category": _CAT.default,
+        "asset_categories": sorted(_CAT.asset_categories),
+        "category_sources": list(CATEGORY_SOURCES),
+        "model_threshold": _CAT.model_threshold,
         "allowed_extensions": setting("uploads.allowed_extensions", [".pdf", ".csv", ".xlsx"]),
         "max_file_bytes": int(setting("uploads.max_file_bytes", 10 * 1024 * 1024)),
         "max_files_per_batch": int(setting("uploads.max_files_per_batch", 50)),
@@ -719,9 +731,12 @@ def recurring(lang: str = _LANG, active_only: bool = False):
     groups = detect_recurring(rows)
     if active_only:
         groups = [g for g in groups if g.active]
-    # Asset-destined recurrences (an ETF savings plan) are listed but kept out
-    # of the spend/income totals, same line gold's spend views draw.
-    consumption = [g for g in groups if g.active and g.category not in ASSET_CATEGORIES]
+    # Asset-destined recurrences (an ETF savings plan, a pension contribution)
+    # are listed but kept out of the spend/income totals — the same line gold's
+    # spend views draw, read from the same declared list.
+    consumption = [
+        g for g in groups if g.active and g.category not in _CAT.asset_categories
+    ]
     return {
         "lang": lang,
         "horizon": max((r["value_date"] for r in rows), default=None),
@@ -842,6 +857,7 @@ _SORT_COLS = {
     "description": "description",
     "category": "category",
     "account": "account",
+    "confidence": "category_confidence",
 }
 
 
@@ -853,7 +869,7 @@ def transactions(
     category: str | None = Query(default=None, description="Filter by category code"),
     category_source: str | None = Query(
         default=None,
-        description="Filter by how the category was assigned (mcc|model|rule|manual|default)",
+        description=f"Filter by how the category was assigned: one of {list(CATEGORY_SOURCES)}",
     ),
     sign: str | None = Query(default=None, description="'income' (amount>0) or 'expense' (amount<0)"),
     date_from: date | None = Query(default=None, description="Value date >= (inclusive)"),
@@ -880,6 +896,11 @@ def transactions(
     """
     if sign not in (None, "income", "expense"):
         raise HTTPException(status_code=422, detail="sign must be 'income' or 'expense'")
+    if category_source is not None and category_source not in CATEGORY_SOURCES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"category_source must be one of {list(CATEGORY_SOURCES)}",
+        )
     if sort not in _SORT_COLS:
         raise HTTPException(status_code=422, detail=f"sort must be one of {sorted(_SORT_COLS)}")
     if order not in ("asc", "desc"):

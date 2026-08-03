@@ -31,7 +31,7 @@ def relink_all(
     """Reset and recompute ``transfer_group`` over all of silver, in one
     transaction. Returns ``(pairs, volume_excluded, net_after)``."""
     engine = engine or get_engine()
-    window = int(setting("transfers.window_days", 3)) if window_days is None else window_days
+    window = int(setting("transfers.window_days", 4)) if window_days is None else window_days
     net_sql = "SELECT coalesce(sum(amount), 0) FROM silver.transactions WHERE transfer_group IS NULL"
     with engine.begin() as conn:
         conn.execute(text("UPDATE silver.transactions SET transfer_group = NULL"))
@@ -63,7 +63,7 @@ def relink_all(
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--window", type=int, default=int(setting("transfers.window_days", 3)))
+    ap.add_argument("--window", type=int, default=int(setting("transfers.window_days", 4)))
     args = ap.parse_args()
 
     n_pairs, moved, net_after = relink_all(window_days=args.window)

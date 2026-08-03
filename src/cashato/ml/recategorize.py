@@ -5,7 +5,7 @@ rows already in the DB, without re-parsing files. Uses ``models/latest.joblib``
 if present (ML layer), with a confidence threshold. Reports the drop in ``other``.
 
 Usage:
-    ./.venv/bin/python ml/recategorize.py --threshold 0.55
+    ./.venv/bin/python ml/recategorize.py --threshold 0.75
 """
 
 from __future__ import annotations
@@ -24,8 +24,10 @@ MODEL_PATH = MODEL_DIR / "latest.joblib"
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    # The fallback mirrors the shipped settings.yaml value: a missing config
+    # must not lower the bar the batch applies vs what live resolution uses.
     ap.add_argument(
-        "--threshold", type=float, default=setting("categorization.model_threshold", 0.55)
+        "--threshold", type=float, default=setting("categorization.model_threshold", 0.75)
     )
     args = ap.parse_args()
 
@@ -35,10 +37,10 @@ def main() -> int:
 
     engine = get_engine()
     other_pct = (
-        "SELECT count(*) FILTER (WHERE category='other')::float/count(*) FROM silver.transactions"
+        "SELECT count(*) FILTER (WHERE category=:d)::float/count(*) FROM silver.transactions"
     )
     with engine.begin() as conn:
-        before = conn.execute(text(other_pct)).scalar_one()
+        before = conn.execute(text(other_pct), {"d": cat.default}).scalar_one()
         rows = conn.execute(
             # A user correction is ground truth, and this tool runs AFTER a
             # retrain — re-resolving every row would silently overwrite the very
@@ -65,7 +67,7 @@ def main() -> int:
                 for r, res in zip(rows, results, strict=True)
             ],
         )
-        after = conn.execute(text(other_pct)).scalar_one()
+        after = conn.execute(text(other_pct), {"d": cat.default}).scalar_one()
 
     print(f"Re-categorized {len(rows)} rows. other: {before * 100:.1f}% -> {after * 100:.1f}%")
     return 0

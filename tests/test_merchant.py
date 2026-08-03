@@ -204,3 +204,14 @@ def test_invalid_clock_values_are_dropped() -> None:
         "CARTA 1234 XXXX XXXX XX99 PRESSO ESEMPIO MILANO"
     )
     assert _m("intesa", desc) == ("ESEMPIO MILANO", None)
+
+
+def test_every_registered_source_declares_a_merchant_strategy():
+    """A drop-in adapter must decide about merchants, not default to silence.
+
+    ``None`` is a legitimate entry ("no extractable merchant in this source's
+    texts") — a MISSING entry is the bug this guards against."""
+    from cashato.parsers.merchant import _BY_SOURCE
+    from cashato.parsers.registry import SOURCE_NAMES
+
+    assert set(_BY_SOURCE) == set(SOURCE_NAMES)

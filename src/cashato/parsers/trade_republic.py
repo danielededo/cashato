@@ -85,15 +85,6 @@ _H_BALANCE = {"SALDO", "BALANCE"}
 # (which also has "IN ENTRATA / IN USCITA / SALDO FINALE").
 _H_DESC = {"DESCRIZIONE", "DESCRIPTION"}
 
-# Types/descriptions that mark investments (IT + EN)
-_INVEST_RE = re.compile(
-    r"savings plan|piano di accumulo|dividend|dividendo|interest|interess|"
-    r"\betf\b|\bishares\b|buy order|sell order|acquisto titoli|vendita titoli|"
-    r"\bisin\b|reinvest",
-    re.IGNORECASE,
-)
-_ISIN_RE = re.compile(r"\b[A-Z]{2}[A-Z0-9]{9}[0-9]\b")
-
 # Numero monetario IT (1.234,56) o EN (1,234.56)
 _MONEY_IT = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$|^\d+,\d{2}$")
 _MONEY_EN = re.compile(r"^\d{1,3}(?:,\d{3})*\.\d{2}$|^\d+\.\d{2}$")

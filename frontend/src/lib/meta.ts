@@ -31,6 +31,14 @@ export interface Meta {
   categoryCodes: string[];
   /** Localized label for a code; falls back to the code itself, never invents one. */
   catLabel: (code: string | null | undefined) => string;
+  /** The backend's fallback code; "other" only until /meta answers. */
+  defaultCategory: string;
+  /** Wealth-not-consumption codes (spend figures exclude these). */
+  assetCategories: string[];
+  /** category_source vocabulary, resolver-priority order. */
+  categorySources: string[];
+  /** Calibrated model cut; null until loaded — don't build queues on a guess. */
+  modelThreshold: number | null;
   acceptAttr: string;
   maxFileBytes: number;
   maxFilesPerBatch: number;
@@ -61,6 +69,10 @@ export function useMeta(): Meta {
     sourceLabel: (id) => (id ? (sourceLabels.get(id) ?? id.replace(/_/g, " ")) : "—"),
     categoryCodes: data?.categories.map((c) => c.code) ?? [],
     catLabel,
+    defaultCategory: data?.default_category ?? "other",
+    assetCategories: data?.asset_categories ?? [],
+    categorySources: data?.category_sources ?? [],
+    modelThreshold: data?.model_threshold ?? null,
     acceptAttr: (data?.allowed_extensions ?? []).join(","),
     maxFileBytes: data?.max_file_bytes ?? 0,
     maxFilesPerBatch: data?.max_files_per_batch ?? 50,

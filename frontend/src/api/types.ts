@@ -272,7 +272,7 @@ export interface TransactionFilters {
   min_confidence?: number;
   max_confidence?: number;
   include_transfers?: boolean;
-  sort?: "date" | "amount" | "abs_amount" | "description" | "category" | "account";
+  sort?: "date" | "amount" | "abs_amount" | "description" | "category" | "account" | "confidence";
   order?: "asc" | "desc";
   limit?: number;
   offset?: number;
@@ -386,6 +386,14 @@ export interface MetaResponse {
   sources: { id: string; label: string }[];
   categories: { code: string; labels: Record<string, string> }[];
   languages: string[];
+  /** The fallback code ("nobody knew") — never restate it as a literal. */
+  default_category: string;
+  /** Wealth-not-consumption codes: spend figures exclude these. */
+  asset_categories: string[];
+  /** category_source vocabulary, in resolver-priority order. */
+  category_sources: string[];
+  /** The calibrated cut below which the model's guess is not trusted. */
+  model_threshold: number;
   allowed_extensions: string[];
   max_file_bytes: number;
   max_files_per_batch: number;

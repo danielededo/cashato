@@ -1,11 +1,33 @@
-// Formatting helpers. Amounts are EUR (the platform is EUR-only today).
+// Formatting helpers. Amounts are EUR (the platform is EUR-only today: the
+// parsers drop other currencies at ingest, so one formatter is honest).
+//
+// Dates and month names follow the UI language. LangProvider pushes it here
+// (setFormatLocale) so the ~20 call sites don't each thread a lang param;
+// components re-render on a language switch, so they re-call these helpers.
 
-const eur = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
-const eur0 = new Intl.NumberFormat("it-IT", {
+import type { Lang } from "../api/types";
+
+// en-GB, not en-US: day-first dates match what an Italian bank's data reader
+// expects even in the English UI; month names come out English either way.
+const LOCALES: Record<Lang, string> = { it: "it-IT", en: "en-GB" };
+
+let locale: string = LOCALES.it;
+let eur = new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" });
+let eur0 = new Intl.NumberFormat(locale, {
   style: "currency",
   currency: "EUR",
   maximumFractionDigits: 0,
 });
+
+export function setFormatLocale(lang: Lang): void {
+  locale = LOCALES[lang];
+  eur = new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" });
+  eur0 = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  });
+}
 
 export function money(n: number | null | undefined): string {
   return n == null ? "—" : eur.format(n);
@@ -19,14 +41,14 @@ export function moneyShort(n: number | null | undefined): string {
   return eur0.format(n);
 }
 
-/** Short month for dense axes: "Mar '24". */
+/** Short month for dense axes: "Mar '24" / "mar '24". */
 export function monthShort(iso: string): string {
   const d = new Date(iso);
-  return `${d.toLocaleDateString("en-US", { month: "short" })} '${String(d.getFullYear()).slice(2)}`;
+  return `${d.toLocaleDateString(locale, { month: "short" })} '${String(d.getFullYear()).slice(2)}`;
 }
 
 export function dateLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("it-IT");
+  return new Date(iso).toLocaleDateString(locale);
 }
 
 /** A local calendar date as `YYYY-MM-DD`, for date filters sent to the API.

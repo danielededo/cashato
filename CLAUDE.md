@@ -204,7 +204,8 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   `config/settings.yaml` (thresholds, embed model, transfer window, upload caps),
   `config/categories.yaml`, `config/mcc.yaml`, `config/banks.yaml` (ABI -> bank
   name; most statements never name their own bank but all carry an IBAN).
-  Editing one deploys via Argo with no image rebuild. Infra endpoints/secrets
+  Editing one deploys via Argo with no image rebuild (stable ConfigMap name, no
+  kustomize hash: running pods need a `rollout restart` to pick it up). Infra endpoints/secrets
   stay env/Secret. (There is no `sources.yaml` — the source registry is code,
   see "Add a source".)
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,

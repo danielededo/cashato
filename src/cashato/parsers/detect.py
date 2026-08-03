@@ -59,7 +59,10 @@ def head_text(path: Path) -> str | None:
             return _csv_head(path)
         if suffix == ".pdf":
             return _pdf_head(path)
-        if suffix in (".xlsx", ".xls"):
+        # .xls (the legacy binary format) is deliberately NOT here: uploads
+        # reject it (settings.yaml allowed_extensions) and openpyxl cannot
+        # read it, so accepting it in detection was a dead promise.
+        if suffix == ".xlsx":
             return _xlsx_head(path)
     except Exception:
         return None

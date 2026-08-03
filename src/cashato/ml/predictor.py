@@ -35,7 +35,7 @@ except Exception:  # noqa: BLE001
 
 from cashato.ml.model import EmbeddingKNN  # noqa: E402
 from cashato.ml.registry import load_champion  # noqa: E402
-from cashato.parsers.categorize import build_text  # noqa: E402
+from cashato.parsers.categorize import Categorizer, build_text  # noqa: E402
 
 DEFAULT_NAME = "cashato-categorizer"
 
@@ -45,9 +45,14 @@ class CategorizerModel(kserve.Model):
         super().__init__(name)
         self.name = name
         self._model: EmbeddingKNN | None = None
+        self._default = "other"
         self.load()
 
     def load(self) -> None:
+        # The configured fallback code, read once at startup with the model:
+        # a no-prediction answer must degrade to the SAME code the resolver
+        # chain uses, not to a literal that drifts from categories.yaml.
+        self._default = Categorizer.load().default
         self._model = load_champion()
         if self._model is None:
             raise RuntimeError("no @champion model in the MLflow registry")
@@ -70,7 +75,7 @@ class CategorizerModel(kserve.Model):
         out = [
             {"category": p[0], "confidence": round(p[1], 4)}
             if p
-            else {"category": "other", "confidence": 0.0}
+            else {"category": self._default, "confidence": 0.0}
             for p in preds
         ]
         return {"predictions": out}
