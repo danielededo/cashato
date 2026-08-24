@@ -8,11 +8,15 @@ The config directory is resolved from ``CASHATO_CONFIG_DIR`` — a read-only mou
 ConfigMap in the cluster; defaults to ``./config`` for local dev. Model artifacts
 likewise resolve from ``CASHATO_MODEL_DIR`` (default ``./models``).
 
-Values are cached for the life of the process (``@cache``). That is safe in the
-cluster because the ConfigMap is generated with a kustomize name hash: editing
-``config/*.yaml`` produces a NEW ConfigMap name, Argo rewrites the Deployments,
-and the pods roll — a process never outlives its config version. Anywhere else
-(local scripts, notebooks) an edit needs a process restart to be seen.
+Values are cached for the life of the process (``@cache``), and nothing
+invalidates that cache — in the cluster included. The ConfigMap is deliberately
+generated with ``disableNameSuffixHash: true`` (a stable name, so the same
+object can be referenced across namespaces), which means editing
+``config/*.yaml`` updates it **in place**: Argo applies the new content, no
+Deployment is rewritten, and the running pods keep serving the values they read
+at startup. Picking up a config change therefore always takes a restart —
+``kubectl rollout restart deploy`` in the cluster, a new process anywhere else.
+This is the documented contract, not an accident (see ``config/README.md``).
 """
 
 from __future__ import annotations

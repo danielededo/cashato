@@ -143,19 +143,33 @@ is `hash(account, value_date, amount, occurrence_index)` — format-independent
 
 The stored category is always a language-neutral **code** (e.g. `dining`);
 per-language labels live in `config/categories.yaml` (add a language = add a key,
-no code change). The resolver walks universal signals in priority order:
+no code change). MCC wins outright when present; between the model and the
+keyword rules the order is decided **per row**, by whether a merchant could be
+extracted from the description:
 
 ```mermaid
 flowchart LR
     T["transaction"] --> MCC{"MCC code?<br/>(ISO 18245)"}
     MCC -- "yes" --> A["category<br/>(source: mcc)"]
-    MCC -- "no" --> ML{"embedding kNN<br/>confidence ≥ threshold?"}
+    MCC -- "no" --> M{"merchant<br/>extracted?"}
+    M -- "yes" --> ML{"embedding kNN<br/>confidence ≥ threshold?"}
     ML -- "yes" --> B["category<br/>(source: model)"]
-    ML -- "no" --> R{"keyword rule?"}
+    ML -- "no" --> R2{"keyword rule?"}
+    M -- "no" --> R{"keyword rule?"}
     R -- "yes" --> C["category<br/>(source: rule)"]
-    R -- "no" --> D["other<br/>(source: default)"]
+    R -- "no" --> ML2{"embedding kNN<br/>confidence ≥ threshold?"}
+    ML2 -- "yes" --> B
+    ML2 -- "no" --> D["other<br/>(source: default)"]
+    R2 -- "yes" --> C
+    R2 -- "no" --> D
     U["user correction"] -. "always wins, never overwritten" .-> E["category<br/>(source: manual)"]
 ```
+
+**Why the order flips.** With a merchant the model leads: embeddings generalize
+to merchants no rule has ever heard of. Without one the feature text is
+operation boilerplate where every wire transfer looks like every other — the
+distinguishing word (*"Affitto"*) drowns for the embedding but is exactly what a
+keyword rule reads, so rules lead there (`parsers/categorize.py`).
 
 > Design choice: we do **not** depend on providers' native categories
 > (taxonomies differ/are inconsistent/often absent). Canonical labels are ours
@@ -196,8 +210,9 @@ Upload statements from the Upload page (or use the synthetic ones in
 published directly for `curl` and OpenAPI: `http://localhost:8000/docs`
 (ingest) and `http://localhost:8001/docs` (query).
 
-It is the same four service images the cluster runs — every endpoint the code
-needs is an environment variable, so nothing is forked or stubbed. Two things
+It builds the same images the cluster runs — one shared `svc` image behind all
+three service containers, plus `migrate` and `frontend` — and every endpoint the
+code needs is an environment variable, so nothing is forked or stubbed. Two things
 differ on purpose, both documented at the top of `compose.yaml`: a single
 Postgres role instead of the least-privilege split CNPG provisions, and no
 `categorizer` (it serves the model through KServe; without it the resolver
@@ -289,9 +304,14 @@ Metrics are tracked with **MLflow** if installed, otherwise the step is skipped.
 ## Development
 
 ```bash
-make install-dev        # runtime + ruff/mypy/pytest/pre-commit
+make install            # package + svc/migrate extras + ruff/mypy/pytest/pre-commit
 make lint && make test  # ruff + unit tests (no DB/data needed)
 ```
+
+Use `make install`, not `make install-dev`: the latter installs the `dev` extra
+alone, and the suite imports `fastapi` and `nats` (in `test_csrf_guard.py` and
+`test_messaging.py`), which live in `svc`. Both CI paths install `.[svc,dev]`
+for the same reason.
 
 Verification scripts reconcile each adapter against the statement's declared
 totals: `tests/verify_{revolut,trade_republic,intesa}.py`.
@@ -301,9 +321,12 @@ totals: `tests/verify_{revolut,trade_republic,intesa}.py`.
 ```
 src/cashato/      the installable package (pip install -e .)
   config.py (settings loader) · obs.py (logs/metrics/traces) · messaging.py (NATS) · objstore.py (MinIO) · transfers.py
+  recurrence.py (recurring-movement detection) · coverage.py (per-source staleness/holes) · model_client.py (KServe)
   parsers/        base.py (Transaction, Decimal, dedup) · registry.py (auto-discovered adapters)
                   revolut.py · trade_republic.py · intesa.py (each: parse + DETECTION) · detect.py · categorize.py
+                  merchant.py (counterparty + time-of-day out of the description)
   ml/             label_llm.py · train.py · model.py (EmbeddingKNN) · recategorize.py · predictor.py
+                  registry.py (MLflow @champion) · register_model.py
   db/             db.py (engine) · migrations/ (Alembic)
   services/       ingest_api · etl_worker · query_api · categorizer   (launched via python -m / uvicorn)
   cli/            load.py · export.py · link_transfers.py   (console scripts: cashato-load / -export / -link-transfers)
@@ -311,9 +334,14 @@ frontend/         React + Vite + TS SPA, served by nginx behind the gateway
 config/           settings.yaml · categories.yaml · mcc.yaml · banks.yaml   (runtime ConfigMap; not baked into images)
 docker/           Dockerfile.{svc,migrate,frontend,train,predict,mlflow}
 infra/            OpenTofu (kind + operators)      k8s/   GitOps manifests (Argo CD)
-demo/             synthetic statements (Mario Bianchi) — fixtures + regression pins
+demo/             generate.py → synthetic statements (Mario Bianchi) + expected_transactions.csv
+                  other_banks/ (files that must stay UNCLAIMED) · DETECTION_COLLISIONS.md
 scripts/          secret-zero.sh · seal-secrets.sh · build-images.sh · gitea-repos.sh
 tests/            unit tests + manual verification scripts
+.github/          Actions (lint/type/test, CodeQL) + Dependabot — the contributor-facing CI
+compose.yaml      the whole app on a laptop, no Kubernetes
+CLAUDE.md         architecture and conventions in depth
+alembic.ini · Makefile · pyproject.toml
 data/  output/  models/   (git-ignored: real statements, exports, model artifacts)
 ```
 

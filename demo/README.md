@@ -23,9 +23,12 @@ same files, so these double as **test fixtures**.
    column geometry derived from the header words' right edges, so amounts are
    right-aligned under their header). Detection is content-based, so each file
    embeds its source's `DETECTION` markers — and avoids the *other* sources'
-   markers (detection runs in registry order: intesa → revolut →
-   trade_republic; that is why the TR statement is titled "RENDICONTO", not
-   "Estratto conto").
+   markers. Registry order is explicitly **not** a tie-breaker: `detect.py`
+   scores every source, the one matching most markers wins, and a tie at the top
+   reports AMBIGUOUS rather than resolving by discovery order (which is just
+   alphabetical `pkgutil`). So the fixtures have to be unambiguous on content
+   alone — that is why the TR statement is titled "RENDICONTO", not "Estratto
+   conto". See [`DETECTION_COLLISIONS.md`](DETECTION_COLLISIONS.md).
 2. **One ground truth, many renderings.** An 18-month synthetic financial life
    (salary, rent, utilities, groceries, subscriptions, ETF savings plan,
    internal transfers) is generated once, then rendered into all six formats.

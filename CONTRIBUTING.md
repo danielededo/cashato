@@ -25,8 +25,12 @@ make test        # pytest (unit tests, no DB/data needed)
 
 Before opening a PR: `make lint && make test` must pass.
 
-> CI/CD: **Tekton** (lint/test/build + ML pipeline) + **Argo CD**
-> (GitOps deploy), self-hosted on the cluster — not GitHub Actions.
+> CI/CD runs in two places, on purpose. **GitHub Actions** is the gate your PR
+> sees: ruff, mypy, pytest and the frontend type-check/build, mirroring the
+> Tekton task step for step so a green check means the same thing in both.
+> **Tekton + Argo CD**, self-hosted on the cluster, own build/push/deploy —
+> which GitHub cannot drive, since the EventListener has no public ingress and
+> the registry is in-cluster.
 
 ## Conventions
 

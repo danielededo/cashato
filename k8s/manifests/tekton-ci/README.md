@@ -88,7 +88,8 @@ it replays the exact payload through the same interceptors.
 kubectl -n cashato-ci get pipelinerun -w   # or the Tekton Dashboard
 ```
 
-The `TektonConfig` pruner keeps the last 20 runs.
+The `TektonConfig` pruner keeps the last 5 runs (`tektonconfig.yaml`: `keep: 5`,
+daily at 13:30).
 
 ## Files
 

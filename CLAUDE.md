@@ -143,7 +143,12 @@ bilingual maps for months/headers/operation types.
 ## Categorization (provider-agnostic, i18n)
 
 Never depend on providers' native categories (inconsistent, often absent, biasing).
-Resolver chain (order = priority) over **universal** signals:
+Resolver chain over **universal** signals. MCC wins outright; **steps 2 and 3
+swap per row** (`categorize.py`: `order = ("model","rule") if merchant_led else
+("rule","model")`) — with a merchant the model leads because embeddings
+generalize to merchants no rule has heard of, without one the text is operation
+boilerplate where every wire transfer looks alike and the distinguishing word
+("Affitto") drowns for the embedding while being exactly what a keyword reads:
 
 1. **MCC** (ISO 18245, `config/mcc.yaml`) — exact, high precision.
 2. **Embedding model** — `EmbeddingKNN` (`src/cashato/ml/model.py`): multilingual
