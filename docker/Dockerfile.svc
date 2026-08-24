@@ -2,7 +2,7 @@
 # The specific command is set by k8s (uvicorn cashato.services.<svc>.app:app or
 # python -m cashato.services.<svc>.worker). config/*.yaml is NOT baked — it is a
 # runtime ConfigMap mounted at CASHATO_CONFIG_DIR.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 

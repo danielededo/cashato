@@ -5,7 +5,7 @@
 # torch is installed CPU-only from the dedicated index (kind has no GPU). The
 # sentence-transformers embedding model is pre-downloaded at build time so runs
 # are reproducible and need no internet. config/*.yaml is a runtime ConfigMap.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
