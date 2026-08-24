@@ -1,0 +1,45 @@
+# Static security analysis, free on public repos. The weekly run matters as
+# much as the per-push one: CodeQL ships new queries and advisories after code
+# is already merged, so a repo that only scans on push stops learning.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Monday 06:00 UTC. Runs on GitHub's hardware, so unlike the CNPG backup
+    # this one does not care that the workstation sleeps at night.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      # Only this job may write findings to the Security tab.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-and-quality is noisier than the default but this is a
+          # data pipeline handling bank statements: prefer the false positives.
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

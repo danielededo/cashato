@@ -1,0 +1,52 @@
+# Every dependency in this repo is pinned somewhere: `==` in pyproject, a
+# lockfile in frontend/, base image tags in docker/, action tags in
+# .github/workflows/. Dependabot is what keeps those pins from silently rotting.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # The OTel SDK and its instrumentation packages are one release train on
+      # two version lines (1.29.0 / 0.50b0). Bumping one without the others is
+      # a known breakage, so they must arrive in a single PR.
+      opentelemetry:
+        patterns: ["opentelemetry-*"]
+      # Lint/type/test tooling: noisy, low-risk, and only ever fails the CI it
+      # is part of — no reason for four separate PRs.
+      dev-tooling:
+        patterns: ["ruff", "mypy", "pytest", "pre-commit", "types-*"]
+      # torch is installed from the CPU wheel index in the train/predict
+      # Dockerfiles, so these three move together or not at all.
+      ml-stack:
+        patterns: ["scikit-learn", "sentence-transformers", "mlflow", "joblib"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      fontsource:
+        patterns: ["@fontsource/*"]
+
+  # Base images in docker/ (python:3.12-slim, node:22-alpine, nginx-unprivileged).
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

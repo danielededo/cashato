@@ -15,6 +15,9 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+# ruff writes a self-ignoring .ruff_cache/.gitignore, so this is belt-and-braces
+# — but `make clean` treats all three caches alike and so should this file.
+.ruff_cache/
 
 # Environment
 .env
@@ -42,6 +45,13 @@ frontend/.vite/
 
 # macOS Finder debris
 .DS_Store
+
+# Claude Code per-machine state. Until now these were only ignored by the
+# author's global gitconfig and .git/info/exclude — neither of which travels
+# with a clone, so anyone else checking the repo out saw them as untracked.
+# A shared .claude/settings.json stays versionable; the local ones do not.
+.claude/settings.local.json
+.claude/*.lock
 
 # setuptools debris from a non-editable pip install
 build/

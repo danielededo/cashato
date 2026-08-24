@@ -1,0 +1,75 @@
+# Mirrors the in-cluster Tekton lint-test task
+# (k8s/manifests/tekton-ci/base/task-lint-test.yaml) so a green check here
+# means exactly what a green check means there. Build/push/deploy deliberately
+# stay in Tekton: the OCI registry and the Argo config repo live inside the
+# kind cluster and are unreachable from a GitHub runner.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A public repo invites drive-by pull requests: hand the token nothing but
+# read access, and let a newer push cancel the run it supersedes.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: lint · types · tests
+    runs-on: ubuntu-latest
+    env:
+      # The unit tests load categories/mcc/settings from the repo tree, not
+      # from the path baked into the service images.
+      CASHATO_CONFIG_DIR: config
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Same extras as Tekton: the unit tests exercise the rule/mcc chain and
+      # transfer pairing, so no torch and no model download.
+      - name: Install (package + svc runtime + dev tools)
+        run: pip install '.[svc,dev]'
+
+      - name: Lint (make lint)
+        run: ruff check .
+
+      - name: Type-check (make typecheck)
+        run: mypy src
+
+      - name: Unit tests (make test)
+        run: python -m pytest
+
+  frontend:
+    name: frontend types · build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 to match docker/Dockerfile.frontend — CI should fail on what
+      # the shipped image would fail on, not on what the author's laptop has.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # `npm run build` is `tsc --noEmit && vite build`: a type error fails here.
+      - name: Type-check and build
+        run: npm run build
