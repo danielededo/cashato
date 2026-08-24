@@ -8,7 +8,7 @@ heavy ML ones are built manually (torch is too slow for buildah-on-kind).
 | `cashato/svc` | `Dockerfile.svc` | ingest-api, etl-worker, query-api, categorizer (one image, command set by k8s) | **CI** on push |
 | `cashato/migrate` | `Dockerfile.migrate` | Alembic migration Job + grants Job; also the CI `bump-deploy` step (git baked in) | **CI** on push |
 | `cashato/frontend` | `Dockerfile.frontend` | the SPA — node build stage → hardened nginx | **CI** on push |
-| `cashato/train` | `Dockerfile.train` | retrain CronJob + champion import Job (torch CPU, embed model pre-downloaded) | `scripts/build-images.sh` |
+| `cashato/train` | `Dockerfile.train` | retrain CronJob + champion import Job (torch CPU, embed model pre-downloaded). **Bakes `models/latest.joblib`**, which is gitignored — so this image cannot be built from a bare clone, and `build-images.sh` skips it until a model exists | `scripts/build-images.sh` |
 | `cashato/predict` | `Dockerfile.predict` | KServe custom predictor; pulls the model from MLflow `@champion` at startup | `scripts/build-images.sh` |
 | `cashato/mlflow` | `Dockerfile.mlflow` | MLflow tracking + registry (adds psycopg2 for CNPG, boto3 for MinIO) | `scripts/build-images.sh` |
 
