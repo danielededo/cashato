@@ -97,8 +97,7 @@ cd infra && tofu init && tofu apply && cd ..
 #    ciphertext changes even when the plaintext does not). Offline against the
 #    cert file, no cluster needed. Commit the result — step 6 pushes it, and
 #    Argo cannot apply what it cannot see.
-#    INCOMPLETE, KNOWINGLY: it rewrites 13 of the 18 committed SealedSecrets.
-#    See the gap noted below before you rely on CI or on DB backups.
+#    Covers all 18, the CI's four included — see below.
 ./scripts/seal-secrets.sh
 
 # 4. Images. The overlays reference registry-less `cashato/*:dev` tags; this
@@ -142,26 +141,14 @@ manifests until step 6 pushes them. Both clear on their own — Argo retries.
 Pods that come up before step 4 sit in `ImagePullBackOff` for the same reason,
 and recover once the `:dev` tags are loaded.
 
-### Known gap: four SealedSecrets no script regenerates
+### What step 3 covers
 
-`seal-secrets.sh` rewrites 14 of the 18 committed `SealedSecret`s. The other
-four are all the CI's, so on a fork they stay encrypted to the upstream key and
-fail with a decryption error no sealing key can fix:
-
-| Not regenerated | Breaks |
-|---|---|
-| `k8s/manifests/tekton-ci/base/sealedsecret-dockerconfig.yaml` | pushing built images |
-| `…/sealedsecret-git-basic-auth.yaml` | the CI's git clone/push |
-| `…/sealedsecret-gitea-admin.yaml` | the webhook-creation Job |
-| `…/sealedsecret-webhook-secret.yaml` | the HMAC check on the webhook |
-
-So a fork gets a working *application* and working *backups*, but a dead *CI
-loop* until those four are re-sealed by hand with `kubeseal`. Nothing tracked
-generates `infra/secrets/webhook-secret.env` either, which is the other half of
-the same gap. It is a real dent in the rule `scripts/README.md` states for
-itself — "git + `infra/secrets/` must be enough to rebuild everything" — and it
-is recorded rather than glossed because the remedy touches live CI credentials
-and deserves its own pass.
+All 18 committed `SealedSecret`s, the CI's four included — so a fork gets a
+working application, working database backups **and** a working CI loop from
+`git` plus its own secret zero, with nothing to re-seal by hand. The four CI
+ones are derived, not stored: the Gitea bridge credential projected into three
+shapes (basic-auth, a git credential store, a Docker `config.json`) plus the
+webhook HMAC token, which `secret-zero.sh` now generates like everything else.
 
 ### Why the Applications point at an in-cluster address
 
