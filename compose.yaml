@@ -1,0 +1,158 @@
+# The whole application on a laptop: no Kubernetes, no Gitea, no Argo, no Tekton.
+#
+#   docker compose up --build      then open http://localhost:8080
+#
+# This is the middle rung of three ways in. Below it, `cashato-load` needs only a
+# Postgres and gives you a categorized CSV (see the README quick start). Above
+# it, infra/ + k8s/ run the same four services on kind with GitOps, MLflow,
+# KServe and the LGTM stack. Same images, same code, same config files — the
+# service URLs are all environment variables with localhost defaults, so nothing
+# here is a fork of anything.
+#
+# Two deliberate divergences from the cluster, both trades for laptop ergonomics:
+#
+#   1. ONE Postgres role (`cashato`) instead of the least-privilege
+#      etl_writer/query_reader/ml_reader split that CNPG provisions and the
+#      db-grants Job locks down. The baseline migration guards every GRANT with
+#      `IF EXISTS (SELECT FROM pg_roles …)`, so it simply skips them here.
+#   2. The two APIs are published on the host (8000/8001) so `curl` and
+#      `/docs` are one hop away; in the cluster they are reachable only through
+#      the gateway. The SPA itself never uses them — it calls relative URLs on
+#      :8080 and nginx does the same path split the gateway does.
+#
+# NOT included: the `categorizer` service, which runs the embedding model
+# through KServe. Without it the resolver chain still categorizes — MCC codes,
+# then the bilingual rules, then `other` — because the model is an optional link
+# (`if self.model is not None`). Its `category.recategorize` messages simply
+# accumulate on the stream until MaxAge expires them; the payloads are file
+# references, so this costs nothing. Train a model with the ML flow in the
+# README if you want that link in the chain.
+
+name: cashato
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cashato
+      POSTGRES_PASSWORD: cashato
+      POSTGRES_DB: cashato
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      # Gate the migration on the server actually accepting connections: the
+      # entrypoint restarts it once during first-time initdb, so "container
+      # started" is not "database ready".
+      test: ["CMD-SHELL", "pg_isready -U cashato -d cashato"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  nats:
+    image: nats:2.10-alpine
+    # -js: the services use JetStream (the stream is created by whichever one
+    # connects first). -m 8222: the monitoring endpoint the healthcheck reads.
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes: ["natsdata:/data"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8222/healthz"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      # The code's own defaults, so nothing needs overriding to work.
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    # 9001 is the web console — handy for seeing the stored statements; the
+    # bucket itself is created by ingest-api at startup.
+    ports: ["9001:9001"]
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  # One-shot, exactly like the db-migrate Job in the cluster: create the
+  # bronze/silver/gold schemas, then exit. Everything else waits for it to
+  # succeed, which is the same "migrate-then-deploy" barrier sync-wave 0 gives.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.migrate
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://cashato:cashato@postgres:5432/cashato
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  ingest-api:
+    build: &svc_build
+      context: .
+      dockerfile: docker/Dockerfile.svc
+    command: ["uvicorn", "cashato.services.ingest_api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment: &svc_env
+      DATABASE_URL: postgresql+psycopg://cashato:cashato@postgres:5432/cashato
+      NATS_URL: nats://nats:4222
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: cashato-uploads
+      MINIO_SECURE: "false"
+      # Same path the ConfigMap mounts at in the cluster, so the loader code
+      # cannot tell the two environments apart.
+      CASHATO_CONFIG_DIR: /etc/cashato/config
+    volumes: &svc_volumes
+      - ./config:/etc/cashato/config:ro
+    ports: ["8000:8000"]
+    depends_on:
+      # The lifespan calls ensure_bucket() and connects to JetStream before
+      # serving, with no retry — so both must be up, not merely started.
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    restart: unless-stopped
+
+  etl-worker:
+    build: *svc_build
+    command: ["python", "-m", "cashato.services.etl_worker.worker"]
+    environment: *svc_env
+    volumes: *svc_volumes
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      nats: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    restart: unless-stopped
+
+  query-api:
+    build: *svc_build
+    command: ["uvicorn", "cashato.services.query_api.app:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment: *svc_env
+    volumes: *svc_volumes
+    ports: ["8001:8001"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    # The image ships no API proxy, because in the cluster the gateway splits
+    # /api/v1 off upstream. Mounting the drop-in into the wildcard include that
+    # nginx.conf already carries turns nginx into that gateway's stand-in.
+    volumes:
+      - ./frontend/api-proxy.conf:/etc/nginx/api-proxy/api-proxy.conf:ro
+    ports: ["8080:8080"]
+    depends_on: [ingest-api, query-api]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  natsdata:
+  miniodata:

@@ -264,10 +264,24 @@ service, including the workers that have no HTTP API to hang a path off.
   see "Add a source".)
 - **Stack**: Python 3.12, Postgres 17, SQLAlchemy + psycopg + Alembic,
   pdfplumber, pandas, sentence-transformers (CPU), NATS, FastAPI, ruff + mypy +
-  pytest, MIT license. Dev: a local Postgres for the data core; the full platform
-  runs on kind (`infra/` OpenTofu + `k8s/` GitOps via Argo CD). Bootstrap images
-  in `docker/`. Everything in English (Italian only in string literals that must
-  match real document text).
+  pytest, MIT license. Bootstrap images in `docker/`. Everything in English
+  (Italian only in string literals that must match real document text).
+- **Three rungs to run it**, same code and same `config/*.yaml`, not variants:
+  (1) the **CLI** over a local Postgres — `cli/load.py` imports neither NATS nor
+  MinIO, so `cashato-load`/`cashato-export` need nothing else; (2) **`compose.yaml`**
+  — Postgres/NATS/MinIO + the two APIs + worker + SPA on a laptop, no cluster;
+  (3) the **full platform** on kind (`infra/` OpenTofu + `k8s/` GitOps via Argo).
+  Every endpoint is an env var with a localhost default, which is what makes the
+  rungs the same build. The model is optional at all three (`if self.model is not
+  None`): the chain degrades to MCC → rules → `other`.
+  Compose diverges deliberately in two places, both stated at the top of the
+  file: one Postgres role instead of the least-privilege split (the baseline
+  guards every GRANT with `IF EXISTS` on the role, so it skips them), and no
+  `categorizer` (it serves the model through KServe). The SPA image ships **no**
+  API proxy because the gateway splits `/api/v1` upstream; `nginx.conf` carries a
+  wildcard `include` that matches nothing in-cluster, and compose mounts
+  `frontend/api-proxy.conf` into it to stand in for the gateway — its path split
+  mirrors `httproutes.yaml`, so both environments route identically.
 
 ## Key decisions
 

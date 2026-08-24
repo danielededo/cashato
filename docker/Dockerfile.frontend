@@ -1,8 +1,10 @@
 # Frontend SPA — multi-stage: build the React/Vite bundle, then serve it
-# as static files with hardened, non-root nginx. The gateway path-splits (`/api/v1`
-# → APIs, `/` → here), so nginx only serves files + the SPA fallback — it does NOT
-# proxy the API. Build context = repo root (see .dockerignore); frontend source is
-# under frontend/.
+# as static files with hardened, non-root nginx. In the cluster the gateway
+# path-splits (`/api/v1` → APIs, `/` → here), so the image ships NO API proxy:
+# nginx serves files + the SPA fallback and nothing else. compose.yaml mounts
+# frontend/api-proxy.conf into the wildcard include nginx.conf carries, which is
+# how the gateway-less stack gets the same split. Build context = repo root (see
+# .dockerignore); frontend source is under frontend/.
 FROM docker.io/library/node:22-alpine AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./

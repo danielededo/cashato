@@ -10,6 +10,14 @@ React + Vite + TypeScript single-page app, served by a hardened nginx behind
 the Envoy Gateway at `/`. The APIs live under `/api/v1` on the **same origin**
 (the gateway path-splits), so the app only ever calls relative URLs.
 
+Because the gateway does that split, the image ships **no** API proxy —
+`nginx.conf` serves static files and the SPA fallback, nothing else. It does
+carry a wildcard `include /etc/nginx/api-proxy/*.conf`, which matches nothing in
+the cluster; `compose.yaml` mounts [`api-proxy.conf`](api-proxy.conf) there to
+make nginx stand in for the gateway when there is none. That file's path split
+mirrors `k8s/manifests/services/base/httproutes.yaml` — if you add a write
+endpoint to ingest-api, both lists need it.
+
 ## Pages
 
 | Page | What it does |

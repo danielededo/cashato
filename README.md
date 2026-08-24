@@ -73,9 +73,24 @@ gold** (enforced by its DB role, not just convention).
 
 | Tool | Use | Required |
 |------|-----|:--------:|
-| **Docker** | local Postgres (data core); kind (full platform) | yes |
-| **Python 3.12** | parsers, loader, services, ML | yes |
+| **Docker** | local Postgres (data core); compose (full app); kind (full platform) | yes |
+| **Python 3.12** | parsers, loader, services, ML | CLI only |
 | **Ollama** | offline LLM labeling | ML only |
+
+## Three ways to run it
+
+Pick the rung you need — they are the same code and the same `config/*.yaml`,
+not variants of it. Nothing forces you up the ladder.
+
+| | What you get | What it costs |
+|---|---|---|
+| **1. CLI** | statements in, categorized CSV out | a venv + one Postgres container ([quick start](#quick-start)) |
+| **2. Compose** | the whole app: upload, dashboard, review, wealth | `docker compose up` ([below](#full-app-on-your-laptop)) |
+| **3. Kubernetes** | + GitOps, CI/CD, MLflow/KServe, LGTM observability | kind + OpenTofu ([`infra/`](infra/README.md), [`k8s/`](k8s/README.md)) |
+
+The ML model is optional at every rung: the resolver falls back from MCC codes
+to bilingual rules to `other`, so categorization works before you train
+anything.
 
 ## Quick start
 
@@ -165,6 +180,36 @@ exists for the local data-core workflow:
 ./.venv/bin/cashato-export --lang it   # -> output/transazioni.csv
 ./.venv/bin/cashato-export --lang en --out output/transactions_en.csv
 ```
+
+## Full app on your laptop
+
+No Kubernetes, no Gitea, no Argo — one command brings up Postgres, NATS, MinIO,
+the two APIs, the worker and the SPA:
+
+```bash
+docker compose up --build          # then open http://localhost:8080
+docker compose down                # add -v to drop the data volumes too
+```
+
+Upload statements from the Upload page (or use the synthetic ones in
+[`demo/`](demo/README.md)) and the dashboard fills in. The APIs are also
+published directly for `curl` and OpenAPI: `http://localhost:8000/docs`
+(ingest) and `http://localhost:8001/docs` (query).
+
+It is the same four service images the cluster runs — every endpoint the code
+needs is an environment variable, so nothing is forked or stubbed. Two things
+differ on purpose, both documented at the top of `compose.yaml`: a single
+Postgres role instead of the least-privilege split CNPG provisions, and no
+`categorizer` (it serves the model through KServe; without it the resolver
+still falls back to MCC codes and rules).
+
+One detail worth knowing if you touch the frontend: the image ships **no** API
+proxy, because in the cluster the Envoy Gateway splits `/api/v1` off before
+nginx ever sees it. `compose.yaml` mounts `frontend/api-proxy.conf` into a
+wildcard `include` that `nginx.conf` carries, which makes nginx stand in for the
+gateway. The wildcard matches nothing in the cluster, so that path is a literal
+no-op there — and the proxy's path split mirrors `httproutes.yaml`, so both
+environments route identically.
 
 ## Services & frontend
 
