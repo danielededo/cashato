@@ -16,10 +16,10 @@ the Envoy Gateway at `/`. The APIs live under `/api/v1` on the **same origin**
 |------|--------------|
 | `Dashboard` | hero net flow, period filters (1M/3M/…), income vs expense, category ranks, heatmap |
 | `Transactions` | day-grouped list, full filter set, server-side sort and filtered-set totals, detail drawer |
-| `Investments` | wealth: gross contributed hero, known/unknown split, net-flow chart, holdings |
+| `Investments` | two things on one page: **liquid wealth** (declared balances per account + the wealth-over-time area) and **investments** (gross contributed hero, known/unknown split, net-flow chart, per-kind table, holdings) |
 | `Review` | low-confidence categorizations, one-click manual correction (feeds active learning) |
 | `Upload` | multi-file drag&drop, per-file status from bronze |
-| `Manage` | account display names, admin reprocess/reset |
+| `Manage` | account display names, admin reprocess/reset, the guided offline retrain steps, and the two data-health panels: reconciliation (parsed movements vs declared balances) and coverage (which statement is missing, per source) |
 
 Cross-cutting: IT/EN i18n (`lib/i18n.ts`), light/dark theme, privacy mode
 (blurs every monetary surface via CSS, `lib/privacy.tsx`).

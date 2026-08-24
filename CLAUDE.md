@@ -30,18 +30,46 @@ Schemas within a single database (not separate DBs):
   quarterly; the 13-month export has one date, so rows it inserts first carry a
   flattened booking). Category follows the text unless `manual`. Re-loading the
   same file is a no-op.
-- **gold** — read-only views for the query API: `v_category_totals`,
-  `v_income_expense_month`, `v_category_month`, `v_internal_transfers`,
-  `v_transactions` (projection of silver so the read API stays gold-only),
-  `v_balances`, `v_reconciliation`, `v_balance_month` (month-end declared
+- **gold** — read-only views for the query API (twelve, all created in the
+  baseline migration): `v_category_totals`, `v_income_expense_month`,
+  `v_category_month`, `v_internal_transfers`, `v_transactions` (projection of
+  silver so the read API stays gold-only), `v_transaction_detail` (the same
+  movement plus how its category was assigned, the raw provider signals, the
+  originating file and the instrument if it was a trade — the drawer behind a
+  row), `v_balances`, `v_reconciliation`, `v_balance_month` (month-end declared
   balance per account, carried forward from the last anchor — feeds the
-  wealth-over-time chart). Plus ML tables `training_labels`,
-  `category_feedback` (active learning).
+  wealth-over-time chart), `v_accounts` (account display metadata with the user
+  override applied), `v_holdings` and `v_investment_month` (positions and
+  contributions per month, behind `/investments`). Plus ML tables
+  `training_labels`, `category_feedback` (active learning).
 
-Silver also holds `balances` — the balances the statements themselves declare
-(Revolut/Trade Republic per-row running balance → end-of-day anchors; Intesa
-quarterly opening/closing lines), upserted on `(account, balance_date)`. Each
-anchor declares its `basis` — which of the two dates the source's balances
+Silver holds four more tables next to `transactions`:
+
+- `accounts` — everything a statement discloses about an account (bank,
+  product, joint/individual, IBAN) plus `display_name_override`. Display
+  metadata only: the account **id** is immutable because it is hashed into
+  `natural_key`.
+- `asset_categories` — which categories are *wealth, not spending*. A row here
+  removes a category from every spend view, so it is reference data seeded by an
+  INSERT in the baseline (currently `investments`, `crypto`, `pension_fund`,
+  `deposits`, `insurance_savings`), and because its rows silently rewrite what
+  counts as spending, `etl_writer` has the blanket silver write grant **revoked**
+  on it. The vocabulary has two twins by necessity — this table is what gold's
+  SQL views read, the `asset_categories` list in `categories.yaml` is what the
+  Python side reads (`Categorizer`, and through it `/meta` and `/recurring`) —
+  and `tests/test_categorize.py` parses the seed out of the migration to assert
+  the two sets are identical, so they cannot drift. A code in the list but not in
+  `categories` fails the service at startup rather than quietly mis-counting.
+- `trades` — at most one row per movement (PK is the `natural_key`, cascading),
+  carrying quantity/side/ISIN/instrument/unit price when the source discloses
+  the instrument. `quantity` is **signed** (positive acquiring, negative
+  disposing) so a position is a running sum with no side-aware arithmetic.
+- `balances` — the balances the statements themselves declare
+  (Revolut/Trade Republic per-row running balance → end-of-day anchors; Intesa
+  quarterly opening/closing lines), upserted on `(account, balance_date)`.
+
+Balance anchors carry the weight of the completeness check, so they deserve the
+detail. Each anchor declares its `basis` — which of the two dates the source's balances
 follow (`booking` for Intesa, whose statements total by data contabile;
 `value` where the dates coincide) — and `gold.v_reconciliation` sums the
 movements by that date, so a valuta crossing a quarter boundary is not a
@@ -63,7 +91,7 @@ Migrations: Alembic (`src/cashato/db/migrations`).
 | `currency`           | str (ISO)  | e.g. `EUR` |
 | `account`            | str        | account/source id (e.g. `revolut_personal_eur`) |
 | `source`             | str        | `revolut` \| `trade_republic` \| `intesa` |
-| `category`           | str \| null| language-neutral **code** (labels live in `categories.yaml`) |
+| `category`           | str        | language-neutral **code** (labels live in `categories.yaml`); **NOT NULL** — a NULL would silently vanish from every spend view, because those exclude the asset categories with `NOT IN` and `NULL NOT IN (…)` is NULL, not true. "Nobody knew" is spelled `other` with `category_source='default'` |
 | `category_source`    | str        | `mcc` \| `model` \| `rule` \| `manual` \| `default` |
 | `category_confidence`| real       | provenance/confidence of the category |
 | `native_category`    | str \| null| provider's own category — bootstrap-only, **never** used at runtime |
@@ -152,7 +180,11 @@ zero, not spending). The etl-worker relinks after every ingest that inserts rows
 
 FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
 `/readyz`), business API under `/api/v1`, `ROOT_PATH` for the gateway, OpenAPI at
-`/docs`. Structured JSON logging + Prometheus `/metrics` (`src/cashato/obs.py`).
+`/docs`. Structured JSON logging + Prometheus metrics (`src/cashato/obs.py`).
+Metrics are **not** a path on the business API: `Instrumentator().instrument(app)`
+is called without `.expose(app)`, and `start_metrics_server` serves the registry
+on its own port (`METRICS_PORT`, default **9100**) — uniform across every
+service, including the workers that have no HTTP API to hang a path off.
 
 - **ingest-api** — `POST /uploads` (stores file, validates extension → 415 and
   per-file size cap → 413, enqueues a NATS job); `GET /files` (status +
@@ -160,14 +192,36 @@ FastAPI microservices; NATS JetStream backbone. Probes at root (`/healthz`,
   NATS event; a **write**, so it lives here, not in the read-only query-api);
   `GET /profile` (account holder → home greeting); `POST /admin/reprocess`
   (re-enqueue every stored file, idempotent via `natural_key`) and
-  `POST /admin/reset` (`scope=data|all`, destructive). Bronze reads and writes
+  `POST /admin/reset` (`scope=data|all`, destructive);
+  `PATCH /admin/accounts/{account_id}` (set or clear an account's display name —
+  only the override moves, what the statements disclosed stays as evidence, and
+  the id itself is never editable because it is hashed into `natural_key`). It
+  sits under `/admin` rather than `/accounts` because the gateway splits the two
+  services by path: `GET /api/v1/accounts` belongs to query-api, so a PATCH
+  there would need method-based routing to disambiguate. Bronze reads and writes
   both live here because query-api is gold-only by design (and by DB role).
 - **etl-worker** — consumes `ingest.jobs` (detect → parse → normalize → dedup →
   persist + fast-path category) and `category.feedback` (apply correction to
-  silver + record in `gold.category_feedback`). Stays light (no torch/model).
+  silver + record in `gold.category_feedback`), and **publishes**
+  `category.recategorize` after an ingest that landed rows — the third subject on
+  the stream, consumed by the categorizer, which runs the model over the new rows
+  so the worker itself stays light (no torch/model).
 - **query-api** — read-only over gold: `GET /summary`, `/monthly`,
   `/categories/monthly`, `/transactions` (filterable/paginated, with
-  filtered-set totals), `/transfers`, `/accounts` (bank/product/joint, composed
+  filtered-set totals), `/transactions/{natural_key}` (one movement in full —
+  how its category was assigned and how confident, the raw provider signals, the
+  originating file, the instrument if it was a trade, and the paired leg if it is
+  half of an internal transfer; 404 on an unknown key),
+  `/meta` (sources from the adapter registry, categories and labels from
+  `categories.yaml`, upload limits from `settings.yaml` — one place for
+  everything a client needs to build its selectors, so a client reading it can
+  never be out of step with what the pipeline accepts),
+  `/investments` (positions from `v_holdings` + contributions per month from
+  `v_investment_month`; the split between instruments we know and `into_unknown`
+  is reported rather than hidden, since a plain transfer to an outside broker
+  never discloses its contents. No market prices: `last_price` is the last price
+  a statement printed, so `value_at_last_price` is a cost-basis-era figure, not
+  today's worth), `/transfers`, `/accounts` (bank/product/joint, composed
   display name), `/reconciliation` (parsed movements vs statement-declared
   balances, `?mismatched_only=true`), `/wealth` (declared balances carried
   forward per month + latest per account, with per-figure `as_of` freshness),

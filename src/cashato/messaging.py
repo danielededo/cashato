@@ -1,12 +1,14 @@
-"""Shared NATS JetStream helper used by the services (ingest-api, etl-worker).
+"""Shared NATS JetStream helper used by the services (ingest-api, etl-worker,
+categorizer).
 
-Two subjects on one stream:
+Three subjects on one stream:
 - ``ingest.jobs`` — a file was uploaded and must be parsed/loaded;
 - ``category.feedback`` — a user corrected a transaction's category (active
-  learning); the consumer applies it to silver + records it in gold.
+  learning); the consumer applies it to silver + records it in gold;
+- ``category.recategorize`` — an ingest landed new rows that want the model.
 
-The feedback consumer lives in the etl-worker; the ``categorizer`` service
-consumes recategorize events.
+The ingest and feedback consumers live in the etl-worker, which also publishes
+the recategorize events; the ``categorizer`` service consumes those.
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ SUBJECT_RECATEGORIZE = "category.recategorize"
 SUBJECTS = [SUBJECT_INGEST, SUBJECT_FEEDBACK, SUBJECT_RECATEGORIZE]
 STREAM = "CASHATO"
 
-# Keep the JetStream fileStore PVC bounded. Both subjects carry work-queue
+# Keep the JetStream fileStore PVC bounded. All three subjects carry work-queue
 # semantics — a job/feedback event is consumed once and acked, then it can go —
 # so WorkQueue retention deletes each message on ack. MaxAge is a safety cap so
 # an un-acked message (e.g. a poison job that always fails) can't pin the PVC
