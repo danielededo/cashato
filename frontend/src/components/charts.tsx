@@ -57,7 +57,7 @@ export const StackedArea = memo(function StackedArea({ data, series }: { data: R
         <CartesianGrid stroke="var(--grid)" vertical={false} />
         <XAxis dataKey="month" tick={axisTick} tickLine={false} stroke="var(--baseline)" />
         <YAxis tick={axisTick} tickLine={false} stroke="var(--baseline)" width={56} tickFormatter={moneyShort} />
-        <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItem} formatter={(v: number) => money(v)} />
+        <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItem} formatter={(v) => money(typeof v === "number" ? v : undefined)} />
         {/* A one-entry legend only repeats the panel title. */}
         {series.length > 1 ? <Legend wrapperStyle={legendStyle} /> : null}
         {series.map((s) => (
@@ -90,7 +90,7 @@ export const MonthlyBars = memo(function MonthlyBars({
         <CartesianGrid stroke="var(--grid)" vertical={false} />
         <XAxis dataKey="month" tick={axisTick} tickLine={false} stroke="var(--baseline)" />
         <YAxis tick={axisTick} tickLine={false} stroke="var(--baseline)" width={56} tickFormatter={moneyShort} />
-        <Tooltip cursor={{ fill: "var(--panel-2)" }} contentStyle={tooltipStyle} itemStyle={tooltipItem} formatter={(v: number) => money(v)} />
+        <Tooltip cursor={{ fill: "var(--panel-2)" }} contentStyle={tooltipStyle} itemStyle={tooltipItem} formatter={(v) => money(typeof v === "number" ? v : undefined)} />
         <Legend wrapperStyle={legendStyle} />
         <Bar dataKey="Income" fill={INCOME_COLOR} radius={[3, 3, 0, 0]} />
         <Bar dataKey="Expense" fill={EXPENSE_COLOR} radius={[3, 3, 0, 0]} />
