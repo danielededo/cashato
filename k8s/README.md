@@ -19,6 +19,47 @@ The source repo stays **human-only**: CI never commits here. Image tags are
 pinned in the separate `cashato-deploy` repo, which Argo watches (details:
 [`manifests/tekton-ci/`](manifests/tekton-ci/README.md)).
 
+## Running this without the CI loop
+
+Gitea is load-bearing for **build** — the Tekton EventListener declares no
+NodePort or LoadBalancer, so only an in-cluster webhook can reach it, and the
+images are pulled from Gitea's registry through the containerd mirror. None of
+that is needed to just *run* the manifests, and there are two ways to skip it.
+
+**Apply them directly, no Argo, no git at all.** The overlays are ordinary
+Kustomize; the `--load-restrictor` is required because the services base
+generates its ConfigMap from `config/*.yaml` at the repo root, outside its
+kustomize root:
+
+```bash
+kubectl kustomize --load-restrictor=LoadRestrictionsNone \
+  manifests/data/overlays/kind | kubectl apply -f -    # then the later waves
+```
+
+Component order is yours to keep in this mode — the wave table below is the
+order the app-of-apps applies for you, and `data` must finish before `services`.
+The overlays declare **registry-less** image names at `:dev` (`cashato/svc`,
+`cashato/migrate`, `cashato/frontend`, plus `cashato/mlflow` and `cashato/train`
+for the ML components); CI is what overwrites them with registry-qualified SHA
+tags. So `docker build` followed by `kind load docker-image cashato/<x>:dev` for
+the ones you want is enough, and no registry is involved at all.
+
+**Or keep Argo and point it at your own fork.** The `repoURL` in `apps/*.yaml`
+is the only thing that binds these Applications to a git host:
+
+```bash
+sed -i 's#http://gitea-http.gitea.svc:3000/cashato/cashato.git#https://github.com/<you>/cashato.git#' apps/*.yaml
+```
+
+Argo needs no credentials for a public repo. `apps/` is a copy by design (the
+root app watches it in `cashato-deploy`), so editing yours is the intended seam,
+not a workaround.
+
+Either way you must generate **your own** secrets first: the committed
+`SealedSecret`s are encrypted to this cluster's sealing key and another
+controller cannot decrypt them. See [`scripts/`](../scripts/README.md) —
+`secret-zero.sh` then `seal-secrets.sh`.
+
 ## Layout
 
 ```
