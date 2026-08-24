@@ -92,7 +92,7 @@ not variants of it. Nothing forces you up the ladder.
 |---|---|---|
 | **1. CLI** | statements in, categorized CSV out | a venv + one Postgres container ([quick start](#quick-start)) |
 | **2. Compose** | the whole app: upload, dashboard, review, wealth | `docker compose up` ([below](#full-app-on-your-laptop)) |
-| **3. Kubernetes** | + GitOps, CI/CD, MLflow/KServe, LGTM observability | kind + OpenTofu; ~10 GB RAM, 62 images to pull ([`infra/`](infra/README.md), [`k8s/`](k8s/README.md)) |
+| **3. Kubernetes** | + GitOps, CI/CD, MLflow/KServe, LGTM observability | kind + OpenTofu ([`infra/`](infra/README.md), [`k8s/`](k8s/README.md)) |
 
 The ML model is optional at every rung: the resolver falls back from MCC codes
 to bilingual rules to `other`, so categorization works before you train
@@ -107,14 +107,11 @@ anything.
 > costs to contribute to. Full contract in
 > [CONTRIBUTING](CONTRIBUTING.md#add-a-new-sourcebank-for-forks--contributors).
 
-Rung 3 provisions a platform rather than an application, and its requirements
-reflect that: 83 pods across 22 namespaces, 62 distinct images from six
-registries, eight pinned third-party Helm charts. Two consequences worth
-stating up front. It rewards reading as much as running — `infra/` and `k8s/`
-document a complete offline GitOps loop and are useful to study without
-applying anything. And its third-party chart pins age faster than the code:
-the Tekton operator already required migration once, when its registry was
-retired.
+Rung 3 provisions a platform rather than an application, so it rewards reading
+as much as running: `infra/` and `k8s/` document a complete offline GitOps loop
+and are worth studying without applying anything. Note also that its
+third-party chart pins age faster than the code does — the Tekton operator
+already required migration once, when its registry was retired.
 
 ## Quick start
 
