@@ -160,7 +160,7 @@ class TestAccountHolder:
             (144.0, 39.7, "MARIO ROSSI"),
             (170.0, 39.7, "Via Roma 1"),
             (170.0, 383.0, "Tax residency: Italy"),
-            (182.4, 39.7, "20127"),
+            (182.4, 39.7, "20121"),
             (194.8, 39.7, "Milano"),
         )
         assert addressee_from_words(words) == "MARIO ROSSI"
