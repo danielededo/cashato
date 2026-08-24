@@ -54,8 +54,10 @@ export function Manage() {
         <div className="panel-head"><h2>{t("mng.retrain")}</h2><span className="hint">{t("mng.retrain.hint")}</span></div>
         <ol className="steps">
           <li>Label the long tail with the host LLM → <code>gold.training_labels</code>:
-            <pre><code>ollama serve  # host GPU
-python -m cashato.ml.label_llm --limit 2000</code></pre>
+            {/* One JS string, not two JSX text lines: JSX joins lines with a
+                space, which would fold the second command into the comment on
+                the first — copy-pasted, it would silently do nothing. */}
+            <pre><code>{"ollama serve  # host GPU\npython -m cashato.ml.label_llm --limit 2000"}</code></pre>
           </li>
           <li>Train the embedding kNN and register it in MLflow:
             <pre><code>python -m cashato.ml.train</code></pre>

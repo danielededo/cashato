@@ -236,7 +236,10 @@ a { color: inherit; text-decoration: none; }
 .rank[aria-selected="true"] { background: var(--brass-dim); border-color: var(--accent); }
 .rank .name { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank .track { height: 7px; border-radius: 2px; background: var(--panel-3); overflow: hidden; }
-.rank .fill { height: 100%; border-radius: 2px; }
+/* Blockified on purpose: .track is a grid item (so its own height applies),
+   but .fill is only its child — as an inline box, width/height would be
+   ignored and the bar would never paint. */
+.rank .fill { display: block; height: 100%; border-radius: 2px; }
 .rank .amt { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
 .swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
 
