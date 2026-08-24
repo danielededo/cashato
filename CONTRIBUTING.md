@@ -3,6 +3,11 @@
 Thanks for your interest! cashato normalizes and categorizes bank transactions
 **locally** and in a **provider-agnostic** way.
 
+By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md) — which
+here carries one project-specific rule: **never post real financial data**, not
+in an issue, a PR, or a fixture. Security bugs go through
+[SECURITY.md](SECURITY.md), privately, not through an issue.
+
 ## Dev setup
 
 ```bash

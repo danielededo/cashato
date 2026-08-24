@@ -1,0 +1,76 @@
+name: Bug report
+description: Something parses, categorizes, dedups or totals wrongly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste real statement data.** Anonymize first: replace names,
+        IBANs and amounts. The parsers care about *layout*, not about your
+        real numbers, so a redacted file reproduces just as well.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: rung
+    attributes:
+      label: How are you running it
+      options:
+        - CLI over a local Postgres
+        - compose.yaml (laptop, no cluster)
+        - kind cluster (OpenTofu + Argo CD)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - Parsing (a statement is read wrongly)
+        - Detection (a file is routed to the wrong source, or rejected)
+        - Deduplication (a movement is duplicated or swallowed)
+        - Categorization (wrong category, or a wrong confidence)
+        - Internal transfers
+        - Balances / reconciliation / coverage
+        - API (ingest-api or query-api)
+        - Frontend
+        - Platform (Tofu, Argo, Tekton, NATS, DB)
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source and format, if the bug involves a file
+      placeholder: "intesa — quarterly PDF (Italian) / revolut — consolidated CSV / …"
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. cashato-load data/redacted.pdf
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Traceback or log lines
+      description: Redact amounts and account identifiers.
+      render: text
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA you are on
+      placeholder: "git rev-parse --short HEAD"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "python -V (3.12+ expected)"

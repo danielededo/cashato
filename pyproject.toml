@@ -11,6 +11,19 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Daniele De Dominicis" }]
 keywords = ["finance", "bank-statements", "etl", "categorization", "pdf-parsing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Natural Language :: Italian",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+
 
 # Minimal shared base: config (pyyaml) + DB (SQLAlchemy/psycopg) + the base
 # categorizer. Everything format/web/ML-specific lives in an extra below, so
@@ -70,6 +83,12 @@ dev = [
     # demo/generate.py renders the synthetic statement PDFs with it
     "fpdf2==2.8.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/danielededo/cashato"
+Repository = "https://github.com/danielededo/cashato"
+Issues = "https://github.com/danielededo/cashato/issues"
+Changelog = "https://github.com/danielededo/cashato/commits/main"
 
 [project.scripts]
 cashato-load = "cashato.cli.load:main"

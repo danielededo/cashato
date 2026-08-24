@@ -394,4 +394,8 @@ Architecture and conventions in depth: [`CLAUDE.md`](CLAUDE.md).
 
 ## License
 
-MIT — see `LICENSE`. Contributions welcome, see `CONTRIBUTING.md`.
+MIT — see [`LICENSE`](LICENSE). Contributions welcome:
+[`CONTRIBUTING.md`](CONTRIBUTING.md) (dev setup, and how to add a bank in one
+module) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+Found something exploitable? Report it privately —
+[`SECURITY.md`](SECURITY.md), never a public issue.

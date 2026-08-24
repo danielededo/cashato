@@ -1,0 +1,66 @@
+name: New bank / new format
+description: Support for a bank or a statement format that is not handled yet
+title: "source: <bank> — <format>"
+labels: ["new-source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adding a bank touches **one adapter module** —
+        `src/cashato/parsers/<name>.py` — and nothing else: the registry
+        discovers it by module name, and detection is content-based, so there
+        is no config to edit. Read the *Add a new source/bank* section of
+        [CONTRIBUTING.md](https://github.com/danielededo/cashato/blob/main/CONTRIBUTING.md)
+        first.
+
+        **Do not attach a real statement.** If a sample is needed, redact it
+        (fake holder, fake IBAN, altered amounts) and keep the layout intact —
+        `demo/` shows what a usable synthetic statement looks like.
+  - type: input
+    id: bank
+    attributes:
+      label: Bank
+      placeholder: "e.g. Fineco, N26, BancoPosta"
+    validations:
+      required: true
+  - type: checkboxes
+    id: formats
+    attributes:
+      label: Formats it exports
+      options:
+        - label: PDF statement
+        - label: CSV export
+        - label: XLSX export
+        - label: Other (say which below)
+  - type: input
+    id: language
+    attributes:
+      label: Language(s) the documents are in
+      placeholder: "Italian / English / both"
+  - type: textarea
+    id: markers
+    attributes:
+      label: Detection markers
+      description: >
+        Words that appear in *every* document of this format and in no other
+        source's — this becomes DETECTION. Quote them exactly as printed.
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Layout notes
+      description: >
+        Signed amounts or separate debit/credit columns? One date or two
+        (value + booking)? Multi-line rows? A running balance, or opening and
+        closing totals? Does it disclose the holder, the IBAN, the instrument
+        on a trade?
+    validations:
+      required: true
+  - type: checkboxes
+    id: intent
+    attributes:
+      label: Are you offering to write it?
+      options:
+        - label: I plan to open a PR for this adapter myself
+        - label: I'm reporting it, someone else may pick it up

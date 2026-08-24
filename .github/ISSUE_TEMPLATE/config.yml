@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/danielededo/cashato/security/advisories/new
+    about: Report privately — never in a public issue. See SECURITY.md.
+  - name: How to add a bank, or a language
+    url: https://github.com/danielededo/cashato/blob/main/CONTRIBUTING.md
+    about: The adapter contract and the dev setup, before you open anything.

@@ -1,0 +1,31 @@
+name: Feature request
+description: An idea for the pipeline, the API, the frontend or the platform
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What can't you answer today
+      description: >
+        The project's north star is financial awareness — "how am I really
+        doing?" — over your own data, locally. Describe the question your data
+        can't answer yet, not the widget you imagine.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd build
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints it respects
+      description: These two are non-negotiable in this project.
+      options:
+        - label: No bank data leaves the machine — all processing stays local
+          required: true
+        - label: Money stays `Decimal`, never `float`
+          required: true
+        - label: It does not depend on any provider's own category taxonomy
