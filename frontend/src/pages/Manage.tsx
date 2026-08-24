@@ -55,7 +55,7 @@ export function Manage() {
         <ol className="steps">
           <li>Label the long tail with the host LLM → <code>gold.training_labels</code>:
             <pre><code>ollama serve  # host GPU
-python -m cashato.ml.label --limit 2000</code></pre>
+python -m cashato.ml.label_llm --limit 2000</code></pre>
           </li>
           <li>Train the embedding kNN and register it in MLflow:
             <pre><code>python -m cashato.ml.train</code></pre>
