@@ -5,7 +5,7 @@
 # frontend/api-proxy.conf into the wildcard include nginx.conf carries, which is
 # how the gateway-less stack gets the same split. Build context = repo root (see
 # .dockerignore); frontend source is under frontend/.
-FROM docker.io/library/node:22-alpine AS build
+FROM docker.io/library/node:26-alpine AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
