@@ -60,6 +60,11 @@ seal query-reader-db cashato query_reader "$query_reader" "$SERVICES/sealedsecre
 # MINIO_ACCESS_KEY/SECRET_KEY in the deployments).
 seal minio-creds minio   "$minio_user" "$minio_password" "$MINIO_DIR/sealedsecret-minio.yaml"
 seal minio-creds cashato "$minio_user" "$minio_password" "$SERVICES/sealedsecret-minio.yaml"
+# ...and for CNPG, whose WAL archiving and ScheduledBackup write to the same
+# bucket (cluster.yaml + backup-bucket-job.yaml read it). This one was committed
+# but never regenerated here, so a fork's backups failed to decrypt with no
+# script to fix it.
+seal minio-creds cashato-data "$minio_user" "$minio_password" "$DATA/sealedsecret-minio.yaml"
 
 # MLflow DB role (mlflow): sealed for CNPG (ns cashato-data, managed.roles password)
 # and for the MLflow server (ns mlflow). Also give MLflow the MinIO creds (artifacts).

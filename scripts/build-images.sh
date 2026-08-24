@@ -31,8 +31,21 @@ build_load cashato/svc:dev      Dockerfile.svc
 build_load cashato/migrate:dev  Dockerfile.migrate
 build_load cashato/frontend:dev Dockerfile.frontend
 build_load cashato/mlflow:dev   Dockerfile.mlflow
-build_load cashato/train:dev    Dockerfile.train
-build_load cashato/predict:dev  Dockerfile.predict
+
+# train/predict BAKE models/latest.joblib, which is gitignored: on a fresh clone
+# it does not exist yet, and under `set -e` an unconditional build here aborted
+# the script after the four images above — looking like a failure when the
+# platform was in fact ready. Skip instead, and say so: a serving image with no
+# model to serve is not useful anyway. Train one (README, "ML pipeline") and
+# re-run to get them.
+if [[ -f "$ROOT/models/latest.joblib" ]]; then
+  build_load cashato/train:dev   Dockerfile.train
+  build_load cashato/predict:dev Dockerfile.predict
+else
+  echo "==> SKIP cashato/train:dev and cashato/predict:dev"
+  echo "    models/latest.joblib is absent (gitignored; produced by cashato.ml.train)."
+  echo "    The four images the platform needs are built and loaded."
+fi
 
 echo "done. kind reloaded the :dev tags — restart pods to use them, e.g.:"
 echo "  kubectl -n cashato rollout restart deploy"

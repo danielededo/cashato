@@ -36,7 +36,7 @@ same files, so these double as **test fixtures**.
    files that share movements dedup automatically no matter the format.
 3. **Verify with the real parsers.** The script ends by running
    `detect_source` + each adapter on the generated files and asserting
-   51 checks (detection, in-file key uniqueness, cross-format dedup,
+   54 checks (detection, in-file key uniqueness, cross-format dedup,
    occurrence index, holder/account extraction, transfer legs, and
    non-misdetection of the `other_banks/` files).
 
@@ -50,7 +50,7 @@ same files, so these double as **test fixtures**.
 | `revolut_consolidated_statement.pdf` | same statement, PDF | **same cash movements as the CSV** → cross-format dedup (PDF ⊂ CSV; the 20 CSV-only keys are interest+crypto) |
 | `trade_republic_rendiconto.pdf` | statement PDF (Italian) | header-derived column geometry, balance-anchored rows, split dates (`04 gen 2025`), sign from IN ENTRATA / IN USCITA column |
 | `trade_republic_transactions.csv` | transaction export | `amount + fee + tax` = the PDF's net amount → **identical key sets** with the PDF |
-| `expected_transactions.csv` | ground truth | the 601 unique silver rows expected after ingesting *all* files (1111 parsed rows − 510 dedup) |
+| `expected_transactions.csv` | ground truth | the 600 unique silver rows expected after ingesting *all* files (1109 parsed rows − 509 dedup) |
 
 ## Deliberate edge cases
 

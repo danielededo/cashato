@@ -13,20 +13,25 @@ everything.** No ad-hoc commands.
 | Script | What it does | When to run |
 |--------|--------------|-------------|
 | `secret-zero.sh` | Generate the pinned Sealed Secrets keypair, the DB role passwords and the MinIO credentials into `infra/secrets/` — **plus `infra/secret.auto.tfvars`** (`git_bridge_password`, the one Tofu variable with no default). Idempotent, never clobbers. The single root of trust. | Once per environment (or restore the backup instead). |
-| `seal-secrets.sh` | Regenerate **13 of the 18** committed `SealedSecret` YAMLs from `infra/secrets/`, offline against the cert file. See the gap below. | After a password change, or on a fresh checkout with the restored secret-zero. |
+| `seal-secrets.sh` | Regenerate **14 of the 18** committed `SealedSecret` YAMLs from `infra/secrets/`, offline against the cert file. See the gap below. | After a password change, or on a fresh checkout with the restored secret-zero. |
 
 **Flow:** `secret-zero.sh` → `tofu apply` (installs the pinned key into the
 controller) → `seal-secrets.sh` → commit the SealedSecrets → Argo applies them →
 the controller decrypts them in-cluster.
 
-> **The rule above is not yet true.** `seal-secrets.sh` does not cover
-> `k8s/manifests/data/base/sealedsecret-minio.yaml` (CNPG backups) nor the four
-> under `k8s/manifests/tekton-ci/base/` (`dockerconfig`, `git-basic-auth`,
-> `gitea-admin`, `webhook-secret` — the whole CI loop), and nothing tracked
-> generates `infra/secrets/webhook-secret.env`. On a fork those five stay
-> encrypted to the upstream key and must be re-sealed by hand with `kubeseal`.
-> Until the script covers all eighteen, "git + `infra/secrets/`" rebuilds the
-> application but not the CI or the backups.
+> **The rule above is not yet fully true.** Four `SealedSecret`s still have no
+> generator, all under `k8s/manifests/tekton-ci/base/`: `dockerconfig`
+> (registry push), `git-basic-auth` (clone/push), `gitea-admin` (the
+> webhook-creating Job) and `webhook-secret` (the HMAC check) — i.e. the whole
+> CI loop. Nothing tracked generates `infra/secrets/webhook-secret.env` either.
+> On a fork those four stay encrypted to the upstream key and must be re-sealed
+> by hand with `kubeseal`. So today "git + `infra/secrets/`" rebuilds the
+> application **and** the database backups, but not the CI.
+>
+> Closing it properly means generating the webhook secret in `secret-zero.sh`
+> and deriving the other three from `git_bridge_username`/`git_bridge_password`
+> — a change that rewrites live CI credentials, so it wants its own pass with a
+> pipeline run to verify, not a drive-by.
 
 ## Git repos (GitOps bridge)
 

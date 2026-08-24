@@ -28,6 +28,7 @@ Conventions:
 - **`seeds`** maps providers' own category strings to ours. Bootstrap-only —
   never consulted at runtime, by design.
 - There is **no `sources.yaml`**: the source registry is code — each parser
-  module carries its own detection markers (see CONTRIBUTING, "Add a source").
+  module carries its own detection markers (see CONTRIBUTING, "Add a new
+  source/bank").
 - Infrastructure endpoints and secrets do **not** belong here: those stay in
   env vars / Secrets. This directory is behavior, not wiring.

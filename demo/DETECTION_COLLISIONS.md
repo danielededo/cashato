@@ -11,7 +11,11 @@ the contributor checklist in CONTRIBUTING; the synthetic files under
 ## How detection works
 
 `src/cashato/parsers/detect.py` extracts a lowercased "head text" (CSV: first
-4096 bytes; PDF: **page 1 text only**; XLSX/XLS: first 25 rows via openpyxl).
+4096 bytes; PDF: **page 1 text only**; XLSX: the first 26 rows via openpyxl —
+`_xlsx_head` breaks on `i > max_rows` with `max_rows=25`, so indices 0–25.
+`.xls` is not read at all: `head_text` handles only those three suffixes and
+returns `None` for anything else, deliberately, since uploads reject the legacy
+binary format outright).
 A source matches if, for ANY of its `DETECTION` groups, ALL markers in that
 group appear in the head text. **Every source is scored and the most specific
 match wins** (specific = matched more markers); a tie at the top is reported
@@ -50,8 +54,10 @@ those banks).
 3. **Widiba XLSX** — the real export title is `Lista Movimenti` (per its
    ofxstatement plugin).
 4. **Webank ".xls"** — the real header contains `Data Contabile`. (The file is
-   actually an HTML table with an .xls extension; openpyxl throws and the head
-   text is `None`, so it escapes for a second, accidental reason.)
+   actually an HTML table with an .xls extension, but that never comes up:
+   `head_text` does not handle `.xls` at all and returns `None` before anything
+   is parsed. openpyxl is never invoked, so this one escapes for a second,
+   structural reason — and `allowed_extensions` would reject the upload anyway.)
 5. **Near-miss class — word-pair groups like `["operazione", "importo"]`.**
    Several real Italian exports carry one of the two words in the header and
    can pick up the other from any CELL in the head window: UniCredit format-2

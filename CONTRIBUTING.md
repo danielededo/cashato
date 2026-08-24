@@ -61,10 +61,29 @@ The design is built so adding a bank touches **one adapter module**, nothing els
      more specific matches, and the misroute is invisible: the wrong parser
      simply finds no table. Prefer the bank's own name, a product name, or a
      string unique to its export (`demo/DETECTION_COLLISIONS.md` is the worked
-     example);
-   - `CURRENCY` — e.g. `"EUR"`.
+     example).
 
-   and, optionally, the account holder (shown as the greeting on the home page):
+   Those two are all `registry.py` actually requires to register a module.
+   `CURRENCY` (e.g. `"EUR"`) is read by nothing outside your own adapter, so
+   declare it for symmetry with the existing three, not because the loader
+   needs it.
+
+   Then the optional hooks — all auto-wired by `hasattr`, so adding one is the
+   whole integration. **The two that matter most are easy to skip and cost you
+   real features:**
+   - `extract_accounts(path) -> list[base.AccountInfo]` — what the document says
+     about the accounts it covers (bank, product, joint/individual, IBAN).
+     Without it your source shows up on the Accounts page as a bare id, with no
+     bank name and no composed display name;
+   - `extract_balances(path) -> list[base.BalanceAnchor]` — the balances the
+     document itself declares (a per-row running balance, or opening/closing
+     lines). These are the **only** ground truth for "did the parser lose a
+     row": reconciliation sums the movements between two anchors and compares.
+     Without it your adapter is unverifiable, and `/reconciliation` and
+     `/coverage` have nothing to say about it. Also declare each anchor's
+     `basis` — which of the two dates that source's balances follow.
+
+   And the account holder (shown as the greeting on the home page):
    - `extract_holder(path) -> str | None` — usually a one-liner over
      `base.addressee_from_words(pdf.pages[0].extract_words())`, which anchors on
      the CAP line of the addressee block. Return `None` for formats that carry no

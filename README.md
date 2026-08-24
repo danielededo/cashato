@@ -51,6 +51,7 @@ flowchart LR
         W["etl-worker"]
         C["categorizer<br/>(KServe model)"]
         NATS[("NATS<br/>JetStream")]
+        OBJ[("MinIO<br/>stored statements")]
         subgraph pg["PostgreSQL (medallion)"]
             B[("bronze<br/>raw files")]
             S[("silver<br/>transactions")]
@@ -59,15 +60,20 @@ flowchart LR
     end
     SPA -->|"upload / feedback"| GW --> IN
     SPA -->|"analytics"| GW --> Q
+    IN -->|"store the file"| OBJ
     IN -->|"ingest.jobs"| NATS --> W
-    IN --> B
+    OBJ -->|"fetch to parse"| W
+    W -->|"register the file"| B
     W -->|"detect → parse → dedup"| S
     W -->|"recategorize event"| NATS --> C --> S
     S --> G --> Q
 ```
 
-Every write goes through `ingest-api` + NATS; `query-api` is **read-only over
-gold** (enforced by its DB role, not just convention).
+`ingest-api` only stores the file and enqueues a job; the **etl-worker** is what
+writes `bronze.raw_files` and silver, fetching the stored statement back from
+MinIO to parse it. That hop is why re-processing needs no raw-row landing table:
+the retained file plus its sha256 is the record. `query-api` is **read-only over
+gold**, enforced by its DB role rather than by convention.
 
 ## Prerequisites
 
@@ -107,8 +113,9 @@ The DB URL is configurable via `DATABASE_URL` (default
 `postgresql+psycopg://cashato:cashato@localhost:5432/cashato`).
 
 **No statements at hand?** The repo ships a fully synthetic demo dataset
-(persona *Mario Bianchi* — see [`demo/`](demo/README.md)) covering every
-supported format:
+(persona *Mario Bianchi* — see [`demo/`](demo/README.md)) covering every source
+and every format but one — there is no sample of the Intesa 13-month **PDF**
+export, only its XLSX twin:
 
 ```bash
 ./.venv/bin/cashato-load --source revolut demo/revolut_consolidated_statement.csv
@@ -269,9 +276,14 @@ flowchart LR
     KS --> CG["categorizer service"]
 ```
 
-A retrain promotes the challenger to `@champion` only if it beats the incumbent
-on the holdout — a bad retrain never regresses serving (see
-[`scripts/`](scripts/README.md)).
+A **registered** retrain promotes the challenger to `@champion` only if it
+matches or beats the incumbent's macro-F1 on the holdout, so a bad retrain never
+regresses serving (see [`scripts/`](scripts/README.md)). `models/latest.joblib`
+— what the batch recategorize applies — follows the same verdict: it is written
+when a challenger is promoted and **left untouched when one is rejected**, so a
+refused model cannot sneak into the batch path behind the registry's back. An
+unregistered run writes it too, deliberately: with no registry to arbitrate,
+that run's model *is* the local model.
 
 ### External / manual steps (tracked for reproducibility)
 
@@ -287,19 +299,32 @@ tar --zstd -xf ~/.local/ollama.tar.zst -C ~/.local   # or decompress via `python
 export PATH="$HOME/.local/bin:$PATH" && ollama serve &
 ```
 
-**2. Pull the model**: `ollama pull qwen2.5:3b` — **3. Verify**: `curl http://localhost:11434/api/tags`.
+**2. Pull the model**: `ollama pull qwen2.5:7b` — **3. Verify**: `curl http://localhost:11434/api/tags`.
+(`7b` is the code default and the recommendation; `--model`/`OLLAMA_MODEL`
+overrides it. A smaller one labels faster and worse, which for the long tail is
+the wrong trade.)
 
 > Ollama runs **locally**; no data leaves the machine.
 
 ### Run the ML pipeline
 
+The training and recategorize steps need the **`train` extra** — `sklearn`,
+`joblib`, `sentence-transformers` — which the quick-start venv does not have:
+
 ```bash
-./.venv/bin/python -m cashato.ml.label_llm --model qwen2.5:3b --limit 1000 # label the long tail
+./.venv/bin/pip install -e '.[svc,migrate,dev,train]'                      # + the ML deps
+./.venv/bin/python -m cashato.ml.label_llm --limit 1000                    # label the long tail
 ./.venv/bin/python -m cashato.ml.train --include-rules --stamp "$(date +%Y%m%d-%H%M)" # train the embedding kNN
-./.venv/bin/python -m cashato.ml.recategorize                                # apply + measure `other` drop
+./.venv/bin/python -m cashato.ml.recategorize                              # apply + measure `other` drop
 ```
 
-Metrics are tracked with **MLflow** if installed, otherwise the step is skipped.
+**MLflow tracking is opt-in, not automatic.** Without `--register`, `train`
+writes `models/latest.joblib` and nothing else: no run is logged, no version is
+created, and no promotion gate runs at all. Add `--register` to log the metrics
+and register a version; promotion is then governed by `--promote`, whose
+`if-better` default keeps the incumbent unless the challenger's macro-F1 is
+**greater than or equal to** the champion's — a tie promotes the newer model.
+`--promote always` skips the comparison.
 
 ## Development
 

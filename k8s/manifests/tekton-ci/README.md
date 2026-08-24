@@ -71,7 +71,7 @@ The CI builds **3 images** backing **7 workloads** across 2 namespaces:
 | Built image | Dockerfile | Consumed by | Namespace |
 |-------------|-----------|-------------|-----------|
 | **`cashato/svc`** | `docker/Dockerfile.svc` | `ingest-api`, `etl-worker`, `query-api`, `categorizer` (Deployments) | `cashato` |
-| **`cashato/migrate`** | `docker/Dockerfile.migrate` | `migration-job`, `grant-job` (Jobs) | `cashato-data` |
+| **`cashato/migrate`** | `docker/Dockerfile.migrate` | the `db-migrate` and `db-grants` Jobs (defined in `migration-job.yaml` / `grant-job.yaml`) | `cashato-data` |
 | **`cashato/frontend`** | `docker/Dockerfile.frontend` | `frontend` (Deployment, nginx) | `cashato` |
 
 > Out of CI scope (built manually via `scripts/build-images.sh`): the heavy
@@ -107,4 +107,5 @@ daily at 13:30).
 | `base/pipeline.yaml` | the `cashato-ci` Pipeline (DAG above) |
 | `base/triggerbinding.yaml` · `triggertemplate.yaml` · `eventlistener.yaml` | Tekton Triggers (build-on-push) |
 | `base/webhook-job.yaml` | Argo Sync-hook that ensures the Gitea webhook |
+| `base/kustomization.yaml` | assembles the above |
 | `overlays/kind/` | environment overlay |
