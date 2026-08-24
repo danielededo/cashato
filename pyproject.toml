@@ -74,12 +74,12 @@ predict = [
 ]
 # dev/CI tooling (installed alongside .[svc] for lint/type/test).
 dev = [
-    "ruff==0.8.4",
-    "mypy==1.14.0",
-    "pre-commit==4.0.1",
-    "types-PyYAML==6.0.12.20240917",
-    "types-python-dateutil==2.9.0.20241206",
-    "pytest==8.3.4",
+    "ruff==0.16.4",
+    "mypy==2.3.1",
+    "pre-commit==4.6.2",
+    "types-PyYAML==6.0.12.20260815",
+    "types-python-dateutil==2.9.0.20260807",
+    "pytest==9.1.1",
     # demo/generate.py renders the synthetic statement PDFs with it
     "fpdf2==2.8.2",
 ]
