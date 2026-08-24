@@ -10,6 +10,22 @@ React + Vite + TypeScript single-page app, served by a hardened nginx behind
 the Envoy Gateway at `/`. The APIs live under `/api/v1` on the **same origin**
 (the gateway path-splits), so the app only ever calls relative URLs.
 
+**Reach it through the gateway, never through the frontend Service.** Because
+nginx here knows nothing about `/api/v1`, its SPA fallback answers those paths
+with `index.html` — so a port-forward straight to `svc/frontend` loads the app
+and then fails every call with `Unexpected token '<', "<!doctype "... is not
+valid JSON`. That is the SPA fallback doing its job on a request that was never
+supposed to arrive. On the cluster:
+
+```bash
+kubectl -n envoy-gateway-system port-forward \
+  svc/envoy-cashato-gateway-cashato-e2465115 8080:80   # then http://localhost:8080
+```
+
+The Gateway listener pins `hostname: localhost` (a DNS-rebinding guard), so
+requests carrying any other Host get a 404 from Envoy — including a plain
+`curl` to the LB IP, which needs `-H 'Host: localhost'`.
+
 Because the gateway does that split, the image ships **no** API proxy —
 `nginx.conf` serves static files and the SPA fallback, nothing else. It does
 carry a wildcard `include /etc/nginx/api-proxy/*.conf`, which matches nothing in

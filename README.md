@@ -92,11 +92,29 @@ not variants of it. Nothing forces you up the ladder.
 |---|---|---|
 | **1. CLI** | statements in, categorized CSV out | a venv + one Postgres container ([quick start](#quick-start)) |
 | **2. Compose** | the whole app: upload, dashboard, review, wealth | `docker compose up` ([below](#full-app-on-your-laptop)) |
-| **3. Kubernetes** | + GitOps, CI/CD, MLflow/KServe, LGTM observability | kind + OpenTofu ([`infra/`](infra/README.md), [`k8s/`](k8s/README.md)) |
+| **3. Kubernetes** | + GitOps, CI/CD, MLflow/KServe, LGTM observability | kind + OpenTofu; ~10 GB RAM, 62 images to pull ([`infra/`](infra/README.md), [`k8s/`](k8s/README.md)) |
 
 The ML model is optional at every rung: the resolver falls back from MCC codes
 to bilingual rules to `other`, so categorization works before you train
 anything.
+
+> **Adding your own bank? You need rung 1, and nothing above it.** Python, and
+> one statement of your own. Write `src/cashato/parsers/<yourbank>.py`, add one
+> line to `_BY_SOURCE` in `parsers/merchant.py`, run `make test`, then run
+> `tests/verify_<yourbank>.py` against your real file to see whether the parsed
+> sums match the totals the document itself declares. No Kubernetes, no Argo, no
+> Gitea — the badges above describe where this project *can* run, not what it
+> costs to contribute to. Full contract in
+> [CONTRIBUTING](CONTRIBUTING.md#add-a-new-sourcebank-for-forks--contributors).
+
+Rung 3 provisions a platform rather than an application, and its requirements
+reflect that: 83 pods across 22 namespaces, 62 distinct images from six
+registries, eight pinned third-party Helm charts. Two consequences worth
+stating up front. It rewards reading as much as running — `infra/` and `k8s/`
+document a complete offline GitOps loop and are useful to study without
+applying anything. And its third-party chart pins age faster than the code:
+the Tekton operator already required migration once, when its registry was
+retired.
 
 ## Quick start
 
