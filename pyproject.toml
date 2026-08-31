@@ -66,7 +66,7 @@ train = [
 ]
 # predict image: KServe custom predictor (torch via Dockerfile).
 predict = [
-    "kserve==0.15.0",
+    "kserve==0.20.0",
     "scikit-learn==1.6.0",
     "joblib==1.4.2",
     "mlflow==2.19.0",
