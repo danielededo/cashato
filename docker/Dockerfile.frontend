@@ -16,7 +16,7 @@ RUN npm run build   # tsc --noEmit + vite build → /app/dist (the CI compile ga
 # (writable dirs are mounted as emptyDir in the Deployment securityContext).
 # Fully-qualified: buildah runs short-name-mode=enforcing (unlike docker) and can't
 # resolve a namespaced short name without a TTY.
-FROM docker.io/nginxinc/nginx-unprivileged:1.27-alpine
+FROM docker.io/nginxinc/nginx-unprivileged:1.31-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
