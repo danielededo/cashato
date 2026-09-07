@@ -46,7 +46,7 @@ svc = [
     "uvicorn[standard]==0.34.0",
     "python-multipart==0.0.20",
     "nats-py==2.9.0",
-    "minio==7.2.15",
+    "minio==7.2.20",
     "prometheus-client==0.21.1",
     "prometheus-fastapi-instrumentator==7.0.0",
     "opentelemetry-sdk==1.29.0",
