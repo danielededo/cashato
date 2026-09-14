@@ -44,7 +44,7 @@ svc = [
     "openpyxl==3.1.5",
     "fastapi==0.115.6",
     "uvicorn[standard]==0.34.0",
-    "python-multipart==0.0.20",
+    "python-multipart==0.0.32",
     "nats-py==2.9.0",
     "minio==7.2.15",
     "prometheus-client==0.21.1",
