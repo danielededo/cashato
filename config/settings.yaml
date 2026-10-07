@@ -15,6 +15,11 @@ categorization:
   # embedding model used by the classifier (sentence-transformers)
   embed_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
   knn_k: 5
+  # offline labeling (label_llm): a model-resolved row whose kNN vote margin
+  # — the winner's lead as a share of the whole vote — is below this is
+  # re-asked to the LLM, however high its confidence. With k=5, 4-1 scores
+  # ~0.6 and 3-2 ~0.2, so 0.5 means "fewer than four of five neighbors agreed".
+  escalate_margin: 0.5
 
 transfers:
   # date window (days) to match an internal transfer between own accounts

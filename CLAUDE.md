@@ -166,7 +166,10 @@ boilerplate where every wire transfer looks alike and the distinguishing word
 `config/categories.yaml` (add a language = add a key, no code change). Native
 categories are at most an opt-in training-bootstrap signal, off by default.
 
-**ML flow (offline, local):** Ollama (host, GPU) labels the long tail →
+**ML flow (offline, local):** Ollama (host, GPU) labels the long tail *and* the
+rows the kNN resolved on a split vote (`Prediction.margin` below
+`categorization.escalate_margin`, most contested first — a wrong answer above
+the threshold never reaches the long-tail queue on its own) →
 `gold.training_labels` → `EmbeddingKNN` trained → recategorize. Ollama is
 **not** in-cluster (labeling-time only). On the platform: MLflow (registry,
 + MinIO) + KServe (serving); a separate **categorizer** service does model

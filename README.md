@@ -344,7 +344,7 @@ The training and recategorize steps need the **`train` extra** — `sklearn`,
 
 ```bash
 ./.venv/bin/pip install -e '.[svc,migrate,dev,train]'                      # + the ML deps
-./.venv/bin/python -m cashato.ml.label_llm --limit 1000                    # label the long tail
+./.venv/bin/python -m cashato.ml.label_llm --limit 1000                    # label the long tail + the kNN's split votes
 ./.venv/bin/python -m cashato.ml.train --include-rules --stamp "$(date +%Y%m%d-%H%M)" # train the embedding kNN
 ./.venv/bin/python -m cashato.ml.recategorize                              # apply + measure `other` drop
 ```
